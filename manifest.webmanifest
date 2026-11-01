@@ -4,8 +4,8 @@
   "start_url": "./editor/",
   "scope": "./",
   "display": "standalone",
-  "theme_color": "#101b2e",
-  "background_color": "#101b2e",
+  "theme_color": "#185BE8",
+  "background_color": "#185BE8",
   "icons": [
     {
       "src": "icon.svg",
