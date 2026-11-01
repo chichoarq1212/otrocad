@@ -1,7 +1,7 @@
 (()=>{
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
-let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6;
+let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1;
 const colors={General:'#dce8f5',Muros:'#56b7e8',Cotas:'#f3c83e',Detalles:'#c69cff',Topografía:'#70d6a3',Vialidad:'#ff9b6b'};
 const clone=x=>JSON.parse(JSON.stringify(x));
 function checkpoint(){undo.push(clone(objects));if(undo.length>100)undo.shift();redo=[]}
@@ -30,11 +30,12 @@ function snapPoint(p){
  return q;
 }
 function constrain(p){
- if(!start)return p;
- let dx=p.x-start.x,dy=p.y-start.y;
+ const base=tool==='poly'&&poly.length?poly[poly.length-1]:start;
+ if(!base)return p;
+ let dx=p.x-base.x,dy=p.y-base.y;
  if(orthoOn){if(Math.abs(dx)>=Math.abs(dy))dy=0;else dx=0}
  else if(polarOn){const len=Math.hypot(dx,dy),a=Math.round(Math.atan2(dy,dx)/(Math.PI/12))*(Math.PI/12);dx=len*Math.cos(a);dy=len*Math.sin(a)}
- return round({x:start.x+dx,y:start.y+dy});
+ return round({x:base.x+dx,y:base.y+dy});
 }
 function arcParams(points){if(!points||points.length<3)return null;const p=points.map(screen),[a,b,c]=p;const d=2*(a.x*(b.y-c.y)+b.x*(c.y-a.y)+c.x*(a.y-b.y));if(Math.abs(d)<1e-6)return null;const aa=a.x*a.x+a.y*a.y,bb=b.x*b.x+b.y*b.y,cc=c.x*c.x+c.y*c.y;const x=(aa*(b.y-c.y)+bb*(c.y-a.y)+cc*(a.y-b.y))/d,y=(aa*(c.x-b.x)+bb*(a.x-c.x)+cc*(b.x-a.x))/d;const a1=Math.atan2(a.y-y,a.x-x),am=Math.atan2(b.y-y,b.x-x),a3=Math.atan2(c.y-y,c.x-x),span=v=>(v+Math.PI*2)%(Math.PI*2),ccw=span(a3-a1),mid=span(am-a1);return{x,y,r:Math.hypot(a.x-x,a.y-y),a1,a3,anticlockwise:mid>ccw}}
 function drawEntity(s,sel=false,preview=false){
@@ -82,7 +83,17 @@ function render(){
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
 function setTool(t){tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;selected=-1;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));updatePrompt();render()}
-function selectAt(q){let found=-1,best=14/zoom;for(let i=objects.length-1;i>=0;i--){const s=objects[i];let d=1e9;if(s.type==='poly'||s.type==='polygon'){for(let j=0;j<s.pts.length;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[(j+1)%s.pts.length]))}else if(s.type==='rect'||s.type==='hatch'||s.type==='ellipse'){if(q.x>=Math.min(s.a.x,s.b.x)-best&&q.x<=Math.max(s.a.x,s.b.x)+best&&q.y>=Math.min(s.a.y,s.b.y)-best&&q.y<=Math.max(s.a.y,s.b.y)+best)d=0}else if(s.type==='circle')d=Math.abs(distance(q,s.a)-distance(s.a,s.b));else if(s.a&&s.b)d=pointLineDistance(q,s.a,s.b);if(d<best){best=d;found=i}}return found}
+function selectAt(q){
+ let found=-1,best=14/zoom;
+ for(let i=objects.length-1;i>=0;i--){const s=objects[i];let d=1e9;
+  if(s.type==='poly'||s.type==='polygon'){const count=s.pts.length-1+(s.type==='polygon'?1:0);for(let j=0;j<count;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[(j+1)%s.pts.length]))}
+  else if(s.type==='rect'||s.type==='hatch'||s.type==='ellipse'){if(q.x>=Math.min(s.a.x,s.b.x)-best&&q.x<=Math.max(s.a.x,s.b.x)+best&&q.y>=Math.min(s.a.y,s.b.y)-best&&q.y<=Math.max(s.a.y,s.b.y)+best)d=0}
+  else if(s.type==='circle')d=Math.abs(distance(q,s.a)-distance(s.a,s.b));
+  else if(s.a&&s.b)d=pointLineDistance(q,s.a,s.b);
+  if(d<best){best=d;found=i}
+ }
+ return found
+}
 function pointLineDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
 function showProperties(){
  const box=$('#properties'),content=$('#propContent');
@@ -110,16 +121,43 @@ function commitEntity(endPoint){
  save();selected=objects.length-1;start=null;temp=null;render();updatePrompt();
 }
 function finishPoly(){if(poly.length>1){checkpoint();objects.push({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)});save()}poly=[];start=null;temp=null;render();updatePrompt();status.textContent='Polilínea terminada'}
-function doOffset(q){if(selected<0){selected=selectAt(q);if(selected<0){status.textContent='Selecciona una entidad para OFFSET';return}status.textContent='Indica distancia de desfase';return}
- const s=objects[selected],d=Number($('#dynLen').value||1);if(!Number.isFinite(d)||d<=0){status.textContent='Introduce una distancia positiva';return}checkpoint();
- if(s.type==='line'){const dx=s.b.x-s.a.x,dy=s.b.y-s.a.y,L=Math.hypot(dx,dy)||1;const side=((q.x-s.a.x)*(-dy/L)+(q.y-s.a.y)*(dx/L))>=0?1:-1;const ox=-dy/L*d*side,oy=dx/L*d*side;objects.push({type:'line',a:{x:s.a.x+ox,y:s.a.y+oy},b:{x:s.b.x+ox,y:s.b.y+oy},layer:s.layer})}
- else if(s.type==='circle'){const r=distance(s.a,s.b),newR=r+(distance(q,s.a)>r?d:-d);if(newR>0)objects.push({type:'circle',a:clone(s.a),b:{x:s.a.x+newR,y:s.a.y},layer:s.layer})}
- else if(s.type==='rect'){const cx=(s.a.x+s.b.x)/2,cy=(s.a.y+s.b.y)/2,expand=distance(q,{x:cx,y:cy})>Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y)/2?d:-d;objects.push({type:'rect',a:{x:s.a.x-expand,y:s.a.y-expand},b:{x:s.b.x+expand,y:s.b.y+expand},layer:s.layer})}
- else {status.textContent='OFFSET para este tipo de entidad aún no disponible';return}
+function doOffset(q){
+ if(selected<0){
+  selected=selectAt(q);
+  if(selected<0){status.textContent='Selecciona una entidad para OFFSET';return}
+  const raw=prompt('Distancia de desfase','1');
+  if(raw===null){selected=-1;return}
+  const d=Number(raw);if(!Number.isFinite(d)||d<=0){selected=-1;status.textContent='Introduce una distancia positiva';return}
+  offsetDistance=d;status.textContent='Indica el lado del desfase';return;
+ }
+ const s=objects[selected],d=offsetDistance,style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype};
+ checkpoint();
+ if(s.type==='line'){
+  const dx=s.b.x-s.a.x,dy=s.b.y-s.a.y,L=Math.hypot(dx,dy)||1;
+  const side=((q.x-s.a.x)*(-dy/L)+(q.y-s.a.y)*(dx/L))>=0?1:-1,ox=-dy/L*d*side,oy=dx/L*d*side;
+  objects.push({type:'line',a:{x:s.a.x+ox,y:s.a.y+oy},b:{x:s.b.x+ox,y:s.b.y+oy},...style});
+ }else if(s.type==='circle'){
+  const r=distance(s.a,s.b),newR=r+(distance(q,s.a)>r?d:-d);
+  if(newR>0)objects.push({type:'circle',a:clone(s.a),b:{x:s.a.x+newR,y:s.a.y},...style});
+ }else if(s.type==='rect'){
+  const cx=(s.a.x+s.b.x)/2,cy=(s.a.y+s.b.y)/2,expand=distance(q,{x:cx,y:cy})>Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y)/2?d:-d;
+  if(Math.abs(s.b.x-s.a.x)>2*Math.abs(expand)&&Math.abs(s.b.y-s.a.y)>2*Math.abs(expand))objects.push({type:'rect',a:{x:s.a.x-expand,y:s.a.y-expand},b:{x:s.b.x+expand,y:s.b.y+expand},...style});
+ }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
  save();selected=objects.length-1;render();status.textContent='OFFSET creado';
 }
 function handleTap(p){
  let q=snapPoint(world(p));q=constrain(q);
+ if(tool==='arc'){
+  arcPoints.push(q);
+  if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();selected=objects.length-1;arcPoints=[];status.textContent='Arco creado';}
+  else status.textContent='Arco: marca el '+(arcPoints.length===1?'segundo':'tercer')+' punto';
+  render();return;
+ }
+ if(tool==='leader'){
+  if(!start){start=q;temp={type:'line',a:clone(q),b:clone(q),...currentStyle($('#layer').value)};status.textContent='Marca el extremo de la directriz';render();return}
+  const label=prompt('Texto de la directriz','');
+  checkpoint();objects.push({type:'leader',a:clone(start),b:clone(q),text:label||'',...currentStyle($('#layer').value)});save();selected=objects.length-1;start=null;temp=null;render();status.textContent='Directriz creada';return;
+ }
  if(tool==='select'){selected=selectAt(q);showProperties();render();return}
  if(tool==='pan'){return}
  if(tool==='offset'){doOffset(q);return}
@@ -151,6 +189,7 @@ canvas.addEventListener('pointermove',e=>{
  if(drag&&tool==='pan'){offset.x=drag.offset.x+p.x-drag.point.x;offset.y=drag.offset.y+p.y-drag.point.y;render();return}
  if(selectionStart){selectionBox={a:selectionStart,b:p};render();return}
  if(tool==='poly'&&poly.length){const q=constrain(snapPoint(world(p)));temp={type:'line',a:clone(poly[poly.length-1]),b:q,...currentStyle($('#layer').value)};render()}
+ else if(tool==='arc'&&arcPoints.length){const q=snapPoint(world(p));temp={type:'line',a:clone(arcPoints[arcPoints.length-1]),b:q,...currentStyle($('#layer').value)};render()}
  else if(start){let q=constrain(snapPoint(world(p)));temp={type:tool,a:clone(start),b:q,...currentStyle($('#layer').value)};render()}
  else render();
 });
@@ -179,19 +218,19 @@ document.addEventListener('keydown',e=>{
 });
 const aliases={L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select'};
 function parseCoordinate(raw,base){
- const s=raw.trim().replace(/\\s+/g,'');let m;
- if((m=s.match(/^@?(-?\\d+(?:[.,]\\d+)?),(-?\\d+(?:[.,]\\d+)?)$/))){const x=Number(m[1].replace(',','.')),y=Number(m[2].replace(',','.'));return s.startsWith('@')?{x:base.x+x,y:base.y+y}:{x,y}}
- if((m=s.match(/^@?(-?\\d+(?:[.,]\\d+)?)<(-?\\d+(?:[.,]\\d+)?)$/))){const len=Number(m[1].replace(',','.')),ang=Number(m[2].replace(',','.'))*Math.PI/180;return {x:base.x+len*Math.cos(ang),y:base.y+len*Math.sin(ang)}}
+ const s=raw.trim().replace(/\s+/g,'');let m;
+ if((m=s.match(/^@?(-?\d+(?:[.,]\d+)?),(-?\d+(?:[.,]\d+)?)$/))){const x=Number(m[1].replace(',','.')),y=Number(m[2].replace(',','.'));return s.startsWith('@')?{x:base.x+x,y:base.y+y}:{x,y}}
+ if((m=s.match(/^@?(-?\d+(?:[.,]\d+)?)<(-?\d+(?:[.,]\d+)?)$/))){const len=Number(m[1].replace(',','.')),ang=Number(m[2].replace(',','.'))*Math.PI/180;return {x:base.x+len*Math.cos(ang),y:base.y+len*Math.sin(ang)}}
  return null;
 }
 function runCommand(raw){
  const textValue=raw.trim(),upper=textValue.toUpperCase(),coordinate=parseCoordinate(textValue,start||{x:0,y:0});
- if(coordinate&&(/^[+-]?(?:\\d|\\.)/.test(textValue)||textValue.startsWith('@'))){
+ if(coordinate&&(/^[+-]?(?:\d|\.)/.test(textValue)||textValue.startsWith('@'))){
   if(!start){start=round(coordinate);temp={type:tool,a:clone(start),b:clone(start),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Punto inicial fijado · introduce el siguiente punto';}
   else commitEntity(round(coordinate));
   return;
  }
- const c=upper.split(/\\s+/)[0];if(!c)return;
+ const c=upper.split(/\s+/)[0];if(!c)return;
  if(c==='F7'||c==='GRID'){toggle('gridToggle');return}if(c==='F8'||c==='ORTHO'){toggle('orthoToggle');return}if(c==='F9'||c==='SNAP'){toggle('snapToggle');return}if(c==='F10'||c==='POLAR'){toggle('polarToggle');return}if(c==='F3'||c==='OSNAP'){toggle('osnapToggle');return}
  if(c==='U'||c==='UNDO'){$('#undo').click();return}if(c==='REDO'){$('#redo').click();return}
  if(c==='HP'||c==='DSETTINGS'||c==='SETTINGS'){alert('CONFIGURACIÓN DE DIBUJO\\nF7 Rejilla: '+(gridOn?'ACTIVA':'INACTIVA')+'\\nF8 Orto: '+(orthoOn?'ACTIVO':'INACTIVO')+'\\nF9 Snap: '+(snapOn?'ACTIVO':'INACTIVO')+'\\nF10 Polar: '+(polarOn?'ACTIVO':'INACTIVO')+'\\nF3 Referencias: '+(osnapOn?'ACTIVAS':'INACTIVAS'));return}
