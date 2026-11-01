@@ -205,9 +205,8 @@ function handleTap(p){
  if(['move','copy','rotate','mirror','scale'].includes(tool)){
   if(modifyTargets.length===0){
    modifyTargets=selectedItems();
-   if(!modifyTargets.length){const hit=selectAt(q);if(hit>=0){applySelection([hit]);modifyTargets=[hit]}}
+   if(!modifyTargets.length){const hit=selectAt(q);if(hit>=0){applySelection([hit]);modifyTargets=[hit];status.textContent='Objeto seleccionado. Indica punto base';return}}
    if(!modifyTargets.length){status.textContent='Selecciona uno o varios objetos';return}
-   moveBase=null;status.textContent=modifyTargets.length+' objeto(s) seleccionado(s). Indica punto base';return
   }
   if(!moveBase){moveBase=q;status.textContent=tool==='mirror'?'Indica el segundo punto del eje':tool==='rotate'?'Indica el ángulo de giro':tool==='scale'?'Indica el factor de escala con la distancia':'Indica punto destino';return}
   const dx=q.x-moveBase.x,dy=q.y-moveBase.y,targets=modifyTargets.filter(i=>i>=0&&i<objects.length);
