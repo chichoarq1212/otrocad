@@ -187,7 +187,7 @@ public class CadView extends View {
         if(tool.equals("LINE")||tool.equals("RECT")||tool.equals("CIRCLE")||tool.equals("DIM")||tool.equals("HATCH")||tool.equals("LEADER")||tool.equals("ELLIPSE")){
             if(anchor==null){anchor=q;cursor=q;invalidate();say("Marca el punto final");}else{addEntity(tool,anchor,q);}return;
         }
-        if(tool.equals("OFFSET")){if(selectedIndices().isEmpty()){int h=hit(q);if(h>=0)setSelection(Arrays.asList(h));say(selected<0?"Selecciona una línea o círculo":"Seleccionado · introduce distancia en CMD");invalidate();return;}offsetSelected(offsetDistance,q);return;}
+        if(tool.equals("OFFSET")){if(selectedIndices().isEmpty()){int h=hit(q);if(h>=0)setSelection(Arrays.asList(h));say(selected<0?"Selecciona una línea o círculo":"Seleccionado · introduce distancia en CMD");invalidate();return;}if(selectedIndices().size()>1){say("OFFSET nativo opera una entidad por vez");return;}offsetSelected(offsetDistance,q);return;}
         if(tool.equals("PAN")){panLast=q;return;}
         say("Herramienta aún no disponible en esta versión nativa");
     }
