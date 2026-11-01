@@ -50,7 +50,9 @@ public class MainActivity extends Activity {
         browser.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if ("https".equals(uri.getScheme()) && "otrocad.ficti-ia3ec.chatgpt.site".equals(uri.getHost())) return false;
+                boolean siteHost = "otrocad.ficti-ia3ec.chatgpt.site".equals(uri.getHost());
+                boolean cdnApp = "cdn.jsdelivr.net".equals(uri.getHost()) && uri.getPath() != null && uri.getPath().startsWith("/gh/chichoarq1212/otrocad@main/");
+                if ("https".equals(uri.getScheme()) && (siteHost || cdnApp)) return false;
                 try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); } catch (ActivityNotFoundException ignored) { }
                 return true;
             }
@@ -65,7 +67,7 @@ public class MainActivity extends Activity {
             }
         });
         browser.setDownloadListener((url, agent, disposition, mime, size) -> Toast.makeText(this, "Guardar archivos aún no está disponible en esta versión Android. Usa OtroCAD en el navegador.", Toast.LENGTH_LONG).show());
-        if (state == null) browser.loadUrl("https://otrocad.ficti-ia3ec.chatgpt.site/editor/");
+        if (state == null) browser.loadUrl("https://cdn.jsdelivr.net/gh/chichoarq1212/otrocad@main/editor/index.html");
         else browser.restoreState(state);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
