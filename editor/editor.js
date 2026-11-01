@@ -423,7 +423,9 @@ function performEnterAction(){
  if(raw){$('#cmd').value='';updateCursorCommand();runCommand(raw);return}
  if(poly.length){finishPoly();return}
  if(start){
-  const q=pointFromInputs()||(temp&&temp.b?round(temp.b):null);
+  let q=pointFromInputs();
+  if(q&&distance(start,q)<=1e-9)q=null;
+  if(!q&&temp&&temp.b&&distance(start,temp.b)>1e-9)q=round(temp.b);
   if(q){commitEntity(q);return}
   status.textContent='Indica el punto final o introduce longitud y ángulo';return;
  }
@@ -551,6 +553,7 @@ function parseCoordinate(raw,base){
 }
 function runCommand(raw){
  const textValue=raw.trim(),upper=textValue.toUpperCase(),parts=upper.split(/\s+/),c=parts[0];if(!c)return;
+ if(!/^[+-]?(?:\d|[.,])/.test(textValue)&&!textValue.startsWith('@')){lastCommand=textValue;try{localStorage.setItem('otrocad-last-command',lastCommand)}catch(e){}}
  if(c==='O'||c==='OFFSET'){const d=Number(parts[1]);if(parts[1]&&Number.isFinite(d)&&d>0){offsetDistance=d;offsetDistancePreset=true}setTool('offset');return}
  const coordinateBase=tool==='arc'&&arcPoints.length?arcPoints[arcPoints.length-1]:(activeAnchor()||{x:0,y:0});
  const coordinate=parseCoordinate(textValue,coordinateBase);
@@ -563,7 +566,6 @@ function runCommand(raw){
   else commitEntity(point);
   return;
  }
- lastCommand=textValue;try{localStorage.setItem('otrocad-last-command',lastCommand)}catch(e){}
  if(c==='F7'||c==='GRID'){toggle('gridToggle');return}if(c==='F8'||c==='ORTHO'){toggle('orthoToggle');return}if(c==='F9'||c==='SNAP'){toggle('snapToggle');return}if(c==='F10'||c==='POLAR'){toggle('polarToggle');return}if(c==='F3'||c==='OSNAP'){toggle('osnapToggle');return}
  if(c==='U'||c==='UNDO'){$('#undo').click();return}if(c==='REDO'){$('#redo').click();return}
  if(c==='HP'||c==='DSETTINGS'||c==='SETTINGS'){showDraftSettings();return}
