@@ -1,1 +1,83 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101b2e"><link rel="manifest" href="manifest.webmanifest"><title>OtroCAD — Tu CAD sin límites</title><style>:root{--n:#101b2e;--y:#f3c83e}*{box-sizing:border-box}body{margin:0;font:16px system-ui;color:#17243a}header{background:var(--n);color:white;display:flex;justify-content:space-between;padding:20px 6%;gap:20px;flex-wrap:wrap}header a{color:white;text-decoration:none}b.accent{color:var(--y)}nav{display:flex;gap:18px;flex-wrap:wrap}.hero{background:var(--n);color:white;padding:75px 7% 95px}.hero h1{font-size:clamp(42px,8vw,88px);line-height:1.05;margin:15px 0}.hero p{max-width:570px;color:#c9d2e0;line-height:1.6}.btn{display:inline-block;background:var(--y);color:var(--n);padding:14px 20px;border-radius:6px;font-weight:800;text-decoration:none;margin:8px 8px 8px 0}.section{padding:60px 7%}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}.card{padding:22px;background:#f2f5f9;border:1px solid #dce2ea;border-radius:8px}footer{background:var(--n);color:white;padding:40px 7%;line-height:1.8}footer a{color:var(--y)}</style></head><body><header><a href="./" style="font-size:26px;font-weight:900">otro<b class="accent">CAD</b></a><nav><a href="#herramientas">Herramientas</a><a href="#instalar">Instalar</a><a href="#creditos">Créditos</a><a href="https://esquechat.com/">ESQUECHAT 3D ↗</a></nav></header><main><section class="hero"><small style="color:var(--y);font-weight:800;letter-spacing:2px">DISEÑA · DIBUJA · CREA</small><h1>Tu CAD,<br>sin límites.</h1><p>Dibujo técnico libre para arquitectura e ingeniería. Diseña desde tu computadora, tablet o Android con una interfaz moderna y herramientas precisas.</p><a class="btn" href="./editor/index.html">Abrir editor CAD →</a><a class="btn" href="#instalar" style="background:white">Instalar aplicación</a><p><small>Versión alfa · Gratuito · Código abierto en preparación</small></p></section><section class="section" id="herramientas"><h2>Herramientas para crear</h2><div class="grid"><div class="card"><h3>Dibujo 2D</h3>Líneas, polilíneas, rectángulos y círculos.</div><div class="card"><h3>Cotas</h3>Mediciones lineales y referencias de dibujo.</div><div class="card"><h3>Hatch</h3>Sombreados diagonales para detalles técnicos.</div><div class="card"><h3>Capas</h3>Organización de objetos y colores por capa.</div></div></section><section class="section" id="instalar" style="background:#e9eef5"><h2>Diseña en cualquier dispositivo</h2><p>Abre el editor en tu navegador o instala la aplicación Android de prueba. El editor admite proyectos propios JSON, DXF y apertura de DWG mediante conversión local en el navegador.</p><a class="btn" href="./editor/">Abrir OtroCAD Web</a><a class="btn" href="https://github.com/chichoarq1212/otrocad/releases/download/android-alpha-0.1.0/app-debug.apk" style="background:#fff">Descargar APK Android</a><a class="btn" href="https://github.com/chichoarq1212/otrocad" style="background:white">Código fuente</a><div class="grid" style="margin-top:18px"><div class="card"><h3>Android</h3>Descarga el APK, permite instalar aplicaciones desde el navegador si Android lo solicita y abre OtroCAD. Requiere conexión a internet.</div><div class="card"><h3>iPhone y iPad</h3>Abre OtroCAD Web en Safari, pulsa Compartir y elige “Añadir a pantalla de inicio”. Se instala como acceso web.</div><div class="card"><h3>Computadora</h3>Abre el editor en Chrome, Edge o Firefox y selecciona Abrir para cargar archivos JSON, DXF o DWG.</div></div><p><small>Versión alfa: el APK Android es una compilación de pruebas firmada en modo debug; no es una versión de tienda ni un CAD profesional terminado.</small></p></section><section class="section"><h2>Del plano al espacio</h2><p>OtroCAD es proyecto hermano de ESQUECHAT 3D, con una misma visión de diseño accesible.</p><a class="btn" href="https://esquechat.com/">Descubrir ESQUECHAT 3D ↗</a></section><section class="section" style="background:#f2f5f9"><h2>Apoya el desarrollo</h2><p>El proyecto busca mantener el acceso gratuito para estudiantes y profesionales. Próximamente se anunciarán los canales oficiales para aportes voluntarios.</p></section></main><footer id="creditos"><strong>OtroCAD</strong> · Arq. Cristhian Torres R., Mgs. · VITTA Online<br>Proyecto hermano: <a href="https://esquechat.com/">ESQUECHAT 3D</a> · <a href="https://github.com/chichoarq1212/otrocad">Código fuente</a><br><small>Versión alfa: verifica siempre las medidas antes de utilizar planos en obra.</small></footer><script>if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});</script></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101b2e">
+<link rel="manifest" href="manifest.webmanifest">
+<title>OtroCAD — Tu CAD sin límites</title>
+<style>
+:root{--n:#101b2e;--y:#f3c83e}
+*{box-sizing:border-box}
+body{margin:0;font:16px system-ui;color:#17243a}
+header{background:var(--n);color:white;display:flex;justify-content:space-between;padding:20px 6%;gap:20px;flex-wrap:wrap}
+header a{color:white;text-decoration:none}
+b.accent{color:var(--y)}
+nav{display:flex;gap:18px;flex-wrap:wrap}
+.hero{background:var(--n);color:white;padding:75px 7% 95px}
+.hero h1{font-size:clamp(42px,8vw,88px);line-height:1.05;margin:15px 0}
+.hero p{max-width:650px;color:#c9d2e0;line-height:1.6}
+.btn{display:inline-block;background:var(--y);color:var(--n);padding:14px 20px;border-radius:6px;font-weight:800;text-decoration:none;margin:8px 8px 8px 0}
+.section{padding:60px 7%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+.card{padding:22px;background:#f2f5f9;border:1px solid #dce2ea;border-radius:8px;line-height:1.55}
+footer{background:var(--n);color:white;padding:40px 7%;line-height:1.8}
+footer a{color:var(--y)}
+</style>
+</head>
+<body>
+<header>
+<a href="./" style="font-size:26px;font-weight:900">otro<b class="accent">CAD</b></a>
+<nav><a href="#herramientas">Herramientas</a><a href="#instalar">Instalar</a><a href="#creditos">Créditos</a><a href="https://esquechat.com/">ESQUECHAT 3D ↗</a></nav>
+</header>
+<main>
+<section class="hero">
+<small style="color:var(--y);font-weight:800;letter-spacing:2px">DISEÑA · DIBUJA · CREA</small>
+<h1>Tu CAD,<br>sin límites.</h1>
+<p>Dibujo técnico para arquitectura e ingeniería. Trabaja desde computadora, tablet o teléfono con herramientas de precisión, edición y anotación.</p>
+<a class="btn" href="./editor/index.html">Abrir editor CAD →</a>
+<a class="btn" href="#instalar" style="background:white">Instalar aplicación</a>
+<p><small>Versión alfa · Proyecto gratuito · Desarrollo abierto</small></p>
+</section>
+<section class="section" id="herramientas">
+<h2>Herramientas para crear</h2>
+<div class="grid">
+<div class="card"><h3>Dibujo 2D</h3>Líneas, polilíneas, rectángulos, círculos, arcos, elipses, textos y directrices.</div>
+<div class="card"><h3>Precisión</h3>Entrada dinámica de longitud y ángulo, coordenadas absolutas y relativas, ORTHO, POLAR y referencias a objetos.</div>
+<div class="card"><h3>Edición</h3>Mover, copiar, OFFSET, rotar, simetría, escala, recortar, alargar y descomponer entidades compatibles.</div>
+<div class="card"><h3>Anotación y capas</h3>Cotas, hatch, colores, grosores de línea y organización por capas.</div>
+<div class="card"><h3>Archivos</h3>Proyectos JSON, importación/exportación DXF, SVG y salida PDF/impresión.</div>
+<div class="card"><h3>Diseño adaptable</h3>Interfaz web para PC y dispositivos táctiles, con guardado local y modo PWA.</div>
+</div>
+</section>
+<section class="section" id="instalar" style="background:#e9eef5">
+<h2>Diseña en cualquier dispositivo</h2>
+<p>La versión web funciona en Chrome, Edge, Firefox y Safari. La PWA puede instalarse desde el navegador y conserva los recursos del editor para trabajar sin conexión después de la primera carga.</p>
+<a class="btn" href="./editor/">Usar OtroCAD Web</a>
+<a class="btn" href="https://github.com/chichoarq1212/otrocad/releases" style="background:white">Ver APK Android y versiones</a>
+<a class="btn" href="https://github.com/chichoarq1212/otrocad" style="background:white">Código fuente</a>
+<div class="grid" style="margin-top:18px">
+<div class="card"><h3>Android nativo</h3>La nueva alfa 0.2.0 usa un motor Android Canvas, sin WebView ni permiso de Internet. Abre y guarda JSON, importa/exporta DXF y genera PDF. El DWG directo todavía no está disponible en el motor nativo.</div>
+<div class="card"><h3>iPhone y iPad</h3>Abre OtroCAD Web en Safari, pulsa Compartir y elige “Añadir a pantalla de inicio”. Es una instalación PWA; no es una aplicación nativa de App Store.</div>
+<div class="card"><h3>Computadora</h3>Abre el editor en Chrome, Edge o Firefox. Puedes abrir JSON y DXF. La conversión de DWG en la versión web carga un módulo externo y requiere conexión a Internet.</div>
+</div>
+<p><small>Versión alfa: las funciones CAD y la compatibilidad DXF aún son parciales. El APK Android de pruebas es debug y no está firmado para distribución de tienda. Verifica cotas, escala y archivos antes de utilizarlos en obra.</small></p>
+</section>
+<section class="section">
+<h2>Del plano al espacio</h2>
+<p>OtroCAD es proyecto hermano de ESQUECHAT 3D, con una misma visión de diseño accesible.</p>
+<a class="btn" href="https://esquechat.com/">Descubrir ESQUECHAT 3D ↗</a>
+</section>
+<section class="section" style="background:#f2f5f9">
+<h2>Apoya el desarrollo</h2>
+<p>El proyecto busca mantener el acceso gratuito para estudiantes y profesionales. Próximamente se anunciarán los canales oficiales para aportes voluntarios.</p>
+</section>
+</main>
+<footer id="creditos">
+<strong>OtroCAD</strong> · Arq. Cristhian Torres R., Mgs. · VITTA Online<br>
+Proyecto hermano: <a href="https://esquechat.com/">ESQUECHAT 3D</a> · <a href="https://github.com/chichoarq1212/otrocad">Código fuente</a><br>
+<small>Versión alfa: verifica siempre las medidas antes de utilizar planos en obra.</small>
+</footer>
+<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});</script>
+</body>
+</html>
