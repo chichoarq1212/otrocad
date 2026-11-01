@@ -21,7 +21,7 @@ Proyecto hermano de [ESQUECHAT 3D](https://esquechat.com/). Identidad visual azu
 - PWA con recursos locales cacheados para volver a abrir el editor sin conexión después de la primera carga.
 
 ### Android nativo
-La versión Android 0.2.0 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, mover/copiar/borrar, undo/redo, ORTHO/POLAR/SNAP, capas básicas, JSON, DXF y PDF.
+La versión Android 0.2.0 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, mover/copiar/borrar, undo/redo, configuración HP, ORTHO/POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF.
 
 ## Limitaciones importantes
 - No es todavía un reemplazo completo de AutoCAD ni de Civil 3D.
