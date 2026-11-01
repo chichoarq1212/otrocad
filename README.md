@@ -24,7 +24,7 @@ Proyecto hermano de [ESQUECHAT 3D](https://esquechat.com/). Identidad visual azu
 - PWA con recursos locales cacheados para volver a abrir el editor sin conexión después de la primera carga.
 
 ### Android nativo
-La versión Android 0.4.4 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, edición geométrica mediante grips arrastrables, mover/copiar/borrar, undo/redo, configuración HP, ORTHO/POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF.
+La versión Android 0.4.4 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, edición geométrica mediante grips arrastrables, mover/copiar/borrar, undo/redo, entrada de longitud exacta por tramo, polilíneas con FIN PL, ORTHO ON/OFF, configuración HP, POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF. Usa el isotipo original en el icono adaptativo y aceleración gráfica.
 
 ### Entrada de longitud en Android 0.4.4
 - En LÍNEA: marca el inicio, toca hacia la dirección deseada e introduce la longitud exacta en las unidades activas.
