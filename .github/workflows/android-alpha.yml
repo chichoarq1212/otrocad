@@ -1,4 +1,4 @@
-name: Compilar OtroCAD Android nativo sin conexión
+name: Compilar OtroCAD Android híbrido online/offline
 on:
   push:
     branches: ["main", "otrocad-android-alpha-*"]
@@ -14,7 +14,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: otrocad-android-native-v049-${{ github.ref }}
+  group: otrocad-android-native-v050-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
@@ -29,25 +29,29 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Compilar APK nativo
+      - name: Incluir editor web local para uso sin conexión
+        run: |
+          mkdir -p android/app/src/main/assets/editor
+          cp editor/index.html editor/editor.js android/app/src/main/assets/editor/
+      - name: Compilar APK híbrido con editor offline
         run: gradle -p android assembleDebug --no-daemon
       - name: Preparar APK con nombre de versión
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.4.9.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.5.0.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: OtroCAD-Android-Nativo-Offline-0.4.9
-          path: OtroCAD-Android-0.4.9.apk
+          name: OtroCAD-Android-Nativo-Offline-0.5.0
+          path: OtroCAD-Android-0.5.0.apk
           if-no-files-found: error
       - name: Publicar APK nativo de pruebas
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-native-0.4.9
+          tag_name: android-native-0.5.0
           target_commitish: ${{ github.sha }}
-          name: OtroCAD Android Nativo Offline 0.4.9
+          name: OtroCAD Android Nativo Offline 0.5.0
           prerelease: true
           make_latest: false
           overwrite_files: true
-          files: OtroCAD-Android-0.4.9.apk
+          files: OtroCAD-Android-0.5.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
