@@ -13,7 +13,7 @@ for(const page of pages){
   if(!local||local.startsWith('/'))continue;
   if(local==='./editor-preview.png')continue; // generated in the screenshot step
   const target=path.resolve(root,path.dirname(page),local);
-  if(!target.startsWith(root+path.sep))throw Error('Link outside site: '+page+' '+url);
+  if(target!==root&&!target.startsWith(root+path.sep))throw Error('Link outside site: '+page+' '+url);
   if(!fs.existsSync(target))throw Error('Broken local link: '+page+' -> '+url);
  }
 }
