@@ -4,7 +4,7 @@ Esta rama reemplaza la envoltura WebView por una vista de dibujo Android basada 
 
 ## Incluido en la versión nativa 0.2.0 alfa
 - Dibujo táctil por puntos: línea, polilínea, rectángulo, círculo, arco, elipse, cota, hatch, texto y directriz.
-- Selección CAD por ventana izquierda→derecha y cruce derecha→izquierda, con selección múltiple táctil y resaltado de entidades.
+- Selección CAD por ventana izquierda→derecha y cruce derecha→izquierda, con selección múltiple táctil, botón MULTI para acumular ventanas/clics y resaltado de entidades.
 - Operaciones de grupo en Android: mover, copiar y borrar varias entidades seleccionadas.
 - Selección, mover, copiar, borrar, deshacer y rehacer.
 - Configuración HP: unidades, rejilla, ORTHO, POLAR, SNAP F9, OSNAP F3, radio de referencia y cruceta.
