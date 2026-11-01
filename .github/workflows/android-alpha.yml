@@ -4,7 +4,7 @@ on:
     branches: ["otrocad-android-alpha-*"]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,3 +25,15 @@ jobs:
           name: OtroCAD-Android-alfa-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Publicar APK instalable de pruebas
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-alpha-0.1.0
+          target_commitish: ${{ github.sha }}
+          name: OtroCAD Android Alpha 0.1.0
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
