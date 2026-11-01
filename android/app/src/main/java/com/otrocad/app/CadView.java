@@ -68,7 +68,7 @@ public class CadView extends View {
         for(int i=0;i<entities.size();i++)drawEntity(c,entities.get(i),i==selected,false);
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         if(tool.equals("POLY")&&poly.size()>0){Entity e=new Entity();e.type="POLY";e.pts.addAll(poly);drawEntity(c,e,false,false);}
-        if(base!=null){PointF end=constrain(snap(cursor));Paint p=new Paint(3);p.setColor(Color.rgb(98,184,232));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f  <  %.1f°",dist(base,end),angle(base,end)),b.x+10,b.y-10,p);}
+        if(base!=null){PointF end=constrain(snap(world(cursor.x,cursor.y)));Paint p=new Paint(3);p.setColor(Color.rgb(98,184,232));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f  <  %.1f°",dist(base,end),angle(base,end)),b.x+10,b.y-10,p);}
         if(crosshair){Paint p=new Paint(3);p.setColor(0x885cb7e8);p.setStrokeWidth(1);c.drawLine(cursor.x,0,cursor.x,getHeight(),p);c.drawLine(0,cursor.y,getWidth(),cursor.y,p);}
     }
     private float angle(PointF a,PointF b){return (float)((Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI+360)%360);}
@@ -115,7 +115,17 @@ public class CadView extends View {
         if(tool.equals("PAN")){panLast=q;return;}
         say("Herramienta aún no disponible en esta versión nativa");
     }
-    private int hit(PointF q){float best=16f/zoom;int found=-1;for(int i=entities.size()-1;i>=0;i--){Entity e=entities.get(i);float d=Float.MAX_VALUE;if(e.pts.size()==1)d=dist(q,e.pts.get(0));else if(e.type.equals("CIRCLE"))d=Math.abs(dist(q,e.pts.get(0))-dist(e.pts.get(0),e.pts.get(1)));else for(int j=1;j<e.pts.size();j++)d=Math.min(d,segmentDistance(q,e.pts.get(j-1),e.pts.get(j)));if(d<best){best=d;found=i;}}return found;}
+    private int hit(PointF q){
+        float best=16f/zoom;int found=-1;
+        for(int i=entities.size()-1;i>=0;i--){Entity e=entities.get(i);float d=Float.MAX_VALUE;
+            if(e.pts.size()==1)d=dist(q,e.pts.get(0));
+            else if(e.type.equals("CIRCLE"))d=Math.abs(dist(q,e.pts.get(0))-dist(e.pts.get(0),e.pts.get(1)));
+            else if((e.type.equals("RECT")||e.type.equals("HATCH"))&&e.pts.size()>1){PointF a=e.pts.get(0),b=e.pts.get(1);PointF p1=a,p2=new PointF(b.x,a.y),p3=b,p4=new PointF(a.x,b.y);d=Math.min(Math.min(segmentDistance(q,p1,p2),segmentDistance(q,p2,p3)),Math.min(segmentDistance(q,p3,p4),segmentDistance(q,p4,p1)));}
+            else if(e.type.equals("ELLIPSE")&&e.pts.size()>1){PointF a=e.pts.get(0),b=e.pts.get(1),prev=null;for(int k=0;k<=48;k++){double t=k*Math.PI*2/48;PointF p=new PointF(a.x+(b.x-a.x)*(float)Math.cos(t),a.y+(b.y-a.y)*(float)Math.sin(t));if(prev!=null)d=Math.min(d,segmentDistance(q,prev,p));prev=p;}}
+            else {for(int j=1;j<e.pts.size();j++)d=Math.min(d,segmentDistance(q,e.pts.get(j-1),e.pts.get(j)));if(e.type.equals("POLYGON")&&e.pts.size()>2)d=Math.min(d,segmentDistance(q,e.pts.get(e.pts.size()-1),e.pts.get(0)));}
+            if(d<best){best=d;found=i;}
+        }return found;
+    }
     private float segmentDistance(PointF p,PointF a,PointF b){float dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy+1e-8f)));return (float)Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);}
     private void offsetSelected(float d,PointF side){
         if(selected<0)return;Entity src=entities.get(selected);if(src.pts.size()<2){say("OFFSET requiere una entidad lineal");return;}
@@ -200,10 +210,18 @@ public class CadView extends View {
         say("Comando no reconocido: "+c);
     }
     public void drawPdf(Canvas c,int w,int h){
-        c.drawColor(Color.WHITE);if(entities.isEmpty())return;float minX=Float.MAX_VALUE,minY=Float.MAX_VALUE,maxX=-Float.MAX_VALUE,maxY=-Float.MAX_VALUE;
+        c.drawColor(Color.WHITE);if(entities.isEmpty())return;
+        float minX=Float.MAX_VALUE,minY=Float.MAX_VALUE,maxX=-Float.MAX_VALUE,maxY=-Float.MAX_VALUE;
         for(Entity e:entities)for(PointF p:e.pts){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
-        float sx=(w-80)/Math.max(1,maxX-minX),sy=(h-80)/Math.max(1,maxY-minY),s=Math.max(1,Math.min(sx,sy));c.save();c.translate(w/2f-(minX+maxX)/2*s,h/2f+(minY+maxY)/2*s);c.scale(s,-s);
-        for(Entity e:entities){Paint p=new Paint(3);p.setColor(e.color);p.setStrokeWidth(Math.max(.5f,e.weight*2));p.setStyle(Paint.Style.STROKE);Path path=new Path();PointF a=e.pts.get(0);path.moveTo(a.x,a.y);if(e.type.equals("CIRCLE")&&e.pts.size()>1)c.drawCircle(a.x,a.y,dist(a,e.pts.get(1)),p);else{for(int i=1;i<e.pts.size();i++)path.lineTo(e.pts.get(i).x,e.pts.get(i).y);if(e.type.equals("RECT")||e.type.equals("POLYGON"))path.close();c.drawPath(path,p);}}
-        c.restore();
+        float rx=Math.max(1,maxX-minX),ry=Math.max(1,maxY-minY),pad=42;
+        float s=Math.max(.001f,Math.min((w-2*pad)/rx,(h-2*pad)/ry)),ox=(w-rx*s)/2,oy=(h-ry*s)/2;
+        for(Entity e:entities){if(e.pts.isEmpty())continue;Paint p=new Paint(3);p.setColor(e.color);p.setStrokeWidth(Math.max(.7f,e.weight*2));p.setStyle(Paint.Style.STROKE);
+            if("DASHED".equals(e.linetype))p.setPathEffect(new DashPathEffect(new float[]{7,4},0));
+            PointF a=e.pts.get(0);float x=ox+(a.x-minX)*s,y=oy+(maxY-a.y)*s;
+            if(e.type.equals("CIRCLE")&&e.pts.size()>1)c.drawCircle(x,y,dist(a,e.pts.get(1))*s,p);
+            else if((e.type.equals("RECT")||e.type.equals("HATCH")||e.type.equals("ELLIPSE"))&&e.pts.size()>1){PointF b=e.pts.get(1);float bx=ox+(b.x-minX)*s,by=oy+(maxY-b.y)*s;RectF r=new RectF(Math.min(x,bx),Math.min(y,by),Math.max(x,bx),Math.max(y,by));if(e.type.equals("ELLIPSE"))c.drawOval(new RectF(x-Math.abs(bx-x),y-Math.abs(by-y),x+Math.abs(bx-x),y+Math.abs(by-y)),p);else{c.drawRect(r,p);if(e.type.equals("HATCH")){c.save();c.clipRect(r);Paint hp=new Paint(3);hp.setColor(e.color);hp.setStrokeWidth(.7f);for(float xx=r.left-r.height();xx<r.right;xx+=8)c.drawLine(xx,r.bottom,xx+r.height(),r.top,hp);c.restore();}}}
+            else if(e.type.equals("TEXT")){p.setStyle(Paint.Style.FILL);p.setPathEffect(null);p.setTextSize(Math.max(10,e.textHeight*s*.35f));c.drawText(e.text==null?"Texto":e.text,x,y,p);}
+            else{Path path=new Path();path.moveTo(x,y);for(int j=1;j<e.pts.size();j++){PointF q=e.pts.get(j);path.lineTo(ox+(q.x-minX)*s,oy+(maxY-q.y)*s);}if(e.type.equals("POLYGON"))path.close();c.drawPath(path,p);if(e.type.equals("DIM")&&e.pts.size()>1){PointF b=e.pts.get(1);p.setStyle(Paint.Style.FILL);p.setPathEffect(null);p.setTextSize(10);c.drawText(String.format(Locale.US,"%.3f",dist(a,b)),(x+ox+(b.x-minX)*s)/2,(y+oy+(maxY-b.y)*s)/2-5,p);}}
+        }
     }
 }
