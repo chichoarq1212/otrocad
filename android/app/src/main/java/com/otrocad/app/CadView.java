@@ -24,7 +24,7 @@ public class CadView extends View {
     private final LinkedHashSet<Integer> selectedItems=new LinkedHashSet<>();
     private final ArrayList<Integer> moveTargets=new ArrayList<>();
     private PointF selectionStartScreen=null,selectionEndScreen=null;
-    private boolean selectionDragging=false,selectionAdditive=false;
+    private boolean selectionDragging=false,selectionAdditive=false,multiSelectMode=false;
     private float weight=.25f, zoom=36f, panX=0, panY=0, offsetDistance=1f,gridStep=10f,polarStep=15f,snapRadius=18f;
     private String units="m";
     private boolean grid=true, gridSnap=false, ortho=false, polar=false, snap=true, crosshair=true;
@@ -39,7 +39,7 @@ public class CadView extends View {
     public void restoreLocal(){String raw=getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).getString("drawing","");if(raw!=null&&!raw.isEmpty())try{loadJson(raw);say("Dibujo local recuperado");}catch(Exception ignored){}}
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
-    public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · arrastra izquierda→derecha para VENTANA y derecha→izquierda para CRUCE":"Herramienta: "+tool);invalidate();}
+    public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · izquierda→derecha VENTANA · derecha→izquierda CRUCE · activa MULTI para acumular":"Herramienta: "+tool);invalidate();}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
     public void toggleOrtho(){ortho=!ortho;invalidate();}
@@ -47,6 +47,8 @@ public class CadView extends View {
     public void toggleSnap(){snap=!snap;invalidate();}
     public void toggleGridSnap(){gridSnap=!gridSnap;invalidate();}
     public void toggleCrosshair(){crosshair=!crosshair;invalidate();}
+    public void toggleMultiSelect(){multiSelectMode=!multiSelectMode;say("Selección múltiple "+(multiSelectMode?"activada":"desactivada"));invalidate();}
+    public boolean isMultiSelectEnabled(){return multiSelectMode;}
     public boolean isGridEnabled(){return grid;}
     public boolean isOrthoEnabled(){return ortho;}
     public boolean isPolarEnabled(){return polar;}
@@ -215,7 +217,7 @@ public class CadView extends View {
         int action=ev.getActionMasked();
         if(action==MotionEvent.ACTION_DOWN){
             PointF p=new PointF(ev.getX(),ev.getY());cursor=p;
-            if(tool.equals("SELECT")){selectionStartScreen=p;selectionEndScreen=p;selectionDragging=false;int meta=ev.getMetaState();selectionAdditive=(meta&(android.view.KeyEvent.META_SHIFT_ON|android.view.KeyEvent.META_CTRL_ON))!=0;invalidate();return true;}
+            if(tool.equals("SELECT")){selectionStartScreen=p;selectionEndScreen=p;selectionDragging=false;int meta=ev.getMetaState();selectionAdditive=multiSelectMode||(meta&(android.view.KeyEvent.META_SHIFT_ON|android.view.KeyEvent.META_CTRL_ON))!=0;invalidate();return true;}
             if(tool.equals("PAN")){panning=true;panLast=p;}else handle(world(p.x,p.y));invalidate();return true;
         }
         if(action==MotionEvent.ACTION_POINTER_DOWN){selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;pinching=true;pinchStart=spacing(ev);pinchZoom=zoom;return true;}
@@ -284,7 +286,7 @@ public class CadView extends View {
     public void setDrawColor(int c){drawColor=c;}
     public void setWeight(float w){weight=w;}
     public void runCommand(String raw){
-        String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);if(u.equals("ESC")||u.equals("CANCEL")){setSelection(Collections.emptyList());anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;say("Comando cancelado · selección limpia");invalidate();return;}String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
+        String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);if(u.equals("MULTI")){toggleMultiSelect();return;}if(u.equals("ESC")||u.equals("CANCEL")){setSelection(Collections.emptyList());anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;say("Comando cancelado · selección limpia");invalidate();return;}String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
         if(u.equals("F7")||u.equals("GRID")){toggleGrid();return;}if(u.equals("F8")||u.equals("ORTHO")){toggleOrtho();return;}if(u.equals("F9")||u.equals("SNAP")){toggleGridSnap();return;}if(u.equals("F3")||u.equals("OSNAP")){toggleSnap();return;}if(u.equals("F10")||u.equals("POLAR")){togglePolar();return;}
         String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
         String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE").contains(t)){setTool(t);return;}
