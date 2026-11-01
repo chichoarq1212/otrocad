@@ -108,12 +108,12 @@ function render(){
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':'#101820';ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
  objects.forEach((s,i)=>{if(!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
- if(temp)drawEntity(temp,false,true);
- if(tool==='poly'&&poly.length)drawEntity({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)},false);
+ if(!printing&&temp)drawEntity(temp,false,true);
+ if(!printing&&tool==='poly'&&poly.length)drawEntity({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)},false);
  if(!printing&&start&&crossOn){const p=screen(start);ctx.strokeStyle='#f3c83e';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(p.x-8,p.y);ctx.lineTo(p.x+8,p.y);ctx.moveTo(p.x,p.y-8);ctx.lineTo(p.x,p.y+8);ctx.stroke()}
  if(!printing&&crossOn){const p=cursor;ctx.strokeStyle='#5cb7e8aa';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(p.x,0);ctx.lineTo(p.x,h);ctx.moveTo(0,p.y);ctx.lineTo(w,p.y);ctx.stroke()}
  const anchor=activeAnchor();if(!printing&&temp&&anchor){const b=screen(temp.b);ctx.fillStyle='#62b8e8';ctx.beginPath();ctx.arc(b.x,b.y,3,0,Math.PI*2);ctx.fill();ctx.font='12px system-ui';ctx.fillText(distance(anchor,temp.b).toFixed(2)+' '+units+' < '+normalize(angle(anchor,temp.b)).toFixed(1)+'°',b.x+12,b.y-12)}
- updateDynamic();
+ if(printing)$('#dynamic').style.display='none';else updateDynamic();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
 function setTool(t){tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));updatePrompt();render()}
@@ -154,14 +154,14 @@ function commitEntity(endPoint){
  else if(tool==='rect'||tool==='hatch'||tool==='ellipse')objects.push({type:tool,a:clone(start),b:clone(endPoint),...style});
  else if(tool==='circle')objects.push({type:'circle',a:clone(start),b:clone(endPoint),...style});
  else if(tool==='polygon'){const n=Math.max(3,Math.min(64,polySides));const r=distance(start,endPoint);const pts=[];for(let i=0;i<n;i++){const a=2*Math.PI*i/n;pts.push({x:start.x+r*Math.cos(a),y:start.y+r*Math.sin(a)})}objects.push({type:'polygon',pts,...style})}
- save();selected=objects.length-1;start=null;temp=null;render();updatePrompt();
+ save();applySelection([objects.length-1]);start=null;temp=null;render();updatePrompt();
 }
 function finishPoly(){if(poly.length>1&&!lockedLayers.has($('#layer').value)){checkpoint();objects.push({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)});save()}else if(poly.length>1){status.textContent='La capa actual está bloqueada'}poly=[];start=null;temp=null;render();updatePrompt();status.textContent='Polilínea terminada'}
 function doOffset(q){
  if(selected<0){
-  selected=selectAt(q);
+  const hit=selectAt(q);applySelection(hit>=0?[hit]:[]);
   if(selected<0){status.textContent='Selecciona una entidad para OFFSET';return}
-  if(!offsetDistancePreset){const raw=prompt('Distancia de desfase','1');if(raw===null){selected=-1;return}const d=Number(raw);if(!Number.isFinite(d)||d<=0){selected=-1;status.textContent='Introduce una distancia positiva';return}offsetDistance=d}
+  if(!offsetDistancePreset){const raw=prompt('Distancia de desfase','1');if(raw===null){clearSelection();return}const d=Number(raw);if(!Number.isFinite(d)||d<=0){clearSelection();status.textContent='Introduce una distancia positiva';return}offsetDistance=d}
   offsetDistancePreset=false;status.textContent='Indica el lado del desfase';return;
  }
  const s=objects[selected],d=offsetDistance,style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype},before=objects.length;
@@ -177,29 +177,29 @@ function doOffset(q){
   const minX=Math.min(s.a.x,s.b.x),maxX=Math.max(s.a.x,s.b.x),minY=Math.min(s.a.y,s.b.y),maxY=Math.max(s.a.y,s.b.y),cx=(minX+maxX)/2,cy=(minY+maxY)/2,expand=distance(q,{x:cx,y:cy})>Math.hypot(maxX-minX,maxY-minY)/2?d:-d;
   if(maxX-minX<=2*Math.abs(expand)||maxY-minY<=2*Math.abs(expand)){status.textContent='El desfase dejaría un rectángulo no válido';return}objects.push({type:'rect',a:{x:minX-expand,y:minY-expand},b:{x:maxX+expand,y:maxY+expand},...style});
  }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
- if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();selected=objects.length-1;render();status.textContent='OFFSET creado';
+ if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([objects.length-1]);render();status.textContent='OFFSET creado';
 }
 function handleTap(p){
  let q=snapPoint(world(p));q=constrain(q);
  if(!['select','pan','move','copy','offset','trim','extend','explode'].includes(tool)&&lockedLayers.has($('#layer').value)){status.textContent='La capa '+$('#layer').value+' está bloqueada';return}
  if(tool==='arc'){
   arcPoints.push(q);
-  if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();selected=objects.length-1;arcPoints=[];status.textContent='Arco creado';}
+  if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);arcPoints=[];status.textContent='Arco creado';}
   else status.textContent='Arco: marca el '+(arcPoints.length===1?'segundo':'tercer')+' punto';
   render();return;
  }
  if(tool==='leader'){
   if(!start){start=q;temp={type:'line',a:clone(q),b:clone(q),...currentStyle($('#layer').value)};status.textContent='Marca el extremo de la directriz';render();return}
   const label=prompt('Texto de la directriz','');
-  checkpoint();objects.push({type:'leader',a:clone(start),b:clone(q),text:label||'',...currentStyle($('#layer').value)});save();selected=objects.length-1;start=null;temp=null;render();status.textContent='Directriz creada';return;
+  checkpoint();objects.push({type:'leader',a:clone(start),b:clone(q),text:label||'',...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);start=null;temp=null;render();status.textContent='Directriz creada';return;
  }
- if(tool==='select'){selected=selectAt(q);showProperties();render();return}
+ if(tool==='select'){const hit=selectAt(q);applySelection(hit>=0?[hit]:[]);showProperties();render();return}
  if(tool==='pan'){return}
  if(tool==='offset'){doOffset(q);return}
  if(tool==='poly'){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Polilínea: marca otro vértice o pulsa Enter';return}
  if(tool==='explode'){explodeAt(q);return}
  if(tool==='trim'||tool==='extend'){
-  if(modifyTarget<0){modifyTarget=selectAt(q);selected=modifyTarget;if(modifyTarget<0){status.textContent='Selecciona la línea que deseas modificar';return}status.textContent='Marca el extremo que deseas '+(tool==='trim'?'recortar':'alargar');return}
+  if(modifyTarget<0){modifyTarget=selectAt(q);applySelection(modifyTarget>=0?[modifyTarget]:[]);if(modifyTarget<0){status.textContent='Selecciona la línea que deseas modificar';return}status.textContent='Marca el extremo que deseas '+(tool==='trim'?'recortar':'alargar');return}
   const idx=modifyTarget;trimOrExtend(idx,q,tool);return;
  }
  if(['move','copy','rotate','mirror','scale'].includes(tool)){
@@ -298,14 +298,14 @@ function trimOrExtend(index,q,mode){
  }
  if(!hits.length){status.textContent='No se encontró una intersección compatible';return}
  hits.sort((x,y)=>distance(x,endpoint==='a'?a:b)-distance(y,endpoint==='a'?a:b));
- checkpoint();s[endpoint]={x:hits[0].x,y:hits[0].y};save();selected=index;modifyTarget=-1;render();status.textContent=mode.toUpperCase()+' aplicado';
+ checkpoint();s[endpoint]={x:hits[0].x,y:hits[0].y};save();applySelection([index]);modifyTarget=-1;render();status.textContent=mode.toUpperCase()+' aplicado';
 }
 function explodeAt(q){
  const i=selectAt(q);if(i<0){status.textContent='Selecciona una polilínea o rectángulo';return}
  const s=objects[i],segments=entitySegments(s);if(!segments.length||s.type==='line'){status.textContent='Esta entidad no requiere EXPLODE';return}
  checkpoint();const style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype};
  const parts=segments.map(([a,b])=>({type:'line',a:clone(a),b:clone(b),...style}));
- objects.splice(i,1,...parts);selected=parts.length?i+parts.length-1:-1;save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
+ objects.splice(i,1,...parts);applySelection(parts.map((_,k)=>i+k));save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
 }
 let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false;
 canvas.addEventListener('pointerdown',e=>{
@@ -375,8 +375,8 @@ function runCommand(raw){
  if(coordinate&&(/^[+-]?(?:\d|\.)/.test(textValue)||textValue.startsWith('@'))){
   const point=round(coordinate);
   if(tool==='poly'){poly.push(point);temp=null;render();status.textContent='Polilínea: vértice añadido · Enter para terminar';return}
-  if(tool==='arc'){arcPoints.push(point);if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();selected=objects.length-1;arcPoints=[];status.textContent='Arco creado'}else status.textContent='Arco: introduce el siguiente punto';render();return}
-  if(tool==='leader'){if(!start){start=point;temp={type:'line',a:clone(point),b:clone(point),...currentStyle($('#layer').value)};status.textContent='Introduce el extremo de la directriz';render()}else{const label=prompt('Texto de la directriz','');checkpoint();objects.push({type:'leader',a:clone(start),b:point,text:label||'',...currentStyle($('#layer').value)});save();selected=objects.length-1;start=null;temp=null;render();status.textContent='Directriz creada'}return}
+  if(tool==='arc'){arcPoints.push(point);if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);arcPoints=[];status.textContent='Arco creado'}else status.textContent='Arco: introduce el siguiente punto';render();return}
+  if(tool==='leader'){if(!start){start=point;temp={type:'line',a:clone(point),b:clone(point),...currentStyle($('#layer').value)};status.textContent='Introduce el extremo de la directriz';render()}else{const label=prompt('Texto de la directriz','');checkpoint();objects.push({type:'leader',a:clone(start),b:point,text:label||'',...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);start=null;temp=null;render();status.textContent='Directriz creada'}return}
   if(!start){start=point;temp={type:tool,a:clone(start),b:clone(start),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Punto inicial fijado · introduce el siguiente punto'}
   else commitEntity(point);
   return;
@@ -385,7 +385,7 @@ function runCommand(raw){
  if(c==='U'||c==='UNDO'){$('#undo').click();return}if(c==='REDO'){$('#redo').click();return}
  if(c==='HP'||c==='DSETTINGS'||c==='SETTINGS'){alert('CONFIGURACIÓN DE DIBUJO\nF7 Rejilla: '+(gridOn?'ACTIVA':'INACTIVA')+'\nF8 Orto: '+(orthoOn?'ACTIVO':'INACTIVO')+'\nF9 Snap: '+(snapOn?'ACTIVO':'INACTIVO')+'\nF10 Polar: '+(polarOn?'ACTIVO':'INACTIVO')+'\nF3 Referencias: '+(osnapOn?'ACTIVAS':'INACTIVAS'));return}
  if(c==='PR'||c==='PROPERTIES'||c==='CTRL+1'){$('#properties').classList.toggle('open');showProperties();return}
- if(c==='E'||c==='ERASE'||c==='DELETE'){if(selected>=0&&!lockedLayers.has(objects[selected]?.layer)){checkpoint();objects.splice(selected,1);selected=-1;save();render()}return}
+ if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
  if(c==='F'||c==='FILLET'||c==='CHA'||c==='CHAMFER'){status.textContent=c+' · empalme/chaflán aún no implementado';return}
@@ -416,9 +416,9 @@ $('#settingsBtn').onclick=showDraftSettings;$('#snapBtn').onclick=()=>toggle('os
 $('#layer').onchange=()=>{$('#drawColor').value=colors[$('#layer').value]||colors.General};
 $('#newLayer').onclick=()=>{const name=prompt('Nombre de la nueva capa');if(name){const op=document.createElement('option');op.textContent=name;$('#layer').append(op);$('#layer').value=name;colors[name]='#62b8e8'}};
 $('#layerColor').onclick=()=>{const c=prompt('Color HEX (ej. #62b8e8)',colors[$('#layer').value]||'#62b8e8');if(c&&/^#[0-9a-f]{6}$/i.test(c)){colors[$('#layer').value]=c;$('#drawColor').value=c}};
-$('#layerVisibility').onclick=()=>{const l=$('#layer').value;if(hiddenLayers.has(l)){hiddenLayers.delete(l);$('#layerVisibility').textContent='Ocultar capa';status.textContent='Capa '+l+' visible'}else{hiddenLayers.add(l);$('#layerVisibility').textContent='Mostrar capa';status.textContent='Capa '+l+' oculta';if(selected>=0&&objects[selected]?.layer===l)selected=-1}render()};
+$('#layerVisibility').onclick=()=>{const l=$('#layer').value;if(hiddenLayers.has(l)){hiddenLayers.delete(l);$('#layerVisibility').textContent='Ocultar capa';status.textContent='Capa '+l+' visible'}else{hiddenLayers.add(l);$('#layerVisibility').textContent='Mostrar capa';status.textContent='Capa '+l+' oculta';applySelection(selectedItems().filter(i=>objects[i]?.layer!==l))}render()};
 $('#layerLock').onclick=()=>{const l=$('#layer').value;if(lockedLayers.has(l)){lockedLayers.delete(l);$('#layerLock').textContent='Bloquear capa';status.textContent='Capa '+l+' desbloqueada'}else{lockedLayers.add(l);$('#layerLock').textContent='Desbloquear capa';status.textContent='Capa '+l+' bloqueada';if(selected>=0&&objects[selected]?.layer===l)selected=-1}render()};
-$('#erase').onclick=()=>{if(selected>=0){checkpoint();objects.splice(selected,1);selected=-1;save();render()}else if(confirm('¿Borrar todo el dibujo?')){checkpoint();objects=[];save();render()}};
+$('#erase').onclick=()=>{if(selectedItems().length)deleteSelection();else if(confirm('¿Borrar todo el dibujo?')){checkpoint();objects=[];clearSelection();save();render()}};
 try{const saved=JSON.parse(localStorage.getItem('otrocad-drawing')||'[]');if(Array.isArray(saved))objects=saved}catch(e){}
 window.addEventListener('beforeprint',()=>{printing=true;render()});window.addEventListener('afterprint',()=>{printing=false;render()});
 new ResizeObserver(resize).observe(stage);setTool('line');resize();
