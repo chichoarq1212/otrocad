@@ -26,6 +26,7 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(Color.rgb(16,27,46));
         getWindow().setNavigationBarColor(Color.rgb(16,27,46));
         buildUi();
+        cad.restoreLocal();
         if(getIntent()!=null&&getIntent().getData()!=null)openUri(getIntent().getData());
     }
     private void buildUi(){
