@@ -16,6 +16,12 @@ public class CadView extends View {
         ArrayList<PointF> pts=new ArrayList<>();
         Entity copy(){Entity e=new Entity();e.type=type;e.layer=layer;e.text=text;e.linetype=linetype;e.color=color;e.weight=weight;e.textHeight=textHeight;for(PointF p:pts)e.pts.add(new PointF(p.x,p.y));return e;}
     }
+    static class GripRef {
+        int entityIndex, pointIndex, kind;
+        PointF point;
+        GripRef(int entityIndex,int pointIndex,int kind,PointF point){this.entityIndex=entityIndex;this.pointIndex=pointIndex;this.kind=kind;this.point=new PointF(point.x,point.y);}
+    }
+    private static final int GRIP_POINT=0, GRIP_RECT=1, GRIP_CIRCLE_RADIUS=2, GRIP_ELLIPSE_RX_POS=3, GRIP_ELLIPSE_RX_NEG=4, GRIP_ELLIPSE_RY_POS=5, GRIP_ELLIPSE_RY_NEG=6;
     private final ArrayList<Entity> entities=new ArrayList<>();
     private final ArrayList<ArrayList<Entity>> undo=new ArrayList<>(),redo=new ArrayList<>();
     private final ArrayList<PointF> poly=new ArrayList<>(),arcPoints=new ArrayList<>();
@@ -25,6 +31,9 @@ public class CadView extends View {
     private final ArrayList<Integer> moveTargets=new ArrayList<>();
     private PointF selectionStartScreen=null,selectionEndScreen=null;
     private boolean selectionDragging=false,selectionAdditive=false,multiSelectMode=false;
+    private GripRef activeGrip=null;
+    private ArrayList<Entity> gripBeforeAll=null;
+    private boolean gripMoved=false;
     private float weight=.25f, zoom=36f, panX=0, panY=0, offsetDistance=1f,gridStep=10f,polarStep=15f,snapRadius=18f;
     private String units="m";
     private boolean grid=true, gridSnap=false, ortho=false, polar=false, snap=true, crosshair=true;
@@ -39,7 +48,7 @@ public class CadView extends View {
     public void restoreLocal(){String raw=getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).getString("drawing","");if(raw!=null&&!raw.isEmpty())try{loadJson(raw);say("Dibujo local recuperado");}catch(Exception ignored){}}
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
-    public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · izquierda→derecha VENTANA · derecha→izquierda CRUCE · activa MULTI para acumular":"Herramienta: "+tool);invalidate();}
+    public void setTool(String t){if(activeGrip!=null)cancelGripDrag();tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · izquierda→derecha VENTANA · derecha→izquierda CRUCE · activa MULTI para acumular":"Herramienta: "+tool);invalidate();}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
     public void toggleOrtho(){ortho=!ortho;invalidate();}
@@ -140,6 +149,7 @@ public class CadView extends View {
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);c.drawColor(Color.rgb(16,24,32));drawGrid(c);
         for(int i=0;i<entities.size();i++)drawEntity(c,entities.get(i),i==selected||selectedItems.contains(i),false);
+        drawSelectionGrips(c);
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         if(tool.equals("POLY")&&poly.size()>0){Entity e=new Entity();e.type="POLY";e.pts.addAll(poly);drawEntity(c,e,false,false);}
         if(base!=null){PointF end=constrain(snap(world(cursor.x,cursor.y)));Paint p=new Paint(3);p.setColor(Color.rgb(98,184,232));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f %s  <  %.1f°",dist(base,end),units,angle(base,end)),b.x+10,b.y-10,p);}
@@ -167,6 +177,86 @@ public class CadView extends View {
         if("DIM".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));p.setStyle(Paint.Style.FILL);p.setPathEffect(null);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f %s",dist(pts.get(0),pts.get(1)),units),(first.x+b.x)/2+5,(first.y+b.y)/2-6,p);}
         if("LEADER".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));p.setStyle(Paint.Style.FILL);p.setPathEffect(null);Path arrow=new Path();arrow.moveTo(first.x,first.y);arrow.lineTo(first.x+8,first.y-4);arrow.lineTo(first.x+8,first.y+4);arrow.close();c.drawPath(arrow,p);if(e.text!=null&&!e.text.isEmpty())c.drawText(e.text,b.x+5,b.y-5,p);}
     }
+
+    private ArrayList<GripRef> gripRefs(Entity e,int entityIndex){
+        ArrayList<GripRef> out=new ArrayList<>();if(e.pts.isEmpty())return out;
+        PointF a=e.pts.get(0);
+        if((e.type.equals("RECT")||e.type.equals("HATCH"))&&e.pts.size()>1){
+            PointF b=e.pts.get(1);
+            out.add(new GripRef(entityIndex,0,GRIP_RECT,new PointF(a.x,a.y)));
+            out.add(new GripRef(entityIndex,1,GRIP_RECT,new PointF(b.x,a.y)));
+            out.add(new GripRef(entityIndex,2,GRIP_RECT,new PointF(b.x,b.y)));
+            out.add(new GripRef(entityIndex,3,GRIP_RECT,new PointF(a.x,b.y)));
+        }else if(e.type.equals("CIRCLE")&&e.pts.size()>1){
+            PointF b=e.pts.get(1);float r=dist(a,b);
+            out.add(new GripRef(entityIndex,0,GRIP_POINT,a));
+            out.add(new GripRef(entityIndex,1,GRIP_CIRCLE_RADIUS,new PointF(a.x+r,a.y)));
+            out.add(new GripRef(entityIndex,1,GRIP_CIRCLE_RADIUS,new PointF(a.x-r,a.y)));
+            out.add(new GripRef(entityIndex,1,GRIP_CIRCLE_RADIUS,new PointF(a.x,a.y+r)));
+            out.add(new GripRef(entityIndex,1,GRIP_CIRCLE_RADIUS,new PointF(a.x,a.y-r)));
+        }else if(e.type.equals("ELLIPSE")&&e.pts.size()>1){
+            PointF b=e.pts.get(1);float rx=Math.abs(b.x-a.x),ry=Math.abs(b.y-a.y);
+            out.add(new GripRef(entityIndex,0,GRIP_POINT,a));
+            out.add(new GripRef(entityIndex,1,GRIP_ELLIPSE_RX_POS,new PointF(a.x+rx,a.y)));
+            out.add(new GripRef(entityIndex,1,GRIP_ELLIPSE_RX_NEG,new PointF(a.x-rx,a.y)));
+            out.add(new GripRef(entityIndex,1,GRIP_ELLIPSE_RY_POS,new PointF(a.x,a.y+ry)));
+            out.add(new GripRef(entityIndex,1,GRIP_ELLIPSE_RY_NEG,new PointF(a.x,a.y-ry)));
+        }else if(e.type.equals("ARC")){
+            int mid=(e.pts.size()-1)/2;
+            out.add(new GripRef(entityIndex,0,GRIP_POINT,e.pts.get(0)));
+            if(mid>0&&mid<e.pts.size()-1)out.add(new GripRef(entityIndex,mid,GRIP_POINT,e.pts.get(mid)));
+            if(e.pts.size()>1)out.add(new GripRef(entityIndex,e.pts.size()-1,GRIP_POINT,e.pts.get(e.pts.size()-1)));
+        }else if(e.type.equals("TEXT")){
+            out.add(new GripRef(entityIndex,0,GRIP_POINT,a));
+        }else{
+            for(int i=0;i<e.pts.size();i++)out.add(new GripRef(entityIndex,i,GRIP_POINT,e.pts.get(i)));
+        }
+        return out;
+    }
+    private void drawSelectionGrips(Canvas c){
+        if(!tool.equals("SELECT"))return;
+        Paint fill=new Paint(3);fill.setColor(0xfff7fbff);fill.setStyle(Paint.Style.FILL);
+        Paint edge=new Paint(3);edge.setColor(0xff1675c9);edge.setStyle(Paint.Style.STROKE);edge.setStrokeWidth(1.5f);
+        for(int idx:selectedIndices()){
+            if(idx<0||idx>=entities.size())continue;
+            for(GripRef g:gripRefs(entities.get(idx),idx)){PointF p=screen(g.point);c.drawRect(p.x-5,p.y-5,p.x+5,p.y+5,fill);c.drawRect(p.x-5,p.y-5,p.x+5,p.y+5,edge);}
+        }
+    }
+    private GripRef findGrip(float sx,float sy){
+        if(!tool.equals("SELECT"))return null;
+        GripRef found=null;float best=18f;
+        for(int idx:selectedIndices()){
+            if(idx<0||idx>=entities.size())continue;
+            for(GripRef g:gripRefs(entities.get(idx),idx)){PointF p=screen(g.point);float d=(float)Math.hypot(sx-p.x,sy-p.y);if(d<best){best=d;found=g;}}
+        }return found;
+    }
+    private void updateGrip(GripRef g,PointF q){
+        if(g==null||g.entityIndex<0||g.entityIndex>=entities.size())return;
+        Entity e=entities.get(g.entityIndex);if(e.pts.isEmpty())return;PointF p=new PointF(q.x,q.y);
+        if(g.kind==GRIP_POINT){if(g.pointIndex>=0&&g.pointIndex<e.pts.size())e.pts.set(g.pointIndex,p);return;}
+        if(e.pts.size()<2)return;PointF a=e.pts.get(0),b=e.pts.get(1);
+        if(g.kind==GRIP_RECT){
+            if(g.pointIndex==0){a.x=p.x;a.y=p.y;}
+            else if(g.pointIndex==1){b.x=p.x;a.y=p.y;}
+            else if(g.pointIndex==2){b.x=p.x;b.y=p.y;}
+            else if(g.pointIndex==3){a.x=p.x;b.y=p.y;}
+        }else if(g.kind==GRIP_CIRCLE_RADIUS){e.pts.set(1,p);}
+        else if(g.kind==GRIP_ELLIPSE_RX_POS){b.x=a.x+Math.abs(p.x-a.x);}
+        else if(g.kind==GRIP_ELLIPSE_RX_NEG){b.x=a.x-Math.abs(p.x-a.x);}
+        else if(g.kind==GRIP_ELLIPSE_RY_POS){b.y=a.y+Math.abs(p.y-a.y);}
+        else if(g.kind==GRIP_ELLIPSE_RY_NEG){b.y=a.y-Math.abs(p.y-a.y);}
+    }
+    private void finishGripDrag(){
+        if(activeGrip==null)return;
+        if(gripMoved&&gripBeforeAll!=null){undo.add(gripBeforeAll);if(undo.size()>80)undo.remove(0);redo.clear();persistLocal();say("Grip actualizado · geometría modificada");}
+        activeGrip=null;gripBeforeAll=null;gripMoved=false;invalidate();
+    }
+    private void cancelGripDrag(){
+        if(activeGrip==null)return;
+        if(gripBeforeAll!=null){entities.clear();entities.addAll(gripBeforeAll);}
+        activeGrip=null;gripBeforeAll=null;gripMoved=false;invalidate();
+    }
+
     private void addEntity(String type,PointF a,PointF b){
         checkpoint();Entity e=new Entity();e.type=type;e.layer=layer;e.color=drawColor;e.weight=weight;e.pts.add(new PointF(a.x,a.y));if(b!=null)e.pts.add(new PointF(b.x,b.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));anchor=null;persistLocal();invalidate();say(type+" creado");
     }
@@ -217,20 +307,21 @@ public class CadView extends View {
         int action=ev.getActionMasked();
         if(action==MotionEvent.ACTION_DOWN){
             PointF p=new PointF(ev.getX(),ev.getY());cursor=p;
-            if(tool.equals("SELECT")){selectionStartScreen=p;selectionEndScreen=p;selectionDragging=false;int meta=ev.getMetaState();selectionAdditive=multiSelectMode||(meta&(android.view.KeyEvent.META_SHIFT_ON|android.view.KeyEvent.META_CTRL_ON))!=0;invalidate();return true;}
+            if(tool.equals("SELECT")){GripRef g=findGrip(p.x,p.y);if(g!=null){activeGrip=g;gripBeforeAll=copyAll();gripMoved=false;say("Grip seleccionado · arrastra para editar");invalidate();return true;}selectionStartScreen=p;selectionEndScreen=p;selectionDragging=false;int meta=ev.getMetaState();selectionAdditive=multiSelectMode||(meta&(android.view.KeyEvent.META_SHIFT_ON|android.view.KeyEvent.META_CTRL_ON))!=0;invalidate();return true;}
             if(tool.equals("PAN")){panning=true;panLast=p;}else handle(world(p.x,p.y));invalidate();return true;
         }
-        if(action==MotionEvent.ACTION_POINTER_DOWN){selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;pinching=true;pinchStart=spacing(ev);pinchZoom=zoom;return true;}
+        if(action==MotionEvent.ACTION_POINTER_DOWN){if(activeGrip!=null)cancelGripDrag();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;pinching=true;pinchStart=spacing(ev);pinchZoom=zoom;return true;}
         if(action==MotionEvent.ACTION_MOVE){
             if(pinching&&ev.getPointerCount()>=2){float s=spacing(ev);if(pinchStart>0)zoom=Math.max(3,Math.min(400,pinchZoom*s/pinchStart));}
+            else if(activeGrip!=null&&ev.getPointerCount()==1){PointF q=snap(world(ev.getX(),ev.getY()));updateGrip(activeGrip,q);gripMoved=true;cursor.set(ev.getX(),ev.getY());}
             else if(selectionStartScreen!=null&&ev.getPointerCount()==1){selectionEndScreen=new PointF(ev.getX(),ev.getY());if(dist(selectionStartScreen,selectionEndScreen)>4)selectionDragging=true;cursor.set(ev.getX(),ev.getY());}
             else if(panning&&ev.getPointerCount()==1){float x=ev.getX(),y=ev.getY();panX+=x-panLast.x;panY+=y-panLast.y;panLast.set(x,y);}
             else {cursor.set(ev.getX(),ev.getY());}
             invalidate();return true;
         }
         if(action==MotionEvent.ACTION_POINTER_UP){pinching=false;return true;}
-        if(action==MotionEvent.ACTION_UP){if(selectionStartScreen!=null)finishSelection();panning=false;pinching=false;return true;}
-        if(action==MotionEvent.ACTION_CANCEL){selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;pinching=false;invalidate();return true;}
+        if(action==MotionEvent.ACTION_UP){if(activeGrip!=null)finishGripDrag();else if(selectionStartScreen!=null)finishSelection();panning=false;pinching=false;return true;}
+        if(action==MotionEvent.ACTION_CANCEL){if(activeGrip!=null)cancelGripDrag();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;pinching=false;invalidate();return true;}
         return true;
     }
     private float spacing(MotionEvent e){if(e.getPointerCount()<2)return 0;float x=e.getX(0)-e.getX(1),y=e.getY(0)-e.getY(1);return (float)Math.hypot(x,y);}
@@ -286,7 +377,7 @@ public class CadView extends View {
     public void setDrawColor(int c){drawColor=c;}
     public void setWeight(float w){weight=w;}
     public void runCommand(String raw){
-        String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);if(u.equals("MULTI")){toggleMultiSelect();return;}if(u.equals("ESC")||u.equals("CANCEL")){setSelection(Collections.emptyList());anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;say("Comando cancelado · selección limpia");invalidate();return;}String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
+        String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);if(u.equals("MULTI")){toggleMultiSelect();return;}if(u.equals("ESC")||u.equals("CANCEL")){if(activeGrip!=null)cancelGripDrag();setSelection(Collections.emptyList());anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;say("Comando cancelado · selección limpia");invalidate();return;}String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
         if(u.equals("F7")||u.equals("GRID")){toggleGrid();return;}if(u.equals("F8")||u.equals("ORTHO")){toggleOrtho();return;}if(u.equals("F9")||u.equals("SNAP")){toggleGridSnap();return;}if(u.equals("F3")||u.equals("OSNAP")){toggleSnap();return;}if(u.equals("F10")||u.equals("POLAR")){togglePolar();return;}
         String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
         String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE").contains(t)){setTool(t);return;}
