@@ -16,13 +16,15 @@ Proyecto hermano de [ESQUECHAT 3D](https://esquechat.com/). Identidad visual azu
 - Precisión: entrada dinámica, coordenadas absolutas/relativas, ORTHO, POLAR, GRID, SNAP, OSNAP y cruceta.
 - Selección CAD: ventana izquierda→derecha (solo entidades totalmente contenidas), cruce derecha→izquierda (entidades tocadas o atravesadas), selección múltiple, Shift/Ctrl o botón MULTI para acumular/quitar, ESC para limpiar; mover/copiar/borrar conjuntos.
 - Edición: mover, copiar, OFFSET, rotar, espejo, escalar, TRIM, EXTEND y EXPLODE para entidades compatibles.
+- Grips CAD: arrastra extremos, vértices, esquinas y puntos de control para editar geometría directamente; incluye líneas, polilíneas, polígonos, rectángulos, círculos, elipses, arcos, cotas, directrices y textos.
+- Grips con historial de edición: guardar, deshacer y cancelar cambios.
 - Capas básicas con visibilidad y bloqueo, color, tipo y grosor de línea.
 - Ventana de configuración HP: unidades, rejilla, incremento POLAR, radio OSNAP, ORTHO, SNAP y cruceta.
 - Abrir/guardar JSON; importar/exportar DXF; exportar SVG e imprimir/guardar PDF.
 - PWA con recursos locales cacheados para volver a abrir el editor sin conexión después de la primera carga.
 
 ### Android nativo
-La versión Android 0.3.0 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, mover/copiar/borrar, undo/redo, configuración HP, ORTHO/POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF.
+La versión Android 0.4.0 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, mover/copiar/borrar, undo/redo, configuración HP, ORTHO/POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF.
 
 ## Limitaciones importantes
 - No es todavía un reemplazo completo de AutoCAD ni de Civil 3D.
@@ -31,7 +33,7 @@ La versión Android 0.3.0 alfa reemplaza la envoltura WebView por una vista Andr
 - En Android nativo faltan operaciones avanzadas como TRIM, EXTEND, FILLET, CHAMFER, bloques dinámicos, layouts y plot styles.
 - Los archivos PDF y las medidas deben revisarse antes de usarse como documentación de obra.
 - Los APK de CI son compilaciones debug para pruebas, no paquetes firmados para Google Play.
-- No instalar el APK antiguo 0.1.0 (basado en WebView); el APK nativo 0.3.0 debe pasar la compilación y validación antes de publicarse.
+- No instalar el APK antiguo 0.1.0 (basado en WebView); el APK nativo 0.4.0 debe pasar la compilación y validación antes de publicarse.
 
 ## Compilar Android
 Requiere JDK 17, Gradle 8.9 y Android SDK 35:
