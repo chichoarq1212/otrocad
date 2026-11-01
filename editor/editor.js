@@ -1,6 +1,6 @@
 (()=>{
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
-let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,poly=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
+let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
 let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6;
 const colors={General:'#dce8f5',Muros:'#56b7e8',Cotas:'#f3c83e',Detalles:'#c69cff',Topografía:'#70d6a3',Vialidad:'#ff9b6b'};
 const clone=x=>JSON.parse(JSON.stringify(x));
@@ -36,11 +36,14 @@ function constrain(p){
  else if(polarOn){const len=Math.hypot(dx,dy),a=Math.round(Math.atan2(dy,dx)/(Math.PI/12))*(Math.PI/12);dx=len*Math.cos(a);dy=len*Math.sin(a)}
  return round({x:start.x+dx,y:start.y+dy});
 }
+function arcParams(points){if(!points||points.length<3)return null;const p=points.map(screen),[a,b,c]=p;const d=2*(a.x*(b.y-c.y)+b.x*(c.y-a.y)+c.x*(a.y-b.y));if(Math.abs(d)<1e-6)return null;const aa=a.x*a.x+a.y*a.y,bb=b.x*b.x+b.y*b.y,cc=c.x*c.x+c.y*c.y;const x=(aa*(b.y-c.y)+bb*(c.y-a.y)+cc*(a.y-b.y))/d,y=(aa*(c.x-b.x)+bb*(a.x-c.x)+cc*(b.x-a.x))/d;const a1=Math.atan2(a.y-y,a.x-x),am=Math.atan2(b.y-y,b.x-x),a3=Math.atan2(c.y-y,c.x-x),span=v=>(v+Math.PI*2)%(Math.PI*2),ccw=span(a3-a1),mid=span(am-a1);return{x,y,r:Math.hypot(a.x-x,a.y-y),a1,a3,anticlockwise:mid>ccw}}
 function drawEntity(s,sel=false){
  ctx.save();const color=sel?'#f3c83e':(s.color||colors[s.layer]||colors.General);ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=sel?2.2:1.25;
  const a=s.a&&screen(s.a),b=s.b&&screen(s.b);
  if(s.type==='line'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
  else if(s.type==='poly'){ctx.beginPath();s.pts.forEach((p,i)=>{const v=screen(p);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.stroke()}
+ else if(s.type==='arc'){const g=arcParams(s.pts);if(g){ctx.beginPath();ctx.arc(g.x,g.y,g.r,g.a1,g.a3,g.anticlockwise);ctx.stroke()}else{const ps=s.pts.map(screen);ctx.beginPath();ctx.moveTo(ps[0].x,ps[0].y);ctx.quadraticCurveTo(ps[1].x,ps[1].y,ps[2].x,ps[2].y);ctx.stroke()}}
+ else if(s.type==='leader'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.font='12px system-ui';ctx.fillText(s.text||'',b.x+4,b.y-4)}
  else if(s.type==='circle'){ctx.beginPath();ctx.arc(a.x,a.y,distance(a,b),0,Math.PI*2);ctx.stroke()}
  else if(s.type==='rect'||s.type==='hatch'){const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y);ctx.strokeRect(x,y,w,h);if(s.type==='hatch'){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.lineWidth=.7;for(let k=-h;k<w+h;k+=10){ctx.beginPath();ctx.moveTo(x+k,y);ctx.lineTo(x+k+h,y+h);ctx.stroke()}ctx.restore()}}
  else if(s.type==='ellipse'){ctx.beginPath();ctx.ellipse(a.x,a.y,Math.abs(b.x-a.x),Math.abs(b.y-a.y),0,0,Math.PI*2);ctx.stroke()}
@@ -77,7 +80,7 @@ function render(){
  updateDynamic();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
-function setTool(t){tool=t;start=null;temp=null;poly=[];moveBase=null;modifyTarget=-1;selected=-1;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));updatePrompt();render()}
+function setTool(t){tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;selected=-1;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));updatePrompt();render()}
 function selectAt(q){let found=-1,best=14/zoom;for(let i=objects.length-1;i>=0;i--){const s=objects[i];let d=1e9;if(s.type==='poly'||s.type==='polygon'){for(let j=0;j<s.pts.length;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[(j+1)%s.pts.length]))}else if(s.type==='rect'||s.type==='hatch'||s.type==='ellipse'){if(q.x>=Math.min(s.a.x,s.b.x)-best&&q.x<=Math.max(s.a.x,s.b.x)+best&&q.y>=Math.min(s.a.y,s.b.y)-best&&q.y<=Math.max(s.a.y,s.b.y)+best)d=0}else if(s.type==='circle')d=Math.abs(distance(q,s.a)-distance(s.a,s.b));else if(s.a&&s.b)d=pointLineDistance(q,s.a,s.b);if(d<best){best=d;found=i}}return found}
 function pointLineDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
 function showProperties(){const box=$('#properties'),content=$('#propContent');if(selected<0){content.textContent='Selecciona una entidad para editar sus propiedades.';return}const s=objects[selected];box.classList.add('open');content.innerHTML='';[['Tipo',s.type],['Capa',s.layer||'General'],['Color',s.color||'Por capa']].forEach(([k,v])=>{const l=document.createElement('label');l.textContent=k;const inp=document.createElement('input');inp.value=v;inp.readOnly=true;content.append(l,inp)});if(s.a&&s.b){[['X inicial',s.a.x],['Y inicial',s.a.y],['X final',s.b.x],['Y final',s.b.y]].forEach(([k,v])=>{const l=document.createElement('label');l.textContent=k;const inp=document.createElement('input');inp.value=Number(v).toFixed(3);inp.dataset.coord=k;content.append(l,inp)});const apply=document.createElement('button');apply.textContent='Aplicar coordenadas';apply.onclick=()=>{checkpoint();content.querySelectorAll('input[data-coord]').forEach(inp=>{const v=Number(inp.value),k=inp.dataset.coord;if(!Number.isFinite(v))return;if(k==='X inicial')s.a.x=v;if(k==='Y inicial')s.a.y=v;if(k==='X final')s.b.x=v;if(k==='Y final')s.b.y=v});save();render()};content.append(apply)}}
@@ -139,6 +142,7 @@ canvas.addEventListener('pointermove',e=>{
 });
 function pointerEnd(e){
  pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;
+ if(selectionStart&&!selectionBox){selected=selectAt(world(selectionStart));showProperties();selectionStart=null}
  if(selectionStart&&selectionBox){const a=world(selectionBox.a),b=world(selectionBox.b),left=Math.min(a.x,b.x),right=Math.max(a.x,b.x),bottom=Math.min(a.y,b.y),top=Math.max(a.y,b.y);selected=-1;for(let i=objects.length-1;i>=0;i--){const s=objects[i],pts=[];if(s.a)pts.push(s.a);if(s.b)pts.push(s.b);if(s.pts)pts.push(...s.pts);if(pts.some(p=>p.x>=left&&p.x<=right&&p.y>=bottom&&p.y<=top)){selected=i;break}}selectionStart=null;selectionBox=null;showProperties()}
  if(drag&&tool==='pan')drag=null;
  render();
