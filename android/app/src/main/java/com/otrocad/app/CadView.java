@@ -34,7 +34,7 @@ public class CadView extends View {
     public void restoreLocal(){String raw=getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).getString("drawing","");if(raw!=null&&!raw.isEmpty())try{loadJson(raw);say("Dibujo local recuperado");}catch(Exception ignored){}}
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
-    public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;panning=false;say("Herramienta: "+tool);invalidate();}
+    public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;selected=-1;panning=false;say("Herramienta: "+tool);invalidate();}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
     public void toggleOrtho(){ortho=!ortho;invalidate();}
@@ -182,7 +182,7 @@ public class CadView extends View {
             else if(e.type.equals("ARC")){float r=num(v,"40",1),a1=(float)Math.toRadians(num(v,"50",0)),a2=(float)Math.toRadians(num(v,"51",90));e.pts.clear();for(int k=0;k<=24;k++){float t=a1+(a2-a1)*k/24f;e.pts.add(new PointF(x+r*(float)Math.cos(t),y+r*(float)Math.sin(t)));}}
             else if(e.type.equals("TEXT"))e.text=first(v,"1","Texto");
             String col=first(v,"420","");if(!col.isEmpty())try{e.color=Color.rgb((int)(Long.parseLong(col)>>16)&255,(int)(Long.parseLong(col)>>8)&255,(int)Long.parseLong(col)&255);}catch(Exception ignored){}
-            e.weight=num(v,"370",25)/100f;out.add(e);i=j-1;
+            e.weight=num(v,"370",25)/100f;e.linetype=first(v,"6","CONTINUOUS");out.add(e);i=j-1;
         }checkpoint();entities.clear();entities.addAll(out);selected=-1;persistLocal();invalidate();say("DXF abierto · "+out.size()+" entidades");
     }
     private static String first(HashMap<String,ArrayList<String>> m,String k,String d){return m.containsKey(k)&&!m.get(k).isEmpty()?m.get(k).get(0):d;}
@@ -190,7 +190,7 @@ public class CadView extends View {
     private static float parse(String s){try{return Float.parseFloat(s);}catch(Exception e){return 0;}}
     public String toDxf(){
         StringBuilder b=new StringBuilder("0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n");
-        for(Entity e:entities){String common="8\n"+e.layer+"\n370\n"+Math.round(e.weight*100)+"\n420\n"+(e.color&0xffffff)+"\n";
+        for(Entity e:entities){String common="8\n"+e.layer+"\n6\n"+e.linetype+"\n370\n"+Math.round(e.weight*100)+"\n420\n"+(e.color&0xffffff)+"\n";
             if(e.pts.size()<1)continue;PointF a=e.pts.get(0);
             if(e.type.equals("LINE")||e.type.equals("DIM")||e.type.equals("LEADER")){if(e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLINE\n").append(common).append("10\n").append(a.x).append("\n20\n").append(a.y).append("\n30\n0\n11\n").append(q.x).append("\n21\n").append(q.y).append("\n31\n0\n");}}
             else if(e.type.equals("CIRCLE")&&e.pts.size()>1)b.append("0\nCIRCLE\n").append(common).append("10\n").append(a.x).append("\n20\n").append(a.y).append("\n40\n").append(dist(a,e.pts.get(1))).append("\n");
@@ -205,12 +205,12 @@ public class CadView extends View {
     public void setDrawColor(int c){drawColor=c;}
     public void setWeight(float w){weight=w;}
     public void runCommand(String raw){
-        String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);
+        String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
         if(u.equals("F7")||u.equals("GRID")){toggleGrid();return;}if(u.equals("F8")||u.equals("ORTHO")){toggleOrtho();return;}if(u.equals("F9")||u.equals("SNAP")){toggleSnap();return;}if(u.equals("F10")||u.equals("POLAR")){togglePolar();return;}
         String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
         String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE").contains(t)){setTool(t);return;}
         if(c.equals("UNDO")||c.equals("U")){undo();return;}if(c.equals("REDO")){redo();return;}if(c.equals("DELETE")){deleteSelected();return;}
-        try{String z=s.replace("@","");if(z.contains("<")){String[] p=z.split("<");float len=Float.parseFloat(p[0]),ang=(float)Math.toRadians(Float.parseFloat(p[1]));PointF base=anchor==null?new PointF(0,0):anchor;handle(new PointF(base.x+len*(float)Math.cos(ang),base.y+len*(float)Math.sin(ang)));return;}if(z.contains(",")){String[] p=z.split(",");float x=Float.parseFloat(p[0]),y=Float.parseFloat(p[1]);PointF base=anchor==null?new PointF(0,0):anchor;if(s.startsWith("@")){x+=base.x;y+=base.y;}handle(new PointF(x,y));return;}}catch(Exception ignored){}
+        try{String z=s.replace("@","");if(z.contains("<")){String[] p=z.split("<");float len=Float.parseFloat(p[0]),ang=(float)Math.toRadians(Float.parseFloat(p[1]));PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):(tool.equals("ARC")&&!arcPoints.isEmpty()?arcPoints.get(arcPoints.size()-1):(anchor==null?new PointF(0,0):anchor));handle(new PointF(base.x+len*(float)Math.cos(ang),base.y+len*(float)Math.sin(ang)));return;}if(z.contains(",")){String[] p=z.split(",");float x=Float.parseFloat(p[0]),y=Float.parseFloat(p[1]);PointF base=anchor==null?new PointF(0,0):anchor;if(s.startsWith("@")){x+=base.x;y+=base.y;}handle(new PointF(x,y));return;}}catch(Exception ignored){}
         say("Comando no reconocido: "+c);
     }
     public void drawPdf(Canvas c,int w,int h){
@@ -219,7 +219,7 @@ public class CadView extends View {
         for(Entity e:entities)for(PointF p:e.pts){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
         float rx=Math.max(1,maxX-minX),ry=Math.max(1,maxY-minY),pad=42;
         float s=Math.max(.001f,Math.min((w-2*pad)/rx,(h-2*pad)/ry)),ox=(w-rx*s)/2,oy=(h-ry*s)/2;
-        for(Entity e:entities){if(e.pts.isEmpty())continue;Paint p=new Paint(3);p.setColor(e.color);p.setStrokeWidth(Math.max(.7f,e.weight*2));p.setStyle(Paint.Style.STROKE);
+        for(Entity e:entities){if(e.pts.isEmpty())continue;Paint p=new Paint(3);p.setColor(e.color==Color.rgb(220,232,245)?Color.BLACK:e.color);p.setStrokeWidth(Math.max(.7f,e.weight*2));p.setStyle(Paint.Style.STROKE);
             if("DASHED".equals(e.linetype))p.setPathEffect(new DashPathEffect(new float[]{7,4},0));
             PointF a=e.pts.get(0);float x=ox+(a.x-minX)*s,y=oy+(maxY-a.y)*s;
             if(e.type.equals("CIRCLE")&&e.pts.size()>1)c.drawCircle(x,y,dist(a,e.pts.get(1))*s,p);
