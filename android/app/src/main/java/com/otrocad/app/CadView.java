@@ -48,7 +48,7 @@ public class CadView extends View {
     public void restoreLocal(){String raw=getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).getString("drawing","");if(raw!=null&&!raw.isEmpty())try{loadJson(raw);say("Dibujo local recuperado");}catch(Exception ignored){}}
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
-    public void setTool(String t){if(activeGrip!=null)cancelGripDrag();tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · izquierda→derecha VENTANA · derecha→izquierda CRUCE · activa MULTI para acumular":"Herramienta: "+tool);invalidate();}
+    public void setTool(String t){if(activeGrip!=null)cancelGripDrag();tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
     public void toggleOrtho(){ortho=!ortho;invalidate();}
@@ -116,8 +116,8 @@ public class CadView extends View {
     }
     private void finishSelection(){
         if(selectionStartScreen==null)return;
-        if(selectionDragging&&selectionEndScreen!=null){PointF a=world(selectionStartScreen.x,selectionStartScreen.y),b=world(selectionEndScreen.x,selectionEndScreen.y);boolean window=selectionEndScreen.x>=selectionStartScreen.x;ArrayList<Integer> hits=selectByWindow(Math.min(a.x,b.x),Math.max(a.x,b.x),Math.min(a.y,b.y),Math.max(a.y,b.y),window);ArrayList<Integer> result=selectionAdditive?selectedIndices():new ArrayList<>();for(int i:hits)if(!result.contains(i))result.add(i);setSelection(result);say(hits.size()+" objeto(s) "+(window?"dentro de ventana":"cruzados por ventana"));}
-        else{int hit=hit(world(selectionStartScreen.x,selectionStartScreen.y));ArrayList<Integer> result=selectedIndices();if(!selectionAdditive)result.clear();if(hit>=0){if(selectionAdditive&&result.contains(hit))result.remove(Integer.valueOf(hit));else if(!result.contains(hit))result.add(hit);}setSelection(result);say(hit>=0?"Objeto seleccionado":(selectionAdditive?"Selección conservada":"Sin selección"));}
+        if(selectionDragging&&selectionEndScreen!=null){PointF a=world(selectionStartScreen.x,selectionStartScreen.y),b=world(selectionEndScreen.x,selectionEndScreen.y);boolean window=selectionEndScreen.x>=selectionStartScreen.x;ArrayList<Integer> hits=selectByWindow(Math.min(a.x,b.x),Math.max(a.x,b.x),Math.min(a.y,b.y),Math.max(a.y,b.y),window);ArrayList<Integer> result=selectionAdditive?selectedIndices():new ArrayList<>();for(int i:hits)if(!result.contains(i))result.add(i);setSelection(result);say(hits.size()+" objeto(s) "+(window?"dentro de ventana":"cruzados por ventana")+" · arrastra grips para editar");}
+        else{int hit=hit(world(selectionStartScreen.x,selectionStartScreen.y));ArrayList<Integer> result=selectedIndices();if(!selectionAdditive)result.clear();if(hit>=0){if(selectionAdditive&&result.contains(hit))result.remove(Integer.valueOf(hit));else if(!result.contains(hit))result.add(hit);}setSelection(result);say(hit>=0?"Objeto seleccionado · arrastra un grip cuadrado para editar":(selectionAdditive?"Selección conservada":"Sin selección"));}
         selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;invalidate();
     }
     private ArrayList<Entity> copyAll(){ArrayList<Entity> a=new ArrayList<>();for(Entity e:entities)a.add(e.copy());return a;}
