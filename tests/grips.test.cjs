@@ -13,11 +13,25 @@ const geometry = source.slice(descriptorsStart, descriptorsEnd) + '\n' + source.
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const { gripDescriptors, applyGrip } = new Function('distance', geometry + '\nreturn { gripDescriptors, applyGrip };')(distance);
 
+const colorStart = source.indexOf('function resolveCadColor(');
+const colorEnd = source.indexOf('function canvasIsLight()', colorStart);
+assert.ok(colorStart >= 0 && colorEnd > colorStart, 'resolveCadColor function must exist');
+const colorCode = source.slice(colorStart, colorEnd);
+const colors = { General: '#dce8f5', Muros: '#56b7e8', Cotas: '#f3c83e' };
+const resolveCadColor = new Function('colors', colorCode + '\nreturn resolveCadColor;')(colors);
+
 const results = [];
 function test(name, fn) {
   fn();
   results.push(name);
 }
+
+test('automatic CAD color contrasts with dark and light canvases', () => {
+  assert.equal(resolveCadColor({ layer: 'General', color: '#dce8f5' }, false), '#ffffff');
+  assert.equal(resolveCadColor({ layer: 'General', color: '#dce8f5' }, true), '#111111');
+  assert.equal(resolveCadColor({ layer: 'Muros', color: '#56b7e8' }, false), '#56b7e8');
+  assert.equal(resolveCadColor({ layer: 'Cotas', color: '#f3c83e' }, true), '#f3c83e');
+});
 
 test('line endpoints', () => {
   const e = { type: 'line', a: { x: 0, y: 0 }, b: { x: 5, y: 0 } };
