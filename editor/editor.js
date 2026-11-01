@@ -26,7 +26,7 @@ function snapPoint(p){
   }
  }
  if(best)return {...best};
- if(snapOn){q.x=Math.round(q.x);q.y=Math.round(q.y)}
+ if(snapOn){q.x=Math.round(q.x/gridStep)*gridStep;q.y=Math.round(q.y/gridStep)*gridStep}
  return q;
 }
 function constrain(p){
