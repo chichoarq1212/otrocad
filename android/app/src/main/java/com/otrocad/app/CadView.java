@@ -168,7 +168,7 @@ public class CadView extends View {
     private void addEntity(String type,PointF a,PointF b){
         checkpoint();Entity e=new Entity();e.type=type;e.layer=layer;e.color=drawColor;e.weight=weight;e.pts.add(new PointF(a.x,a.y));if(b!=null)e.pts.add(new PointF(b.x,b.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));anchor=null;persistLocal();invalidate();say(type+" creado");
     }
-    private void finishPoly(){if(poly.size()>1){checkpoint();Entity e=new Entity();e.type="POLY";e.layer=layer;e.color=drawColor;e.weight=weight;for(PointF p:poly)e.pts.add(new PointF(p.x,p.y));entities.add(e);selected=entities.size()-1;}poly.clear();anchor=null;persistLocal();invalidate();say("Polilínea terminada");}
+    private void finishPoly(){if(poly.size()>1){checkpoint();Entity e=new Entity();e.type="POLY";e.layer=layer;e.color=drawColor;e.weight=weight;for(PointF p:poly)e.pts.add(new PointF(p.x,p.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));}poly.clear();anchor=null;persistLocal();invalidate();say("Polilínea terminada");}
     public void finish(){finishPoly();}
     private void handle(PointF raw){
         PointF q=constrain(snap(raw));
@@ -182,8 +182,8 @@ public class CadView extends View {
             if(tool.equals("COPY"))setSelection(created);moveTargets.clear();moveBase=null;persistLocal();invalidate();say("Edición aplicada a "+(tool.equals("COPY")?created.size():selectedIndices().size())+" objeto(s)");return;
         }
         if(tool.equals("POLY")){poly.add(q);cursor=new PointF(q.x,q.y);invalidate();say("Vértice añadido · pulsa Terminar PL");return;}
-        if(tool.equals("ARC")){arcPoints.add(q);if(arcPoints.size()==3){ArrayList<PointF> a=arcPoints;checkpoint();Entity e=new Entity();e.type="ARC";e.layer=layer;e.color=drawColor;e.weight=weight;for(int i=0;i<=24;i++){float t=i/24f;PointF p=new PointF(a.get(0).x*(1-t)*(1-t)+a.get(1).x*2*(1-t)*t+a.get(2).x*t*t,a.get(0).y*(1-t)*(1-t)+a.get(1).y*2*(1-t)*t+a.get(2).y*t*t);e.pts.add(p);}entities.add(e);selected=entities.size()-1;arcPoints.clear();persistLocal();say("Arco creado");}else say("Marca el siguiente punto del arco");invalidate();return;}
-        if(tool.equals("TEXT")){Entity e=new Entity();e.type="TEXT";e.layer=layer;e.color=drawColor;e.text=textValue;e.pts.add(q);checkpoint();entities.add(e);selected=entities.size()-1;persistLocal();invalidate();say("Texto colocado");return;}
+        if(tool.equals("ARC")){arcPoints.add(q);if(arcPoints.size()==3){ArrayList<PointF> a=arcPoints;checkpoint();Entity e=new Entity();e.type="ARC";e.layer=layer;e.color=drawColor;e.weight=weight;for(int i=0;i<=24;i++){float t=i/24f;PointF p=new PointF(a.get(0).x*(1-t)*(1-t)+a.get(1).x*2*(1-t)*t+a.get(2).x*t*t,a.get(0).y*(1-t)*(1-t)+a.get(1).y*2*(1-t)*t+a.get(2).y*t*t);e.pts.add(p);}entities.add(e);setSelection(Arrays.asList(entities.size()-1));arcPoints.clear();persistLocal();say("Arco creado");}else say("Marca el siguiente punto del arco");invalidate();return;}
+        if(tool.equals("TEXT")){Entity e=new Entity();e.type="TEXT";e.layer=layer;e.color=drawColor;e.text=textValue;e.pts.add(q);checkpoint();entities.add(e);setSelection(Arrays.asList(entities.size()-1));persistLocal();invalidate();say("Texto colocado");return;}
         if(tool.equals("LINE")||tool.equals("RECT")||tool.equals("CIRCLE")||tool.equals("DIM")||tool.equals("HATCH")||tool.equals("LEADER")||tool.equals("ELLIPSE")){
             if(anchor==null){anchor=q;cursor=q;invalidate();say("Marca el punto final");}else{addEntity(tool,anchor,q);}return;
         }
@@ -209,7 +209,7 @@ public class CadView extends View {
         if(src.type.equals("CIRCLE")){PointF center=src.pts.get(0);float radius=dist(center,src.pts.get(1));float nr=radius+(dist(side,center)>=radius?d:-d);if(nr<=0){say("El desfase dejaría un radio no válido");return;}e.pts.clear();e.pts.add(new PointF(center.x,center.y));e.pts.add(new PointF(center.x+nr,center.y));}
         else if(src.type.equals("LINE")){PointF a=src.pts.get(0),b=src.pts.get(1);float dx=b.x-a.x,dy=b.y-a.y,len=(float)Math.hypot(dx,dy);if(len<1e-6){say("Entidad demasiado corta");return;}float sign=((side.x-a.x)*(-dy/len)+(side.y-a.y)*(dx/len))>=0?1:-1,ox=-dy/len*d*sign,oy=dx/len*d*sign;for(PointF p:e.pts){p.x+=ox;p.y+=oy;}}
         else {say("OFFSET nativo admite líneas y círculos en esta alfa");return;}
-        checkpoint();entities.add(e);selected=entities.size()-1;persistLocal();invalidate();say("OFFSET creado");
+        checkpoint();entities.add(e);setSelection(Arrays.asList(entities.size()-1));persistLocal();invalidate();say("OFFSET creado");
     }
     @Override public boolean onTouchEvent(MotionEvent ev){
         int action=ev.getActionMasked();
