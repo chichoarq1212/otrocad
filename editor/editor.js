@@ -175,6 +175,7 @@ function doOffset(q){
 }
 function handleTap(p){
  let q=snapPoint(world(p));q=constrain(q);
+ if(!['select','pan','move','copy','offset','trim','extend','explode'].includes(tool)&&lockedLayers.has($('#layer').value)){status.textContent='La capa '+$('#layer').value+' está bloqueada';return}
  if(tool==='arc'){
   arcPoints.push(q);
   if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();selected=objects.length-1;arcPoints=[];status.textContent='Arco creado';}
@@ -315,7 +316,7 @@ function runCommand(raw){
  if(c==='U'||c==='UNDO'){$('#undo').click();return}if(c==='REDO'){$('#redo').click();return}
  if(c==='HP'||c==='DSETTINGS'||c==='SETTINGS'){alert('CONFIGURACIÓN DE DIBUJO\nF7 Rejilla: '+(gridOn?'ACTIVA':'INACTIVA')+'\nF8 Orto: '+(orthoOn?'ACTIVO':'INACTIVO')+'\nF9 Snap: '+(snapOn?'ACTIVO':'INACTIVO')+'\nF10 Polar: '+(polarOn?'ACTIVO':'INACTIVO')+'\nF3 Referencias: '+(osnapOn?'ACTIVAS':'INACTIVAS'));return}
  if(c==='PR'||c==='PROPERTIES'||c==='CTRL+1'){$('#properties').classList.toggle('open');showProperties();return}
- if(c==='E'||c==='ERASE'||c==='DELETE'){if(selected>=0){checkpoint();objects.splice(selected,1);selected=-1;save();render()}return}
+ if(c==='E'||c==='ERASE'||c==='DELETE'){if(selected>=0&&!lockedLayers.has(objects[selected]?.layer)){checkpoint();objects.splice(selected,1);selected=-1;save();render()}return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
  if(c==='F'||c==='FILLET'||c==='CHA'||c==='CHAMFER'){status.textContent=c+' · empalme/chaflán aún no implementado';return}
