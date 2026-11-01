@@ -12,6 +12,8 @@ import android.provider.OpenableColumns;
 import android.view.Gravity;
 import android.view.WindowManager;
 import android.view.View;
+import android.os.Build;
+import android.view.WindowInsets;
 import android.widget.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -27,19 +29,21 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         getWindow().setStatusBarColor(Color.rgb(24,91,232));
         getWindow().setNavigationBarColor(Color.rgb(24,91,232));
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         buildUi();
         cad.restoreLocal();
         if(getIntent()!=null&&getIntent().getData()!=null)openUri(getIntent().getData());
     }
     private void buildUi(){
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.rgb(24,91,232));
-        LinearLayout brandRow=new LinearLayout(this);brandRow.setOrientation(LinearLayout.HORIZONTAL);brandRow.setGravity(Gravity.CENTER_VERTICAL);brandRow.setPadding(10,5,8,5);ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.ic_otrocad);logo.setContentDescription("Isotipo original de OtroCAD");logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brandRow.addView(logo,new LinearLayout.LayoutParams(40,40));TextView title=new TextView(this);title.setText("otroCAD  ·  CAD NATIVO OFFLINE");title.setTextColor(Color.WHITE);title.setTextSize(16);title.setTypeface(null,1);title.setPadding(9,0,4,0);brandRow.addView(title,new LinearLayout.LayoutParams(-1,-2));root.addView(brandRow,new LinearLayout.LayoutParams(-1,-2));
-        status=new TextView(this);status.setText("Listo · Dibujo y archivos procesados localmente");status.setTextColor(0xffdce8f5);status.setTextSize(11);status.setPadding(10,4,10,7);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(0xfff1f5ff);root.setFitsSystemWindows(true);
+        if(Build.VERSION.SDK_INT>=35){root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);return insets;});}
+        LinearLayout brandRow=new LinearLayout(this);brandRow.setOrientation(LinearLayout.HORIZONTAL);brandRow.setGravity(Gravity.CENTER_VERTICAL);brandRow.setBackgroundColor(0xff185be8);brandRow.setPadding(12,7,10,7);ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.ic_otrocad);logo.setContentDescription("Isotipo original de OtroCAD");logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brandRow.addView(logo,new LinearLayout.LayoutParams(40,40));TextView title=new TextView(this);title.setText("otroCAD");title.setTextColor(Color.WHITE);title.setTextSize(16);title.setTypeface(null,1);title.setPadding(9,0,4,0);brandRow.addView(title,new LinearLayout.LayoutParams(-1,-2));root.addView(brandRow,new LinearLayout.LayoutParams(-1,54));
+        status=new TextView(this);status.setText("Listo · Dibujo y archivos procesados localmente");status.setTextColor(0xff153665);status.setBackgroundColor(0xffe8efff);status.setTextSize(11);status.setPadding(10,4,10,7);
         cad=new CadView(this);cad.setStatusListener(s->status.setText(s));cad.setLengthRequestListener((suggested,unit,isPoly,ortho)->showLengthDialog(suggested,unit,isPoly,ortho));
         // Native Android ribbon: each category owns its own visible tools.
         LinearLayout tabStrip=new LinearLayout(this);tabStrip.setOrientation(LinearLayout.HORIZONTAL);
         HorizontalScrollView tabScroll=new HorizontalScrollView(this);tabScroll.setHorizontalScrollBarEnabled(false);tabScroll.addView(tabStrip);
-        root.addView(tabScroll,new LinearLayout.LayoutParams(-1,44));
+        tabScroll.setBackgroundColor(0xffe8efff);root.addView(tabScroll,new LinearLayout.LayoutParams(-1,52));
         android.widget.FrameLayout ribbonPanels=new android.widget.FrameLayout(this);
         final String[] tabNames={"DIBUJO","MODIFICAR","ANOTAR","CAPAS","VISTA","CONFIG.","ARCHIVOS"};
         final View[] panels=new View[tabNames.length];
@@ -67,31 +71,31 @@ public class MainActivity extends Activity {
             ribbonPanels.addView(panels[i],new android.widget.FrameLayout.LayoutParams(-1,-1));
             panels[i].setVisibility(i==0?View.VISIBLE:View.GONE);
             Button tab=smallButton(tabNames[i]);tabs[i]=tab;
-            tab.setTextColor(i==0?0xff173665:Color.WHITE);
-            tab.setBackgroundTintList(android.content.res.ColorStateList.valueOf(i==0?0xffffcf23:0xff185be8));
+            tab.setTextColor(0xff153665);
+            tab.setBackgroundTintList(android.content.res.ColorStateList.valueOf(i==0?0xffffcf23:0xffdce8fa));
             tab.setOnClickListener(v->{
                 for(int j=0;j<panels.length;j++){
                     panels[j].setVisibility(j==tabIndex?View.VISIBLE:View.GONE);
-                    tabs[j].setTextColor(j==tabIndex?0xff173665:Color.WHITE);
-                    tabs[j].setBackgroundTintList(android.content.res.ColorStateList.valueOf(j==tabIndex?0xffffcf23:0xff185be8));
+                    tabs[j].setTextColor(0xff153665);
+                    tabs[j].setBackgroundTintList(android.content.res.ColorStateList.valueOf(j==tabIndex?0xffffcf23:0xffdce8fa));
                 }
             });
             tabStrip.addView(tab,new LinearLayout.LayoutParams(-2,-1));
         }
-        root.addView(ribbonPanels,new LinearLayout.LayoutParams(-1,52));
+        ribbonPanels.setBackgroundColor(Color.WHITE);root.addView(ribbonPanels,new LinearLayout.LayoutParams(-1,62));
         root.addView(cad,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout cmdrow=new LinearLayout(this);cmdrow.setPadding(7,5,7,5);cmdrow.setGravity(Gravity.CENTER_VERTICAL);
-        command=new EditText(this);command.setSingleLine(true);command.setTextColor(Color.WHITE);command.setHintTextColor(0xff9fb0c3);command.setHint("Comando: LINE, PLINE, OFFSET, MOVE, @10,0");command.setTextSize(13);command.setPadding(10,5,10,5);command.setBackgroundColor(0xffe7efff);cmdrow.addView(command,new LinearLayout.LayoutParams(0,44,1));
+        LinearLayout cmdrow=new LinearLayout(this);cmdrow.setBackgroundColor(Color.WHITE);cmdrow.setPadding(7,5,7,5);cmdrow.setGravity(Gravity.CENTER_VERTICAL);
+        command=new EditText(this);command.setSingleLine(true);command.setTextColor(0xff153665);command.setHintTextColor(0xff657b99);command.setHint("Comando: LINE, PLINE, OFFSET, MOVE, @10,0");command.setTextSize(13);command.setPadding(10,5,10,5);command.setBackgroundColor(0xffe7efff);cmdrow.addView(command,new LinearLayout.LayoutParams(0,44,1));
         Button run=smallButton("EJECUTAR");run.setOnClickListener(v->runCommand());cmdrow.addView(run);command.setOnEditorActionListener((v,id,event)->{runCommand();return true;});root.addView(cmdrow,new LinearLayout.LayoutParams(-1,52));
-        root.addView(status,new LinearLayout.LayoutParams(-1,-2));
+        status.setSingleLine(true);status.setEllipsize(android.text.TextUtils.TruncateAt.END);root.addView(status,new LinearLayout.LayoutParams(-1,32));
         setContentView(root);
     }
     private HorizontalScrollView toolbar(String[][] items){
         HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.setHorizontalScrollBarEnabled(false);LinearLayout row=new LinearLayout(this);row.setPadding(5,3,5,3);
         for(String[] item:items){Button b=smallButton(item[0]);b.setOnClickListener(v->toolAction(item[1]));row.addView(b,new LinearLayout.LayoutParams(-2,-1));}
-        scroll.addView(row);return scroll;
+        scroll.addView(row,new HorizontalScrollView.LayoutParams(-2,-1));return scroll;
     }
-    private Button smallButton(String label){Button b=new Button(this);b.setText(label);b.setTextSize(10);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setPadding(8,3,8,3);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffe7efff));return b;}
+    private Button smallButton(String label){Button b=new Button(this);b.setText(label);b.setTextSize(12);b.setTextColor(0xff153665);b.setAllCaps(false);b.setIncludeFontPadding(false);b.setMinHeight(0);b.setMinimumHeight(0);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(14,3,14,3);b.setGravity(Gravity.CENTER);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffe7efff));return b;}
     private void addToggle(LinearLayout row,String label,Runnable action){Button b=smallButton(label);b.setOnClickListener(v->{action.run();b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffffcf23));});row.addView(b,new LinearLayout.LayoutParams(0,-1,1));}
     private void addOrthoToggle(LinearLayout row){
         orthoButton=smallButton(cad.isOrthoEnabled()?"ORTHO ON":"ORTHO OFF");
