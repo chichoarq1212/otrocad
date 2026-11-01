@@ -39,7 +39,7 @@ public class CadView extends View {
     public void restoreLocal(){String raw=getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).getString("drawing","");if(raw!=null&&!raw.isEmpty())try{loadJson(raw);say("Dibujo local recuperado");}catch(Exception ignored){}}
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
-    public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say("Herramienta: "+tool);invalidate();}
+    public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · arrastra izquierda→derecha para VENTANA y derecha→izquierda para CRUCE":"Herramienta: "+tool);invalidate();}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
     public void toggleOrtho(){ortho=!ortho;invalidate();}
