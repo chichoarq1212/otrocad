@@ -1,0 +1,85 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#185BE8"><link rel="icon" href="../icon.svg" type="image/svg+xml"><link rel="manifest" href="../manifest.webmanifest"><title>Herramientas de OtroCAD · OtroCAD</title><style>
+:root{--navy:#101b2e;--navy2:#172942;--blue:#185BE8;--yellow:#FFCF23;--ink:#17243a;--muted:#657488;--paper:#f2f6fa;--line:#dce4ec}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font:16px/1.55 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink)}
+a{color:inherit}.wrap{width:min(1160px,calc(100% - 36px));margin:auto}
+header{height:74px;background:var(--navy);color:#fff;border-bottom:1px solid #ffffff20}
+.head{height:100%;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{display:inline-flex;align-items:center;gap:9px;color:#fff;text-decoration:none;font-size:25px;font-weight:900;letter-spacing:-1px;white-space:nowrap}.brand .accent{color:var(--yellow)}
+.brandmark{width:39px;height:39px;flex:0 0 auto;display:block}nav{display:flex;gap:24px;align-items:center}nav a{text-decoration:none;color:#dbe5ef;font-size:14px;font-weight:700}nav a:hover{color:var(--yellow)}
+nav .navbtn{border:1px solid #FFCF2388;border-radius:7px;padding:9px 14px;color:var(--yellow)}
+.hero{background:var(--navy);color:#fff;padding:68px 0 78px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;inset:0 0 0 50%;opacity:.22;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M40 0H0V40' fill='none' stroke='%2362b8e8' stroke-width='.8'/%3E%3C/svg%3E")}
+.hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:44px}
+.eyebrow{color:var(--yellow);font-size:12px;font-weight:850;letter-spacing:2px;text-transform:uppercase}
+h1{font-size:clamp(42px,5.5vw,68px);line-height:1.03;letter-spacing:-2.5px;margin:18px 0}
+h1 em{font-style:normal;color:var(--yellow)}.intro{max-width:570px;color:#c6d3e1;font-size:17px;line-height:1.7}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin:26px 0}.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:13px 18px;min-height:48px;border-radius:7px;text-decoration:none;font-weight:850;font-size:14px}
+.primary{background:var(--yellow);color:var(--navy)}.secondary{border:1px solid #8aa0b7;color:#fff;background:#ffffff08}
+.meta{display:flex;flex-wrap:wrap;gap:18px;color:#9fb2c7;font-size:12px}.meta b{color:var(--blue)}
+.mock{border:1px solid #597493;border-radius:12px;overflow:hidden;background:#0b1522;box-shadow:0 22px 60px #0005}.mock iframe{display:block;width:100%;height:410px;border:0;background:#101820}
+.mockbar{height:38px;background:#172942;border-bottom:1px solid #314862;display:flex;align-items:center;gap:7px;padding:0 13px;color:#a7bbd0;font:10px monospace;letter-spacing:1px}
+.mockbar i{width:7px;height:7px;border-radius:50%;background:#7088a1}.mockbar strong{margin-left:auto;color:var(--yellow)}
+.plan{display:block;width:100%;height:auto}
+.proof{border-bottom:1px solid var(--line);background:#fff}.proofgrid{display:grid;grid-template-columns:repeat(4,1fr)}
+.proofitem{padding:19px 12px;display:flex;align-items:center;justify-content:center;gap:10px;border-right:1px solid var(--line);font-size:13px;font-weight:800;color:#33445a}.proofitem:last-child{border:0}
+.prooficon{display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:#eaf4fb;color:#247eae;font-size:19px}
+section.content{padding:72px 0}.soft{background:var(--paper)}
+.sectionhead{text-align:center;max-width:700px;margin:0 auto 34px}.kicker{color:#277fae;text-transform:uppercase;font-size:11px;letter-spacing:1.8px;font-weight:850}
+h2{font-size:clamp(29px,3.5vw,42px);line-height:1.13;letter-spacing:-1.2px;color:var(--navy);margin:10px 0}
+.sectionhead p{color:var(--muted);margin:0;line-height:1.7}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{padding:23px;border:1px solid var(--line);border-radius:10px;background:#fff;min-height:170px}
+.cardicon{width:42px;height:42px;border-radius:9px;background:#eaf4fb;color:#247eae;display:grid;place-items:center;font-size:21px}
+.card h3{margin:14px 0 6px;color:var(--navy);font-size:17px}.card p{margin:0;color:var(--muted);font-size:14px;line-height:1.65}
+.downloads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.download{padding:30px;border-radius:11px;background:var(--navy);color:#fff;border-top:4px solid var(--yellow)}
+.download.web{background:#eaf3f9;color:var(--navy);border-color:var(--blue)}
+.pill{display:inline-block;padding:5px 9px;border-radius:99px;background:#FFCF2322;color:var(--yellow);font-size:11px;font-weight:850;margin-bottom:13px}
+.web .pill{background:#185BE822;color:#247eae}.download h3{font-size:23px;margin:0 0 8px}.download p{font-size:14px;color:#c6d3e1;line-height:1.7;margin:0 0 17px}
+.web p{color:#5e7083}.download small{display:block;color:#9fb2c7;font-size:11px;line-height:1.6;margin-top:13px}.web small{color:#66778a}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.step{padding:20px;border:1px solid var(--line);border-radius:9px;background:#fff}.step b{display:block;color:#247eae;font-size:12px;margin-bottom:7px}.step p{margin:0;color:var(--muted);font-size:13px}
+.sibling{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:28px;background:var(--navy2);color:#fff;border-radius:11px}.sibling h3{font-size:22px;margin:0 0 4px}.sibling p{margin:0;color:#c6d3e1;font-size:14px}.sibling a{color:var(--yellow);font-weight:850;text-decoration:none;white-space:nowrap}
+footer{background:#0b1421;color:#c6d3e1;padding:34px 0;font-size:13px}.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}.foot strong{color:#fff;font-size:17px}.foot a{color:var(--yellow);text-decoration:none}.fine{color:#91a4b8;font-size:11px;max-width:600px;margin-top:7px}
+@media(max-width:850px){.hero-grid{grid-template-columns:1fr;gap:32px}.mock{max-width:650px;width:100%;margin:auto}.cards{grid-template-columns:repeat(2,1fr)}.proofgrid{grid-template-columns:repeat(2,1fr)}.proofitem:nth-child(2){border-right:0}.proofitem:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+@media(max-width:600px){.brandmark{width:34px;height:34px}.mock iframe{height:430px}.wrap{width:calc(100% - 28px)}header{height:64px}.brand{font-size:22px}.brand svg{width:32px;height:32px}nav{gap:12px}nav a:not(.navbtn){display:none}.hero{padding:48px 0 52px}h1{font-size:43px;letter-spacing:-1.7px}.intro{font-size:15px}.actions{display:grid;grid-template-columns:1fr}.btn{width:100%}section.content{padding:53px 0}.cards,.downloads,.steps{grid-template-columns:1fr}.card{min-height:0}.proofitem{font-size:11px;justify-content:flex-start;padding:14px 7px}.prooficon{width:29px;height:29px}.download{padding:24px}.sibling{align-items:flex-start;flex-direction:column}.sibling a{white-space:normal}}
+
+/* ESQUECHAT / OtroCAD visual system: cobalt, sunshine yellow and clean architectural whites */
+:root{--navy:#103b83;--navy2:#1554bc;--blue:#185BE8;--yellow:#FFCF23;--ink:#142c57;--muted:#5e718e;--paper:#f2f6ff;--line:#d9e4f5}
+body{background:#fff}header{background:#185BE8;border-bottom:1px solid #ffffff3d;box-shadow:0 4px 22px #123a8722}
+.brand{letter-spacing:-.65px}.brandmark{border-radius:11px;box-shadow:0 3px 12px #073fa866}
+nav a{color:#fff}nav a:hover{color:var(--yellow)}nav .navbtn{background:var(--yellow);color:#13366f;border:0;box-shadow:0 3px 12px #071d5220}
+.hero{background:linear-gradient(120deg,#185BE8 0%,#1652cf 65%,#0d3d9f 100%);padding:72px 0 82px}
+.hero:after{opacity:.13;background-image:linear-gradient(#ffffff50 1px,transparent 1px),linear-gradient(90deg,#ffffff50 1px,transparent 1px);background-size:36px 36px}
+.hero h1{letter-spacing:-2.3px}.hero .intro{color:#e7efff}.hero .eyebrow{color:#ffdf66}
+.primary{background:var(--yellow);color:#132f67;box-shadow:0 5px 18px #091d4a24}.primary:hover{background:#ffe06a}
+.secondary{background:#ffffff14;border-color:#ffffff9e;color:#fff}.secondary:hover{background:#ffffff25}
+.meta{color:#e4eeff}.meta b{color:#ffdb50}
+.mock{border:4px solid #ffffffc7;border-radius:15px;box-shadow:0 28px 65px #082d8255}
+.mockbar{background:#0e3272;border-bottom-color:#4b8cf0;color:#dbeaff}
+.proof{box-shadow:0 8px 22px #103a7c0b}.prooficon,.cardicon{background:#e8efff;color:#185BE8}
+.kicker{color:#185BE8}.card{border-radius:15px;box-shadow:0 5px 22px #185be809;transition:transform .15s,box-shadow .15s}.card:hover{transform:translateY(-3px);box-shadow:0 10px 25px #185be81c}
+.download{background:#185BE8;border-top-color:var(--yellow);border-radius:16px}.download.web{background:#eaf1ff;border-color:#185BE8}.download.web .pill{color:#185BE8;background:#185be819}
+.download .pill{background:#ffffff24;color:#fff}.download p{color:#edf3ff}.download.web p{color:#435c82}
+.step{border-radius:13px}.step b{color:#185BE8}.sibling{background:linear-gradient(110deg,#185BE8,#0e3b94);border-radius:15px}
+.platform-downloads .download{display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:0;padding:26px}
+.platform-downloads .download h3{margin:0;font-size:25px}.platform-downloads .download p{margin:0 0 5px;flex:1}
+.platform-downloads .download .btn{width:100%;min-height:43px;padding:10px 12px;text-align:center}
+.platform-downloads .download small{margin-top:7px}
+.platform-downloads .download.ios{background:#fff;color:#15356c;border:1px solid #d7e4ff;border-top:4px solid #FFCF23}
+.platform-downloads .download.ios p,.platform-downloads .download.ios small{color:#4d6285}
+.platform-downloads .download.ios .pill{background:#eaf1ff;color:#185BE8}
+.platform-downloads .download.ios .secondary,.platform-downloads .download.web .secondary{color:#185BE8;border-color:#9bb9f5;background:#fff}
+@media(max-width:980px){.platform-downloads{grid-template-columns:repeat(2,minmax(0,1fr))}.platform-downloads .ios{grid-column:1/-1}}
+@media(max-width:600px){.platform-downloads{grid-template-columns:1fr}.platform-downloads .ios{grid-column:auto}}
+footer{background:#0d2c65}footer a,.sibling a{color:#ffdc58}
+:focus-visible{outline:3px solid #FFCF23;outline-offset:3px}
+
+.subpage-head{background:#185BE8;color:white;padding:15px 0}.subpage-head .wrap{display:flex;align-items:center;justify-content:space-between;gap:15px}.subpage-head a{color:#fff;text-decoration:none;font-weight:800}.subpage-head .back{background:#ffcf23;color:#173665;border-radius:9px;padding:9px 14px}.subpage-title{background:linear-gradient(110deg,#185BE8,#103c9c);color:white;padding:38px 0}.subpage-title h1{font-size:clamp(32px,5vw,49px);margin:8px 0}.subpage-title p{color:#e7efff;max-width:760px}.subpage-head .brand{display:flex;gap:10px;align-items:center}@media(max-width:600px){.subpage-head .back{font-size:12px}}
+</style></head><body><header class="subpage-head" style="height:auto"><div class="wrap"><a class="brand" href="../"><img src="../icon.svg" alt="OtroCAD" style="width:38px;height:38px;border-radius:9px"><span>otro<b class="accent">CAD</b></span></a><a class="back" href="../">← Inicio</a></div></header><div class="subpage-title"><div class="wrap"><span class="eyebrow">OtroCAD · Centro de recursos</span><h1>Herramientas de OtroCAD</h1><p>Explora las funciones de dibujo, modificación, precisión, anotación y archivos.</p></div></div><main><section class="content" id="herramientas"><div class="wrap"><div class="sectionhead"><span class="kicker">Herramientas de trabajo</span><h2>Todo empieza con una buena geometría.</h2><p>Un espacio de dibujo pensado para crear, modificar y organizar planos técnicos desde diferentes dispositivos.</p></div>
+<div class="cards">
+<article class="card"><span class="cardicon">／</span><h3>Dibujo 2D</h3><p>Líneas, polilíneas, rectángulos, círculos, arcos, elipses, polígonos, textos y directrices.</p></article>
+<article class="card"><span class="cardicon">⌖</span><h3>Precisión CAD</h3><p>Coordenadas, longitud y ángulo dinámicos, ORTHO, POLAR, SNAP y referencias a objetos.</p></article>
+<article class="card"><span class="cardicon">✥</span><h3>Edición geométrica</h3><p>Selección por ventana y cruce, grips arrastrables, mover, copiar, OFFSET, rotar y más.</p></article>
+<article class="card"><span class="cardicon">▤</span><h3>Capas y propiedades</h3><p>Organiza entidades por capas y controla color, grosor y tipo de línea.</p></article>
+<article class="card"><span class="cardicon">▧</span><h3>Anotación</h3><p>Cotas, textos, sombreados y herramientas para documentar tus dibujos.</p></article>
+<article class="card"><span class="cardicon">⇩</span><h3>Archivos</h3><p>Proyectos JSON, importación y exportación DXF, SVG e impresión PDF.</p></article>
+</div></div></section>
+<section class="content soft"><div class="wrap"><div class="sibling"><div><h3>¿Quieres aprender paso a paso?</h3><p>Recorre la interfaz, los comandos y las pruebas en nuestro tutorial.</p></div><a href="../tutorial/">Abrir tutorial ↗</a></div></div></section></main><footer><div class="wrap foot"><span>OtroCAD · Versión alfa</span><span><a href="../tutorial/">Tutorial</a> · <a href="../descargas/">Descargas</a> · <a href="../herramientas/">Herramientas</a> · <a href="../editor/">Editor</a></span></div></footer><script>if('serviceWorker'in navigator)navigator.serviceWorker.register('../sw.js').catch(()=>{});</script></body></html>
