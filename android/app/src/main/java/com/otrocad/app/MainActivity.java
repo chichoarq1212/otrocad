@@ -37,7 +37,7 @@ public class MainActivity extends Activity {
         root.addView(toolbar(new String[][]{{"SELEC","SELECT"},{"LINE","LINE"},{"PLINE","POLY"},{"RECT","RECT"},{"CIRCLE","CIRCLE"},{"ARC","ARC"},{"ELIPSE","ELLIPSE"},{"COTA","DIM"},{"HATCH","HATCH"},{"TEXTO","TEXT"},{"DIRECTRIZ","LEADER"}}),new LinearLayout.LayoutParams(-1,52));
         root.addView(toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"OFFSET","OFFSET"},{"BORRAR","ERASE"},{"PAN","PAN"},{"DESHACER","UNDO"},{"REHACER","REDO"},{"ABRIR","OPEN"},{"GUARDAR","SAVE"},{"DXF","DXF"},{"PDF","PDF"}}),new LinearLayout.LayoutParams(-1,52));
         LinearLayout settings=new LinearLayout(this);settings.setGravity(Gravity.CENTER_VERTICAL);settings.setPadding(6,3,6,3);
-        addToggle(settings,"GRID",()->cad.toggleGrid());addToggle(settings,"ORTHO",()->cad.toggleOrtho());addToggle(settings,"POLAR",()->cad.togglePolar());addToggle(settings,"SNAP",()->cad.toggleSnap());addToggle(settings,"CRUZ",()->cad.toggleCrosshair());Button hp=smallButton("HP");hp.setOnClickListener(v->showSettings());settings.addView(hp,new LinearLayout.LayoutParams(0,-1,1));
+        addToggle(settings,"GRID",()->cad.toggleGrid());addToggle(settings,"ORTHO",()->cad.toggleOrtho());addToggle(settings,"POLAR",()->cad.togglePolar());addToggle(settings,"SNAP",()->cad.toggleGridSnap());addToggle(settings,"OSNAP",()->cad.toggleSnap());addToggle(settings,"CRUZ",()->cad.toggleCrosshair());Button hp=smallButton("HP");hp.setOnClickListener(v->showSettings());settings.addView(hp,new LinearLayout.LayoutParams(0,-1,1));
         root.addView(settings,new LinearLayout.LayoutParams(-1,42));
         LinearLayout options=new LinearLayout(this);options.setGravity(Gravity.CENTER_VERTICAL);options.setPadding(8,2,8,2);
         Spinner layers=new Spinner(this);String[] layerNames={"General","Muros","Cotas","Detalles","Topografía","Vialidad"};ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,layerNames);layers.setAdapter(adapter);layers.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){cad.setLayer(layerNames[pos]);}});
@@ -71,14 +71,15 @@ public class MainActivity extends Activity {
         CheckBox g=new CheckBox(this);g.setText("Rejilla F7");g.setChecked(cad.isGridEnabled());panel.addView(g);
         CheckBox o=new CheckBox(this);o.setText("ORTHO F8");o.setChecked(cad.isOrthoEnabled());panel.addView(o);
         CheckBox p=new CheckBox(this);p.setText("POLAR F10");p.setChecked(cad.isPolarEnabled());panel.addView(p);
-        CheckBox s=new CheckBox(this);s.setText("Referencias SNAP");s.setChecked(cad.isSnapEnabled());panel.addView(s);
+        CheckBox gs=new CheckBox(this);gs.setText("Ajuste a rejilla SNAP F9");gs.setChecked(cad.isGridSnapEnabled());panel.addView(gs);
+        CheckBox s=new CheckBox(this);s.setText("Referencias OSNAP F3");s.setChecked(cad.isSnapEnabled());panel.addView(s);
         CheckBox x=new CheckBox(this);x.setText("Cruceta");x.setChecked(cad.isCrosshairEnabled());panel.addView(x);
         EditText gridStep=new EditText(this);gridStep.setSingleLine(true);gridStep.setInputType(8194);gridStep.setHint("Espaciado de rejilla");gridStep.setText(String.valueOf(cad.getGridStep()));panel.addView(gridStep);
         EditText polarStep=new EditText(this);polarStep.setSingleLine(true);polarStep.setInputType(8194);polarStep.setHint("Incremento polar en grados");polarStep.setText(String.valueOf(cad.getPolarStep()));panel.addView(polarStep);
         EditText snapRadius=new EditText(this);snapRadius.setSingleLine(true);snapRadius.setInputType(8194);snapRadius.setHint("Radio de referencia en píxeles");snapRadius.setText(String.valueOf(cad.getSnapRadius()));panel.addView(snapRadius);
         Spinner units=new Spinner(this);String[] unitOptions={"Metros (m)","Centímetros (cm)","Milímetros (mm)"};units.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,unitOptions));units.setSelection(cad.getUnits().equals("cm")?1:cad.getUnits().equals("mm")?2:0);panel.addView(units);
         new AlertDialog.Builder(this).setTitle("Configuración de pantalla · HP").setView(panel).setNegativeButton("Cancelar",null).setPositiveButton("Aplicar",(d,w)->{
-            cad.setGridEnabled(g.isChecked());cad.setOrthoEnabled(o.isChecked());cad.setPolarEnabled(p.isChecked());cad.setSnapEnabled(s.isChecked());cad.setCrosshairEnabled(x.isChecked());
+            cad.setGridEnabled(g.isChecked());cad.setOrthoEnabled(o.isChecked());cad.setPolarEnabled(p.isChecked());cad.setGridSnapEnabled(gs.isChecked());cad.setSnapEnabled(s.isChecked());cad.setCrosshairEnabled(x.isChecked());
             cad.setGridStep(readNumber(gridStep,cad.getGridStep()));cad.setPolarStep(readNumber(polarStep,cad.getPolarStep()));cad.setSnapRadius(readNumber(snapRadius,cad.getSnapRadius()));
             cad.setUnits(units.getSelectedItemPosition()==1?"cm":units.getSelectedItemPosition()==2?"mm":"m");status.setText("Configuración de dibujo aplicada");
         }).show();
