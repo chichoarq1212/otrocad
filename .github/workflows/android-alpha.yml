@@ -1,7 +1,7 @@
 name: Compilar OtroCAD Android nativo sin conexión
 on:
   push:
-    branches: ["otrocad-android-alpha-*"]
+    branches: ["main", "otrocad-android-alpha-*"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
