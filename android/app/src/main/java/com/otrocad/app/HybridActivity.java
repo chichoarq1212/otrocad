@@ -35,8 +35,8 @@ public class HybridActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.WHITE);
         LinearLayout bar=new LinearLayout(this);bar.setPadding(8,3,8,3);bar.setBackgroundColor(0xff185be8);
         indicator=new TextView(this);indicator.setTextColor(Color.WHITE);indicator.setTextSize(12);indicator.setGravity(17);
-        notice("OtroCAD · conectando…");bar.addView(indicator,new LinearLayout.LayoutParams(0,44,1));
-        Button reload=new Button(this);reload.setText("↻");reload.setTextColor(Color.WHITE);reload.setAllCaps(false);reload.setOnClickListener(v->loadOnline());bar.addView(reload,new LinearLayout.LayoutParams(52,44));
+        notice("OtroCAD · EDITOR LOCAL");bar.addView(indicator,new LinearLayout.LayoutParams(0,44,1));
+        Button reload=new Button(this);reload.setText("Online");reload.setTextColor(Color.WHITE);reload.setAllCaps(false);reload.setOnClickListener(v->loadOnline());bar.addView(reload,new LinearLayout.LayoutParams(52,44));
         root.addView(bar,new LinearLayout.LayoutParams(-1,50));
         web=new WebView(this);web.setBackgroundColor(0xff101820);
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
@@ -46,7 +46,7 @@ public class HybridActivity extends Activity {
         settings.setSupportZoom(false);
         web.setWebChromeClient(new WebChromeClient());
         web.setWebViewClient(new WebViewClient(){
-            @Override public void onPageFinished(WebView v,String url){if(url.startsWith(OFFLINE)){offline=true;notice("OtroCAD · SIN CONEXIÓN · editor local");}else if(url.startsWith(ONLINE)){offline=false;notice("OtroCAD · EN LÍNEA · actualización automática");}}
+            @Override public void onPageFinished(WebView v,String url){if(url.startsWith(OFFLINE)){offline=true;notice("OtroCAD · EDITOR LOCAL · sin internet");}else if(url.startsWith(ONLINE)){offline=false;notice("OtroCAD · WEB EN LÍNEA");}}
             @Override public void onReceivedError(WebView v,WebResourceRequest req,android.webkit.WebResourceError err){
                 if(req.isForMainFrame()&&!offline){loadOffline();}
             }
@@ -62,7 +62,7 @@ public class HybridActivity extends Activity {
         });
         root.addView(web,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
-        loadOnline();
+        loadOffline();
     }
     private void loadOnline(){
         offline=false;notice("OtroCAD · conectando…");
@@ -72,7 +72,7 @@ public class HybridActivity extends Activity {
         if(caps==null||!caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)){loadOffline();return;}
         web.loadUrl(ONLINE);
     }
-    private void loadOffline(){offline=true;notice("OtroCAD · SIN CONEXIÓN · editor local");web.loadUrl(OFFLINE);}
+    private void loadOffline(){offline=true;notice("OtroCAD · EDITOR LOCAL · sin internet");web.loadUrl(OFFLINE);}
     @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
     @Override protected void onDestroy(){if(web!=null)web.destroy();super.onDestroy();}
 }
