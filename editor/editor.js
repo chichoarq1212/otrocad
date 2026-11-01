@@ -1,6 +1,7 @@
 (()=>{
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,selectedSet=new Set(),modifyTargets=[],poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
+let lastCommand='',cursorCommandEl=null,contextMenuEl=null;
 let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,offsetDistancePreset=false,printing=false,units='m',gridStep=1,polarStep=15,snapRadius=12,hiddenLayers=new Set(),lockedLayers=new Set();
 const colors={General:'#dce8f5',Muros:'#56b7e8',Cotas:'#f3c83e',Detalles:'#c69cff',Topografía:'#70d6a3',Vialidad:'#ff9b6b'};
 function resolveCadColor(s,lightBackground=false){
@@ -377,8 +378,101 @@ function explodeAt(q){
  objects.splice(i,1,...parts);applySelection(parts.map((_,k)=>i+k));save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
 }
 let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false,multiSelectOn=false,gripDrag=null;
+
+stage.setAttribute('tabindex','-1');
+const commandUiStyle=document.createElement('style');
+commandUiStyle.textContent='#otrocad-cursor-command{position:absolute;z-index:40;display:flex;align-items:center;gap:8px;max-width:300px;padding:7px 10px;border:1px solid #6b91c7;border-radius:6px;background:rgba(12,30,54,.96);color:#f5f8ff;box-shadow:0 6px 22px #0008;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;pointer-events:none;transform:translate(14px,14px);white-space:nowrap}#otrocad-cursor-command[hidden],#otrocad-context-menu[hidden]{display:none!important}#otrocad-cursor-command .cmd-tag{padding:3px 5px;border-radius:3px;background:#ffcf23;color:#173665;font:800 10px system-ui;letter-spacing:.5px}#otrocad-cursor-command .cmd-value{overflow:hidden;text-overflow:ellipsis}#otrocad-context-menu{position:fixed;z-index:99999;display:grid;gap:2px;min-width:245px;max-width:min(290px,calc(100vw - 16px));padding:6px;border:1px solid #b9cbe7;border-radius:8px;background:#f8faff;color:#173665;box-shadow:0 14px 42px #061b3d55;font:13px Inter,system-ui,Arial}#otrocad-context-menu .cad-menu-title{padding:7px 9px 8px;color:#6980a3;font-size:10px;font-weight:850;letter-spacing:.8px}#otrocad-context-menu .cad-menu-item{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;min-height:34px;padding:7px 9px;border:0;border-radius:5px;background:transparent;color:#173665;text-align:left;font:600 12px Inter,system-ui,Arial}#otrocad-context-menu .cad-menu-item:hover:not(:disabled){background:#e8f0ff;color:#185be8}#otrocad-context-menu .cad-menu-item:disabled{opacity:.38;cursor:default}#otrocad-context-menu .cad-menu-hint{color:#7185a4;font-size:10px;font-weight:500}#otrocad-context-menu .cad-menu-sep{height:1px;margin:4px 3px;background:#dbe5f4}#otrocad-context-menu .cad-menu-item.primary{background:#eaf1ff;color:#185be8;font-weight:800}#stage:focus{outline:none}';
+document.head.append(commandUiStyle);
+cursorCommandEl=document.createElement('div');
+cursorCommandEl.id='otrocad-cursor-command';
+cursorCommandEl.hidden=true;
+cursorCommandEl.innerHTML='<span class="cmd-tag">CMD</span><span class="cmd-value"></span>';
+stage.append(cursorCommandEl);
+contextMenuEl=document.createElement('div');
+contextMenuEl.id='otrocad-context-menu';
+contextMenuEl.hidden=true;
+contextMenuEl.setAttribute('role','menu');
+document.body.append(contextMenuEl);
+try{lastCommand=localStorage.getItem('otrocad-last-command')||''}catch(e){}
+function updateCursorCommand(){
+ const value=$('#cmd').value.trim();
+ if(!value){cursorCommandEl.hidden=true;return}
+ cursorCommandEl.hidden=false;
+ const maxX=Math.max(8,stage.clientWidth-210),maxY=Math.max(8,stage.clientHeight-42);
+ cursorCommandEl.style.left=Math.max(8,Math.min(cursor.x+12,maxX))+'px';
+ cursorCommandEl.style.top=Math.max(8,Math.min(cursor.y+12,maxY))+'px';
+ cursorCommandEl.querySelector('.cmd-value').textContent=value;
+}
+function hideCadContextMenu(){if(contextMenuEl)contextMenuEl.hidden=true}
+function addCadMenuDivider(){const line=document.createElement('div');line.className='cad-menu-sep';contextMenuEl.append(line)}
+function addCadMenuItem(label,hint,action,disabled=false,primary=false){
+ const b=document.createElement('button');b.type='button';b.className='cad-menu-item'+(primary?' primary':'');b.disabled=!!disabled;b.setAttribute('role','menuitem');
+ const name=document.createElement('span');name.textContent=label;
+ const key=document.createElement('span');key.className='cad-menu-hint';key.textContent=hint||'';
+ b.append(name,key);
+ b.addEventListener('click',()=>{hideCadContextMenu();if(!b.disabled){action();stage.focus({preventScroll:true})}});
+ contextMenuEl.append(b);
+}
+function cancelCurrentAction(){
+ $('#cmd').value='';updateCursorCommand();
+ start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];selectionStart=null;selectionBox=null;
+ render();updatePrompt();status.textContent='Comando cancelado · listo para continuar';
+}
+function performEnterAction(){
+ const raw=$('#cmd').value.trim();
+ if(raw){$('#cmd').value='';updateCursorCommand();runCommand(raw);return}
+ if(poly.length){finishPoly();return}
+ if(start){
+  const q=pointFromInputs()||(temp&&temp.b?round(temp.b):null);
+  if(q){commitEntity(q);return}
+  status.textContent='Indica el punto final o introduce longitud y ángulo';return;
+ }
+ if(arcPoints.length){status.textContent='Arco: marca el siguiente punto o pulsa Escape para cancelar';return}
+ if(lastCommand){runCommand(lastCommand);return}
+ status.textContent='No hay un comando activo para confirmar';
+}
+function submitCommand(){
+ const raw=$('#cmd').value.trim();
+ if(raw){$('#cmd').value='';updateCursorCommand();runCommand(raw);return}
+ performEnterAction();
+}
+function repeatLastCommand(){
+ if(!lastCommand){status.textContent='Todavía no hay un comando anterior';return}
+ $('#cmd').value='';updateCursorCommand();runCommand(lastCommand);
+}
+function showCadContextMenu(e){
+ e.preventDefault();
+ contextMenuEl.innerHTML='<div class="cad-menu-title">OTROCAD · MENÚ CONTEXTUAL</div>';
+ const raw=$('#cmd').value.trim();
+ const enterLabel=raw?'Ejecutar comando':(poly.length?'Enter · Terminar polilínea':(start?'Enter · Confirmar punto':'Enter'));
+ addCadMenuItem(enterLabel,'↵',performEnterAction,!raw&&!poly.length&&!start&&!lastCommand,true);
+ addCadMenuItem('Repetir último comando',lastCommand||'—',repeatLastCommand,!lastCommand);
+ addCadMenuDivider();
+ addCadMenuItem('Cancelar operación','Esc',cancelCurrentAction,false);
+ addCadMenuItem('Deshacer','Ctrl + Z',()=>$('#undo').click(),!undo.length);
+ addCadMenuItem('Rehacer','Ctrl + Y',()=>$('#redo').click(),!redo.length);
+ addCadMenuDivider();
+ addCadMenuItem('Eliminar selección','Supr',()=>{deleteSelection();showProperties()},!selectedItems().length);
+ addCadMenuItem('Seleccionar todo','Ctrl + A',()=>{applySelection(objects.map((_,i)=>i));showProperties();render()},!objects.length);
+ addCadMenuItem('Propiedades','Ctrl + 1',()=>{$('#properties').classList.toggle('open');showProperties()});
+ addCadMenuItem('Encuadrar dibujo','Zoom ext.',()=>$('#fit').click());
+ addCadMenuItem('Activar encuadre','PAN',()=>setTool('pan'));
+ contextMenuEl.hidden=false;
+ const rect=contextMenuEl.getBoundingClientRect();
+ contextMenuEl.style.left=Math.max(8,Math.min(e.clientX,window.innerWidth-rect.width-8))+'px';
+ contextMenuEl.style.top=Math.max(8,Math.min(e.clientY,window.innerHeight-rect.height-8))+'px';
+}
+$('#cmd').addEventListener('input',updateCursorCommand);
+$('#cmd').addEventListener('keydown',e=>{
+ if(e.key==='Enter'){e.preventDefault();submitCommand()}
+ else if(e.key==='Escape'){e.preventDefault();cancelCurrentAction();$('#cmd').blur();stage.focus({preventScroll:true})}
+});
+document.addEventListener('pointerdown',e=>{if(contextMenuEl&&!contextMenuEl.contains(e.target))hideCadContextMenu()});
+contextMenuEl.addEventListener('contextmenu',e=>e.preventDefault());
+
 canvas.addEventListener('pointerdown',e=>{
  if(e.button===2){e.preventDefault();return}
+ stage.focus({preventScroll:true});hideCadContextMenu();
  canvas.setPointerCapture(e.pointerId);const p=pointer(e);pointers.set(e.pointerId,p);
  if(pointers.size===2){if(gripDrag)cancelGripDrag();const v=[...pointers.values()];pinch={dist:distance(v[0],v[1]),zoom};start=null;temp=null;selectionStart=null;selectionBox=null;return}
  if(tool==='pan'){drag={point:p,offset:clone(offset)};return}
@@ -386,7 +480,7 @@ canvas.addEventListener('pointerdown',e=>{
  handleTap(p);
 });
 canvas.addEventListener('pointermove',e=>{
- const p=pointer(e);cursor=p;$('#crossinfo').textContent='X '+world(p).x.toFixed(3)+' '+units+' · Y '+world(p).y.toFixed(3)+' '+units+' · Z 0.000';
+ const p=pointer(e);cursor=p;updateCursorCommand();$('#crossinfo').textContent='X '+world(p).x.toFixed(3)+' '+units+' · Y '+world(p).y.toFixed(3)+' '+units+' · Z 0.000';
  if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);
  if(pointers.size===2&&pinch){const v=[...pointers.values()];zoom=Math.max(2,Math.min(500,pinch.zoom*distance(v[0],v[1])/(pinch.dist||1)));render();return}
  if(drag&&tool==='pan'){offset.x=drag.offset.x+p.x-drag.point.x;offset.y=drag.offset.y+p.y-drag.point.y;render();return}
@@ -415,7 +509,7 @@ function pointerEnd(e){
  render();
 }
 canvas.addEventListener('pointerup',pointerEnd);canvas.addEventListener('pointercancel',pointerEnd);
-canvas.addEventListener('contextmenu',e=>{e.preventDefault();if(poly.length)finishPoly();else if(start){start=null;temp=null;render()}else {$('#cmd').value='';$('#cmd').focus()}});
+canvas.addEventListener('contextmenu',showCadContextMenu);
 canvas.addEventListener('wheel',e=>{e.preventDefault();const p=pointer(e),before=world(p);zoom=Math.max(2,Math.min(500,zoom*(e.deltaY<0?1.12:.89)));const after=screen(before);offset.x+=p.x-after.x;offset.y+=p.y-after.y;render()},{passive:false});
 function updateToggle(id,on){$(id).classList.toggle('active',on)}
 function toggle(id){const map={gridToggle:'gridOn',orthoToggle:'orthoOn',snapToggle:'snapOn',polarToggle:'polarOn',osnapToggle:'osnapOn',crossToggle:'crossOn'};const k=map[id];if(k==='gridOn')gridOn=!gridOn;if(k==='orthoOn')orthoOn=!orthoOn;if(k==='snapOn')snapOn=!snapOn;if(k==='polarOn')polarOn=!polarOn;if(k==='osnapOn')osnapOn=!osnapOn;if(k==='crossOn')crossOn=!crossOn;const values={gridOn,orthoOn,snapOn,polarOn,osnapOn,crossOn};updateToggle('#'+id,values[k]);render()}
@@ -423,14 +517,30 @@ function toggle(id){const map={gridToggle:'gridOn',orthoToggle:'orthoOn',snapTog
 ['gridToggle','orthoToggle','snapToggle','polarToggle','osnapToggle','crossToggle'].forEach(id=>$('#'+id).onclick=()=>toggle(id));
 $('#multiSelectToggle').onclick=()=>{multiSelectOn=!multiSelectOn;$('#multiSelectToggle').querySelector('.multi-state').textContent=multiSelectOn?'ON':'OFF';$('#multiSelectToggle').setAttribute('aria-pressed',String(multiSelectOn));$('#multiSelectToggle').classList.toggle('active',multiSelectOn);status.textContent='Selección múltiple '+(multiSelectOn?'activada':'desactivada')};
 document.addEventListener('keydown',e=>{
- if(e.key==='Escape'){e.preventDefault();if(gripDrag)cancelGripDrag();start=null;temp=null;poly=[];moveBase=null;modifyTarget=-1;modifyTargets=[];selectionStart=null;selectionBox=null;clearSelection();if(document.activeElement?.id==='cmd')document.activeElement.blur();showProperties();render();return}
- if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){if(e.key==='Enter'&&document.activeElement.id==='dynLen'){e.preventDefault();$('#dynAngle').focus()}else if(e.key==='Enter'&&document.activeElement.id==='dynAngle'){e.preventDefault();const q=pointFromInputs();if(q){if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)}}return}
- if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelection();showProperties();return}
- if(e.key==='F7'){e.preventDefault();toggle('gridToggle');return}if(e.key==='F8'){e.preventDefault();toggle('orthoToggle');return}if(e.key==='F9'){e.preventDefault();toggle('snapToggle');return}if(e.key==='F10'){e.preventDefault();toggle('polarToggle');return}if(e.key==='F3'){e.preventDefault();toggle('osnapToggle');return}
- if(e.key==='Enter'){if(poly.length){finishPoly();return}if(start){const q=pointFromInputs();if(q)commitEntity(q);return}}
- if(e.key===' '&&poly.length){finishPoly();return}
+ if(!contextMenuEl.hidden&&e.key==='Escape'){e.preventDefault();hideCadContextMenu();return}
+ const active=document.activeElement;
+ if(['INPUT','TEXTAREA','SELECT'].includes(active?.tagName)){
+  if(e.key==='Enter'&&active.id==='dynLen'){e.preventDefault();$('#dynAngle').focus()}
+  else if(e.key==='Enter'&&active.id==='dynAngle'){e.preventDefault();const q=pointFromInputs();if(q){if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)}}
+  return;
+ }
+ if(document.querySelector('dialog[open]'))return;
+ if(e.key==='Escape'){e.preventDefault();cancelCurrentAction();return}
+ if(e.key==='Backspace'&&$('#cmd').value){e.preventDefault();$('#cmd').value=$('#cmd').value.slice(0,-1);updateCursorCommand();return}
+ if(e.key==='Delete'||e.key==='Backspace'){if(selectedItems().length){e.preventDefault();deleteSelection();showProperties();return}}
+ if(e.key==='F7'){e.preventDefault();toggle('gridToggle');return}
+ if(e.key==='F8'){e.preventDefault();toggle('orthoToggle');return}
+ if(e.key==='F9'){e.preventDefault();toggle('snapToggle');return}
+ if(e.key==='F10'){e.preventDefault();toggle('polarToggle');return}
+ if(e.key==='F3'){e.preventDefault();toggle('osnapToggle');return}
+ if(e.key==='Enter'){e.preventDefault();performEnterAction();return}
+ if(e.key===' '&&poly.length){e.preventDefault();finishPoly();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){$('#undo').click();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){$('#redo').click();return}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'&&(active===stage||active===canvas||active===document.body)){e.preventDefault();applySelection(objects.map((_,i)=>i));showProperties();render();return}
+ if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+  e.preventDefault();$('#cmd').value += e.key;updateCursorCommand();return;
+ }
 });
 const aliases={L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
 function parseCoordinate(raw,base){
@@ -453,6 +563,7 @@ function runCommand(raw){
   else commitEntity(point);
   return;
  }
+ lastCommand=textValue;try{localStorage.setItem('otrocad-last-command',lastCommand)}catch(e){}
  if(c==='F7'||c==='GRID'){toggle('gridToggle');return}if(c==='F8'||c==='ORTHO'){toggle('orthoToggle');return}if(c==='F9'||c==='SNAP'){toggle('snapToggle');return}if(c==='F10'||c==='POLAR'){toggle('polarToggle');return}if(c==='F3'||c==='OSNAP'){toggle('osnapToggle');return}
  if(c==='U'||c==='UNDO'){$('#undo').click();return}if(c==='REDO'){$('#redo').click();return}
  if(c==='HP'||c==='DSETTINGS'||c==='SETTINGS'){showDraftSettings();return}
@@ -465,7 +576,7 @@ function runCommand(raw){
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
-$('#cmd').addEventListener('keydown',e=>{if(e.key==='Enter'){runCommand($('#cmd').value);$('#cmd').value=''}});
+$('#cmd').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submitCommand()}});
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!==b.dataset.tab)});
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
 $('#finish-poly').onclick=finishPoly;
