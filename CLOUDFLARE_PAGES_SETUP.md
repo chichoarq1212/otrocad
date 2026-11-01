@@ -34,7 +34,8 @@ No publica `android/`, `.github/`, `tests/` ni los archivos internos de desarrol
 - Yo puedo seguir modificando los archivos del repositorio desde ChatGPT mediante la conexión de GitHub.
 - Cada cambio que llegue a `main` activa una publicación automática en Cloudflare Pages.
 - Cloudflare permite enlaces de vista previa para ramas y solicitudes de cambios.
-- El APK Android continúa compilándose mediante GitHub Actions; Cloudflare Pages solo aloja la versión web.
+- El APK Android continúa compilándose mediante GitHub Actions cuando cambian los archivos de Android; los cambios exclusivamente web se validan por separado y no disparan una compilación Android.
+- El workflow web comprueba sintaxis, pruebas de grips y que la carpeta publicada no incluya `android/`, `.github/` ni `tests/`.
 
 ## Coste y límites del plan gratuito
 
