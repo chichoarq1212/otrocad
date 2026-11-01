@@ -14,6 +14,7 @@ Proyecto hermano de [ESQUECHAT 3D](https://esquechat.com/). Identidad visual azu
 ### Web / PWA
 - Dibujo 2D: línea, polilínea, rectángulo, círculo, arco, elipse, polígono, cotas, hatch, texto y directrices.
 - Precisión: entrada dinámica, coordenadas absolutas/relativas, ORTHO, POLAR, GRID, SNAP, OSNAP y cruceta.
+- Selección CAD: ventana izquierda→derecha (solo entidades totalmente contenidas), cruce derecha→izquierda (entidades tocadas o atravesadas), selección múltiple, Shift/Ctrl para añadir o quitar, ESC para limpiar; mover/copiar/borrar conjuntos.
 - Edición: mover, copiar, OFFSET, rotar, espejo, escalar, TRIM, EXTEND y EXPLODE para entidades compatibles.
 - Capas básicas con visibilidad y bloqueo, color, tipo y grosor de línea.
 - Ventana de configuración HP: unidades, rejilla, incremento POLAR, radio OSNAP, ORTHO, SNAP y cruceta.
