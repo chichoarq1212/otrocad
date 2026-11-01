@@ -103,7 +103,7 @@ function showDraftSettings(){
  };
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
 }
-function updatePrompt(){promptEl.textContent=tool==='select'?'SELECCIÓN · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
+function updatePrompt(){promptEl.textContent=tool==='select'?'SELECCIÓN · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE · arrastra grips para editar':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
 function render(){
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':'#101820';ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
  objects.forEach((s,i)=>{if(!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
@@ -367,7 +367,7 @@ let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectio
 canvas.addEventListener('pointerdown',e=>{
  if(e.button===2){e.preventDefault();return}
  canvas.setPointerCapture(e.pointerId);const p=pointer(e);pointers.set(e.pointerId,p);
- if(pointers.size===2){const v=[...pointers.values()];pinch={dist:distance(v[0],v[1]),zoom};start=null;temp=null;selectionStart=null;selectionBox=null;return}
+ if(pointers.size===2){if(gripDrag)cancelGripDrag();const v=[...pointers.values()];pinch={dist:distance(v[0],v[1]),zoom};start=null;temp=null;selectionStart=null;selectionBox=null;return}
  if(tool==='pan'){drag={point:p,offset:clone(offset)};return}
  if(tool==='select'){const grip=findGripAt(p);if(grip){checkpoint();gripDrag={...grip,before:clone(objects[grip.index]),moved:false,historyAdded:true};return}selectionStart=p;selectionBox=null;selectionAdditive=multiSelectOn||!!(e.shiftKey||e.ctrlKey||e.metaKey);return}
  handleTap(p);
@@ -391,10 +391,10 @@ function pointerEnd(e){
  if(selectionStart){
   if(selectionBox){
    const a=selectionBox.a,b=selectionBox.b,wa=world(a),wb=world(b),rect={left:Math.min(wa.x,wb.x),right:Math.max(wa.x,wb.x),bottom:Math.min(wa.y,wb.y),top:Math.max(wa.y,wb.y)};
-   const windowMode=b.x>=a.x,hits=selectByWindow(rect,windowMode);applySelection(hits,selectionAdditive);status.textContent=hits.length+' objeto(s) '+(windowMode?'dentro de ventana':'cruzados por ventana');
+   const windowMode=b.x>=a.x,hits=selectByWindow(rect,windowMode);applySelection(hits,selectionAdditive);status.textContent=hits.length+' objeto(s) '+(windowMode?'dentro de ventana':'cruzados por ventana')+' · arrastra grips para editar';
   }else{
    const hit=selectAt(world(selectionStart));if(selectionAdditive){const ids=new Set(selectedItems());if(hit>=0){if(ids.has(hit))ids.delete(hit);else ids.add(hit)}applySelection([...ids])}else applySelection(hit>=0?[hit]:[]);
-   status.textContent=hit>=0?'Objeto seleccionado':(selectionAdditive?'Selección conservada':'Selección vacía');
+   status.textContent=hit>=0?'Objeto seleccionado · arrastra un grip cuadrado para editar':(selectionAdditive?'Selección conservada':'Selección vacía');
   }
   selectionStart=null;selectionBox=null;showProperties();
  }
