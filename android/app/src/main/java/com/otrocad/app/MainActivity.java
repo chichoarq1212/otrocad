@@ -21,6 +21,7 @@ public class MainActivity extends Activity {
     private CadView cad;
     private TextView status;
     private EditText command;
+    private Button orthoButton;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -61,14 +62,19 @@ public class MainActivity extends Activity {
     private Button smallButton(String label){Button b=new Button(this);b.setText(label);b.setTextSize(10);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setPadding(8,3,8,3);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff243448));return b;}
     private void addToggle(LinearLayout row,String label,Runnable action){Button b=smallButton(label);b.setOnClickListener(v->{action.run();b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffb38b20));});row.addView(b,new LinearLayout.LayoutParams(0,-1,1));}
     private void addOrthoToggle(LinearLayout row){
-        Button b=smallButton(cad.isOrthoEnabled()?"ORTHO ON":"ORTHO OFF");
-        Runnable refresh=()->{boolean on=cad.isOrthoEnabled();b.setText(on?"ORTHO ON":"ORTHO OFF");b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(on?0xffb38b20:0xff243448));};
-        b.setOnClickListener(v->{cad.toggleOrtho();refresh.run();});
-        refresh.run();row.addView(b,new LinearLayout.LayoutParams(0,-1,1));
+        orthoButton=smallButton(cad.isOrthoEnabled()?"ORTHO ON":"ORTHO OFF");
+        orthoButton.setOnClickListener(v->{cad.toggleOrtho();refreshOrthoToggle();});
+        refreshOrthoToggle();row.addView(orthoButton,new LinearLayout.LayoutParams(0,-1,1));
+    }
+    private void refreshOrthoToggle(){
+        if(orthoButton==null)return;
+        boolean on=cad.isOrthoEnabled();
+        orthoButton.setText(on?"ORTHO ON":"ORTHO OFF");
+        orthoButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(on?0xffb38b20:0xff243448));
     }
     private void showLengthDialog(float suggested,String unit,boolean isPolyline,boolean ortho){
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(20,8,20,4);
-        TextView info=new TextView(this);info.setText((ortho?"ORTHO ACTIVADO · dirección horizontal o vertical":"ORTHO DESACTIVADO · dirección libre")+"\\nLa dirección se toma del último toque en el área de dibujo.");info.setTextColor(0xff536477);info.setPadding(0,0,0,12);panel.addView(info);
+        TextView info=new TextView(this);info.setText((ortho?"ORTHO ACTIVADO · dirección horizontal o vertical":"ORTHO DESACTIVADO · dirección libre")+"\nLa dirección se toma del último toque en el área de dibujo.");info.setTextColor(0xff536477);info.setPadding(0,0,0,12);panel.addView(info);
         EditText input=new EditText(this);input.setSingleLine(true);input.setInputType(8194);input.setHint("Ejemplo: 2.00");input.setText(String.format(java.util.Locale.US,"%.2f",Math.max(.01f,suggested)));input.setSelectAllOnFocus(true);panel.addView(input,new LinearLayout.LayoutParams(-1,-2));
         TextView unitLabel=new TextView(this);unitLabel.setText("Longitud en "+unit+" · escribe solo el número");unitLabel.setTextColor(0xff536477);unitLabel.setPadding(0,7,0,0);panel.addView(unitLabel);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle(isPolyline?"Longitud del siguiente tramo":"Longitud exacta de la línea").setView(panel).setNegativeButton("Cancelar",(d,w)->cad.cancelPendingLength()).setPositiveButton(isPolyline?"Añadir tramo":"Crear línea",null).create();
@@ -98,7 +104,7 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("Configuración de pantalla · HP").setView(panel).setNegativeButton("Cancelar",null).setPositiveButton("Aplicar",(d,w)->{
             cad.setGridEnabled(g.isChecked());cad.setOrthoEnabled(o.isChecked());cad.setPolarEnabled(p.isChecked());cad.setGridSnapEnabled(gs.isChecked());cad.setSnapEnabled(s.isChecked());cad.setCrosshairEnabled(x.isChecked());
             cad.setGridStep(readNumber(gridStep,cad.getGridStep()));cad.setPolarStep(readNumber(polarStep,cad.getPolarStep()));cad.setSnapRadius(readNumber(snapRadius,cad.getSnapRadius()));
-            cad.setUnits(units.getSelectedItemPosition()==1?"cm":units.getSelectedItemPosition()==2?"mm":"m");status.setText("Configuración de dibujo aplicada");
+            cad.setUnits(units.getSelectedItemPosition()==1?"cm":units.getSelectedItemPosition()==2?"mm":"m");refreshOrthoToggle();status.setText("Configuración de dibujo aplicada");
         }).show();
     }
     private float readNumber(EditText field,float fallback){try{return Float.parseFloat(field.getText().toString().trim());}catch(Exception e){return fallback;}}

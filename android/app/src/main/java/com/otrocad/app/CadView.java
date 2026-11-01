@@ -266,7 +266,7 @@ public class CadView extends View {
     private void addEntity(String type,PointF a,PointF b){
         checkpoint();Entity e=new Entity();e.type=type;e.layer=layer;e.color=drawColor;e.weight=weight;e.pts.add(new PointF(a.x,a.y));if(b!=null)e.pts.add(new PointF(b.x,b.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));anchor=null;persistLocal();invalidate();say(type+" creado");
     }
-    private void finishPoly(){pendingLength=false;pendingDirection=null;int count=poly.size();if(count>1){checkpoint();Entity e=new Entity();e.type="POLY";e.layer=layer;e.color=drawColor;e.weight=weight;for(PointF p:poly)e.pts.add(new PointF(p.x,p.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));persistLocal();}poly.clear();anchor=null;persistLocal();invalidate();say(count>1?"Polilínea terminada":"No hay suficientes vértices para terminar la polilínea");}
+    private void finishPoly(){pendingLength=false;pendingDirection=null;int count=poly.size();if(count>1){checkpoint();Entity e=new Entity();e.type="POLY";e.layer=layer;e.color=drawColor;e.weight=weight;for(PointF p:poly)e.pts.add(new PointF(p.x,p.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));poly.clear();anchor=null;persistLocal();invalidate();say("Polilínea terminada · "+(count-1)+" tramo(s)");}else if(count==1){say("Añade al menos un tramo antes de terminar la polilínea");invalidate();}else say("No hay una polilínea activa");}
     public void finish(){finishPoly();}
     private void handleTouch(PointF raw){
         PointF q=constrain(snap(raw));
