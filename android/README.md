@@ -2,10 +2,12 @@
 
 Esta rama reemplaza la envoltura WebView por una vista de dibujo Android basada en Canvas. El editor de esta versión funciona localmente y no solicita permiso de Internet.
 
-## Incluido en la versión nativa 0.3.0 alfa
+## Incluido en la versión nativa 0.4.0 alfa
 - Dibujo táctil por puntos: línea, polilínea, rectángulo, círculo, arco, elipse, cota, hatch, texto y directriz.
 - Selección CAD por ventana izquierda→derecha y cruce derecha→izquierda, con selección múltiple táctil, botón MULTI para acumular ventanas/clics y resaltado de entidades.
 - Operaciones de grupo en Android: mover, copiar y borrar varias entidades seleccionadas.
+- Grips CAD visibles y arrastrables para extremos, vértices, esquinas, centros y radios; edición directa de líneas, polilíneas, polígonos, rectángulos, círculos, elipses, arcos y textos.
+- Edición de grips con autoguardado, deshacer y cancelación segura del gesto.
 - Selección, mover, copiar, borrar, deshacer y rehacer.
 - Configuración HP: unidades, rejilla, ORTHO, POLAR, SNAP F9, OSNAP F3, radio de referencia y cruceta.
 - Coordenadas absolutas y relativas en la línea de comandos.
