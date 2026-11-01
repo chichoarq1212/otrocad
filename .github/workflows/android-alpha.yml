@@ -2,8 +2,14 @@ name: Compilar OtroCAD Android nativo sin conexión
 on:
   push:
     branches: ["main", "otrocad-android-alpha-*"]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-alpha.yml"
   pull_request:
     branches: ["main"]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-alpha.yml"
   workflow_dispatch:
 permissions:
   contents: write
@@ -23,19 +29,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Validar sintaxis del editor web y PWA
-        run: |
-          node --check editor/editor.js
-          node --check sw.js
-          node --check tests/grips.test.cjs
-          node tests/grips.test.cjs
-          node scripts/build-pages.cjs
-          test -f dist/index.html
-          test -f dist/editor/index.html
-          node -e "JSON.parse(require('fs').readFileSync('manifest.webmanifest', 'utf8'))"
       - name: Compilar APK nativo
         run: gradle -p android assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
