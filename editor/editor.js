@@ -1,5 +1,5 @@
 (()=>{
-const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),prompt=$('#prompt');
+const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,poly=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
 let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6;
 const colors={General:'#dce8f5',Muros:'#56b7e8',Cotas:'#f3c83e',Detalles:'#c69cff',Topografía:'#70d6a3',Vialidad:'#ff9b6b'};
@@ -65,7 +65,7 @@ function updateDynamic(){
  if(document.activeElement!==$('#dynLen'))$('#dynLen').value=len.toFixed(3);
  if(document.activeElement!==$('#dynAngle'))$('#dynAngle').value=ang.toFixed(1);
 }
-function updatePrompt(){prompt.textContent=start?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase())}
+function updatePrompt(){promptEl.textContent=start?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase())}
 function render(){
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle='#101820';ctx.fillRect(0,0,w,h);drawGrid(w,h);
  objects.forEach((s,i)=>drawEntity(s,i===selected));
@@ -81,7 +81,7 @@ function setTool(t){tool=t;start=null;temp=null;poly=[];moveBase=null;modifyTarg
 function selectAt(q){let found=-1,best=14/zoom;for(let i=objects.length-1;i>=0;i--){const s=objects[i];let d=1e9;if(s.type==='poly'||s.type==='polygon'){for(let j=0;j<s.pts.length;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[(j+1)%s.pts.length]))}else if(s.type==='rect'||s.type==='hatch'||s.type==='ellipse'){if(q.x>=Math.min(s.a.x,s.b.x)-best&&q.x<=Math.max(s.a.x,s.b.x)+best&&q.y>=Math.min(s.a.y,s.b.y)-best&&q.y<=Math.max(s.a.y,s.b.y)+best)d=0}else if(s.type==='circle')d=Math.abs(distance(q,s.a)-distance(s.a,s.b));else if(s.a&&s.b)d=pointLineDistance(q,s.a,s.b);if(d<best){best=d;found=i}}return found}
 function pointLineDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
 function showProperties(){const box=$('#properties'),content=$('#propContent');if(selected<0){content.textContent='Selecciona una entidad para editar sus propiedades.';return}const s=objects[selected];box.classList.add('open');content.innerHTML='';[['Tipo',s.type],['Capa',s.layer||'General'],['Color',s.color||'Por capa']].forEach(([k,v])=>{const l=document.createElement('label');l.textContent=k;const inp=document.createElement('input');inp.value=v;inp.readOnly=true;content.append(l,inp)});if(s.a&&s.b){[['X inicial',s.a.x],['Y inicial',s.a.y],['X final',s.b.x],['Y final',s.b.y]].forEach(([k,v])=>{const l=document.createElement('label');l.textContent=k;const inp=document.createElement('input');inp.value=Number(v).toFixed(3);inp.dataset.coord=k;content.append(l,inp)});const apply=document.createElement('button');apply.textContent='Aplicar coordenadas';apply.onclick=()=>{checkpoint();content.querySelectorAll('input[data-coord]').forEach(inp=>{const v=Number(inp.value),k=inp.dataset.coord;if(!Number.isFinite(v))return;if(k==='X inicial')s.a.x=v;if(k==='Y inicial')s.a.y=v;if(k==='X final')s.b.x=v;if(k==='Y final')s.b.y=v});save();render()};content.append(apply)}}
-function pointFromInputs(){const len=Number($('#dynLen').value),ang=Number($('#dynAngle').value);if(!Number.isFinite(len)||len<0||!Number.isFinite(ang))return null;const rad=ang*Math.PI/180;return round({x:start.x+len*Math.cos(rad),y:start.y+len*Math.sin(rad)})}
+function pointFromInputs(){const ls=$('#dynLen').value.trim(),as=$('#dynAngle').value.trim();if(!ls||!as)return null;const len=Number(ls),ang=Number(as);if(!Number.isFinite(len)||len<0||!Number.isFinite(ang))return null;const rad=ang*Math.PI/180;return round({x:start.x+len*Math.cos(rad),y:start.y+len*Math.sin(rad)})}
 function commitEntity(endPoint){
  if(!start)return;
  const layer=$('#layer').value;
@@ -147,7 +147,7 @@ canvas.addEventListener('pointerup',pointerEnd);canvas.addEventListener('pointer
 canvas.addEventListener('contextmenu',e=>{e.preventDefault();if(poly.length)finishPoly();else if(start){start=null;temp=null;render()}else {$('#cmd').value='';$('#cmd').focus()}});
 canvas.addEventListener('wheel',e=>{e.preventDefault();const p=pointer(e),before=world(p);zoom=Math.max(2,Math.min(500,zoom*(e.deltaY<0?1.12:.89)));const after=screen(before);offset.x+=p.x-after.x;offset.y+=p.y-after.y;render()},{passive:false});
 function updateToggle(id,on){$(id).classList.toggle('active',on)}
-function toggle(id,key){const map={gridToggle:'gridOn',orthoToggle:'orthoOn',snapToggle:'snapOn',polarToggle:'polarOn',osnapToggle:'osnapOn',crossToggle:'crossOn'};const k=map[id];if(k=== 'gridOn')gridOn=!gridOn;if(k==='orthoOn')orthoOn=!orthoOn;if(k==='snapOn')snapOn=!snapOn;if(k==='polarOn')polarOn=!polarOn;if(k==='osnapOn')osnapOn=!osnapOn;if(k==='crossOn')crossOn=!crossOn;updateToggle('#'+id,eval(k));render()}
+function toggle(id){const map={gridToggle:'gridOn',orthoToggle:'orthoOn',snapToggle:'snapOn',polarToggle:'polarOn',osnapToggle:'osnapOn',crossToggle:'crossOn'};const k=map[id];if(k==='gridOn')gridOn=!gridOn;if(k==='orthoOn')orthoOn=!orthoOn;if(k==='snapOn')snapOn=!snapOn;if(k==='polarOn')polarOn=!polarOn;if(k==='osnapOn')osnapOn=!osnapOn;if(k==='crossOn')crossOn=!crossOn;const values={gridOn,orthoOn,snapOn,polarOn,osnapOn,crossOn};updateToggle('#'+id,values[k]);render()}
 [['gridToggle',gridOn],['orthoToggle',orthoOn],['snapToggle',snapOn],['polarToggle',polarOn],['osnapToggle',osnapOn],['crossToggle',crossOn]].forEach(([id,on])=>updateToggle('#'+id,on));
 ['gridToggle','orthoToggle','snapToggle','polarToggle','osnapToggle','crossToggle'].forEach(id=>$('#'+id).onclick=()=>toggle(id));
 document.addEventListener('keydown',e=>{
