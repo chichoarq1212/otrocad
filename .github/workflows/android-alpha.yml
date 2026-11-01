@@ -31,21 +31,23 @@ jobs:
           gradle-version: '8.9'
       - name: Compilar APK nativo
         run: gradle -p android assembleDebug --no-daemon
+      - name: Preparar APK con nombre de versión
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.4.1.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: OtroCAD-Android-Nativo-Offline-0.4.0
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: OtroCAD-Android-Nativo-Offline-0.4.1
+          path: OtroCAD-Android-0.4.1.apk
           if-no-files-found: error
       - name: Publicar APK nativo de pruebas
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-native-0.4.0
+          tag_name: android-native-0.4.1
           target_commitish: ${{ github.sha }}
-          name: OtroCAD Android Nativo Offline 0.4.0
+          name: OtroCAD Android Nativo Offline 0.4.1
           prerelease: true
           make_latest: false
           overwrite_files: true
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          files: OtroCAD-Android-0.4.1.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
