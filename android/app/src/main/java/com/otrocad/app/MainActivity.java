@@ -14,6 +14,8 @@ import android.view.WindowManager;
 import android.view.View;
 import android.os.Build;
 import android.view.WindowInsets;
+import android.os.Build;
+import android.view.WindowInsets;
 import android.widget.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +31,7 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         getWindow().setStatusBarColor(Color.rgb(24,91,232));
         getWindow().setNavigationBarColor(Color.rgb(24,91,232));
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         buildUi();
         cad.restoreLocal();
