@@ -85,10 +85,10 @@ public class MainActivity extends Activity {
         try(OutputStream out=getContentResolver().openOutputStream(uri)){if(out==null)throw new IOException("No se pudo abrir el destino");pdf.writeTo(out);}finally{pdf.close();}
     }
     private void openUri(Uri uri){
-        try{String name=displayName(uri).toLowerCase();StringBuilder raw=new StringBuilder();try(InputStream in=getContentResolver().openInputStream(uri);BufferedReader br=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8))){String line;while((line=br.readLine())!=null)raw.append(line).append('\n');}
-            String s=raw.toString();if(name.endsWith(".dxf")||(s.contains("SECTION")&&s.contains("ENTITIES")))cad.loadDxf(s);
-            else if(name.endsWith(".dwg")){status.setText("DWG nativo aún no está disponible. Convierte a DXF para abrirlo sin conexión.");return;}
-            else cad.loadJson(s);
+        try{String name=displayName(uri).toLowerCase();
+            if(name.endsWith(".dwg")){status.setText("DWG nativo aún no está disponible. Convierte a DXF para abrirlo sin conexión.");return;}
+            StringBuilder raw=new StringBuilder();try(InputStream in=getContentResolver().openInputStream(uri);BufferedReader br=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8))){if(br==null)throw new IOException("Archivo vacío");String line;while((line=br.readLine())!=null)raw.append(line).append('\n');}
+            String s=raw.toString();if(name.endsWith(".dxf")||(s.contains("SECTION")&&s.contains("ENTITIES")))cad.loadDxf(s);else cad.loadJson(s);
         }catch(Exception e){new AlertDialog.Builder(this).setTitle("No se pudo abrir").setMessage(e.getMessage()).setPositiveButton("OK",null).show();}
     }
     private String displayName(Uri uri){String result="";try(Cursor c=getContentResolver().query(uri,null,null,null,null)){if(c!=null&&c.moveToFirst()){int i=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(i>=0)result=c.getString(i);}}catch(Exception ignored){}return result.isEmpty()?String.valueOf(uri.getLastPathSegment()):result;}
