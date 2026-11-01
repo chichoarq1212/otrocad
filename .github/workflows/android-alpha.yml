@@ -1,14 +1,16 @@
-name: Compilar OtroCAD Android alfa
+name: Compilar OtroCAD Android nativo sin conexión
 on:
   push:
-    branches: ["otrocad-android-alpha-*"]
+    branches: ["main", "otrocad-android-alpha-*"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -18,19 +20,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Compilar APK de pruebas
+      - name: Compilar APK nativo
         run: gradle -p android assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: OtroCAD-Android-alfa-debug
+          name: OtroCAD-Android-Nativo-Offline-0.2.0
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-      - name: Publicar APK instalable de pruebas
+      - name: Publicar APK nativo de pruebas
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-alpha-0.1.0
+          tag_name: android-native-0.2.0
           target_commitish: ${{ github.sha }}
-          name: OtroCAD Android Alpha 0.1.0
+          name: OtroCAD Android Nativo Offline 0.2.0
           prerelease: true
           make_latest: false
           overwrite_files: true

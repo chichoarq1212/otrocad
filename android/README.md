@@ -1,7 +1,30 @@
-# OtroCAD Android — prototipo inicial
+# OtroCAD Android — motor nativo sin WebView
 
-Este proyecto inicia una envoltura Android con WebView para el editor web de OtroCAD. Requiere conexión y aún no es una aplicación CAD nativa completa. Es código de partida, no un APK probado.
+Esta rama reemplaza la envoltura WebView por una vista de dibujo Android basada en Canvas. El editor de esta versión funciona localmente y no solicita permiso de Internet.
 
-Pendiente antes de entregar un APK utilizable: implementar guardado/descargas de archivos y PDF, tratamiento correcto de archivos compartidos, gestión de impresión y ventanas, respaldo de dibujos, soporte sin conexión y pruebas en dispositivos Android. También falta compilar y firmar el paquete. Abrir desde la aplicación usa el selector de Android; no se ha verificado en dispositivo.
+## Incluido en la versión nativa 0.2.0 alfa
+- Dibujo táctil por puntos: línea, polilínea, rectángulo, círculo, arco, elipse, cota, hatch, texto y directriz.
+- Selección, mover, copiar, borrar, deshacer y rehacer.
+- Rejilla, ORTHO, POLAR, referencias a objetos y cruceta.
+- Coordenadas absolutas y relativas en la línea de comandos.
+- Capas básicas, colores y grosores de línea.
+- Abrir/guardar proyectos JSON, importar/exportar DXF y exportar PDF.
+- Apertura de archivos compartidos desde el selector de archivos Android cuando el proveedor entrega un tipo compatible.
+- Trabajo local sin conexión; el dibujo no depende del editor web.
 
-Para desarrollo se requieren JDK 17, Gradle compatible con Android Gradle Plugin 8.7.3, Android SDK 35 y acceso a los repositorios de Google y Maven Central. Abrir `android/` en Android Studio y crear una compilación debug para pruebas; no distribuirla como versión final.
+## Limitaciones conocidas de esta alfa
+- No es todavía un sustituto completo de AutoCAD ni de Civil 3D.
+- La apertura directa de DWG no está implementada en el motor nativo; para esta versión se debe convertir a DXF.
+- El importador/exportador DXF cubre entidades comunes, no todas las entidades, bloques, referencias externas, estilos ni objetos proxy de AutoCAD.
+- El motor 2D nativo todavía no incluye el conjunto completo de operaciones avanzadas (TRIM, EXTEND, FILLET, CHAMFER, bloques dinámicos, layouts y plot styles).
+- El PDF exporta una vista de dibujo básica; se deben revisar escala, textos y grosores antes de usarlo como plano de construcción.
+- El APK de CI es una compilación debug para pruebas, no una firma de distribución de Play Store.
+
+## Compilación
+Requiere JDK 17, Gradle 8.9 y Android SDK 35. Desde la raíz del repositorio:
+
+```bash
+gradle -p android assembleDebug --no-daemon
+```
+
+El APK queda en `android/app/build/outputs/apk/debug/app-debug.apk`.
