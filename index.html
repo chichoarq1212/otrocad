@@ -1,83 +1,86 @@
 <!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#101b2e">
-<link rel="manifest" href="manifest.webmanifest">
-<title>OtroCAD — Tu CAD sin límites</title>
+<html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101b2e"><meta name="description" content="OtroCAD: dibujo técnico CAD 2D gratuito para arquitectura e ingeniería. Editor web y Android nativo.">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>OtroCAD — Dibujo técnico sin límites</title>
 <style>
-:root{--n:#101b2e;--y:#f3c83e}
-*{box-sizing:border-box}
-body{margin:0;font:16px system-ui;color:#17243a}
-header{background:var(--n);color:white;display:flex;justify-content:space-between;padding:20px 6%;gap:20px;flex-wrap:wrap}
-header a{color:white;text-decoration:none}
-b.accent{color:var(--y)}
-nav{display:flex;gap:18px;flex-wrap:wrap}
-.hero{background:var(--n);color:white;padding:75px 7% 95px}
-.hero h1{font-size:clamp(42px,8vw,88px);line-height:1.05;margin:15px 0}
-.hero p{max-width:650px;color:#c9d2e0;line-height:1.6}
-.btn{display:inline-block;background:var(--y);color:var(--n);padding:14px 20px;border-radius:6px;font-weight:800;text-decoration:none;margin:8px 8px 8px 0}
-.section{padding:60px 7%}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
-.card{padding:22px;background:#f2f5f9;border:1px solid #dce2ea;border-radius:8px;line-height:1.55}
-footer{background:var(--n);color:white;padding:40px 7%;line-height:1.8}
-footer a{color:var(--y)}
-</style>
-</head>
-<body>
-<header>
-<a href="./" style="font-size:26px;font-weight:900">otro<b class="accent">CAD</b></a>
-<nav><a href="#herramientas">Herramientas</a><a href="#instalar">Instalar</a><a href="#creditos">Créditos</a><a href="https://esquechat.com/">ESQUECHAT 3D ↗</a></nav>
-</header>
+:root{--navy:#101b2e;--navy2:#172942;--blue:#62b8e8;--yellow:#f3c83e;--ink:#17243a;--muted:#657488;--paper:#f2f6fa;--line:#dce4ec}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font:16px/1.55 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink)}
+a{color:inherit}.wrap{width:min(1160px,calc(100% - 36px));margin:auto}
+header{height:74px;background:var(--navy);color:#fff;border-bottom:1px solid #ffffff20}
+.head{height:100%;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-size:25px;font-weight:900;letter-spacing:-1px}
+.brand svg{width:38px;height:38px}.brand span span{color:var(--yellow)}
+nav{display:flex;gap:24px;align-items:center}nav a{text-decoration:none;color:#dbe5ef;font-size:14px;font-weight:700}nav a:hover{color:var(--yellow)}
+nav .navbtn{border:1px solid #f3c83e88;border-radius:7px;padding:9px 14px;color:var(--yellow)}
+.hero{background:var(--navy);color:#fff;padding:68px 0 78px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;inset:0 0 0 50%;opacity:.22;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M40 0H0V40' fill='none' stroke='%2362b8e8' stroke-width='.8'/%3E%3C/svg%3E")}
+.hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:44px}
+.eyebrow{color:var(--yellow);font-size:12px;font-weight:850;letter-spacing:2px;text-transform:uppercase}
+h1{font-size:clamp(42px,5.5vw,68px);line-height:1.03;letter-spacing:-2.5px;margin:18px 0}
+h1 em{font-style:normal;color:var(--yellow)}.intro{max-width:570px;color:#c6d3e1;font-size:17px;line-height:1.7}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin:26px 0}.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:13px 18px;min-height:48px;border-radius:7px;text-decoration:none;font-weight:850;font-size:14px}
+.primary{background:var(--yellow);color:var(--navy)}.secondary{border:1px solid #8aa0b7;color:#fff;background:#ffffff08}
+.meta{display:flex;flex-wrap:wrap;gap:18px;color:#9fb2c7;font-size:12px}.meta b{color:var(--blue)}
+.mock{border:1px solid #597493;border-radius:12px;overflow:hidden;background:#0b1522;box-shadow:0 22px 60px #0005}
+.mockbar{height:38px;background:#172942;border-bottom:1px solid #314862;display:flex;align-items:center;gap:7px;padding:0 13px;color:#a7bbd0;font:10px monospace;letter-spacing:1px}
+.mockbar i{width:7px;height:7px;border-radius:50%;background:#7088a1}.mockbar strong{margin-left:auto;color:var(--yellow)}
+.plan{display:block;width:100%;height:auto}
+.proof{border-bottom:1px solid var(--line);background:#fff}.proofgrid{display:grid;grid-template-columns:repeat(4,1fr)}
+.proofitem{padding:19px 12px;display:flex;align-items:center;justify-content:center;gap:10px;border-right:1px solid var(--line);font-size:13px;font-weight:800;color:#33445a}.proofitem:last-child{border:0}
+.prooficon{display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:#eaf4fb;color:#247eae;font-size:19px}
+section.content{padding:72px 0}.soft{background:var(--paper)}
+.sectionhead{text-align:center;max-width:700px;margin:0 auto 34px}.kicker{color:#277fae;text-transform:uppercase;font-size:11px;letter-spacing:1.8px;font-weight:850}
+h2{font-size:clamp(29px,3.5vw,42px);line-height:1.13;letter-spacing:-1.2px;color:var(--navy);margin:10px 0}
+.sectionhead p{color:var(--muted);margin:0;line-height:1.7}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{padding:23px;border:1px solid var(--line);border-radius:10px;background:#fff;min-height:170px}
+.cardicon{width:42px;height:42px;border-radius:9px;background:#eaf4fb;color:#247eae;display:grid;place-items:center;font-size:21px}
+.card h3{margin:14px 0 6px;color:var(--navy);font-size:17px}.card p{margin:0;color:var(--muted);font-size:14px;line-height:1.65}
+.downloads{display:grid;grid-template-columns:1fr 1fr;gap:20px}.download{padding:30px;border-radius:11px;background:var(--navy);color:#fff;border-top:4px solid var(--yellow)}
+.download.web{background:#eaf3f9;color:var(--navy);border-color:var(--blue)}
+.pill{display:inline-block;padding:5px 9px;border-radius:99px;background:#f3c83e22;color:var(--yellow);font-size:11px;font-weight:850;margin-bottom:13px}
+.web .pill{background:#62b8e822;color:#247eae}.download h3{font-size:23px;margin:0 0 8px}.download p{font-size:14px;color:#c6d3e1;line-height:1.7;margin:0 0 17px}
+.web p{color:#5e7083}.download small{display:block;color:#9fb2c7;font-size:11px;line-height:1.6;margin-top:13px}.web small{color:#66778a}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.step{padding:20px;border:1px solid var(--line);border-radius:9px;background:#fff}.step b{display:block;color:#247eae;font-size:12px;margin-bottom:7px}.step p{margin:0;color:var(--muted);font-size:13px}
+.sibling{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:28px;background:var(--navy2);color:#fff;border-radius:11px}.sibling h3{font-size:22px;margin:0 0 4px}.sibling p{margin:0;color:#c6d3e1;font-size:14px}.sibling a{color:var(--yellow);font-weight:850;text-decoration:none;white-space:nowrap}
+footer{background:#0b1421;color:#c6d3e1;padding:34px 0;font-size:13px}.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}.foot strong{color:#fff;font-size:17px}.foot a{color:var(--yellow);text-decoration:none}.fine{color:#91a4b8;font-size:11px;max-width:600px;margin-top:7px}
+@media(max-width:850px){.hero-grid{grid-template-columns:1fr;gap:32px}.mock{max-width:650px;width:100%;margin:auto}.cards{grid-template-columns:repeat(2,1fr)}.proofgrid{grid-template-columns:repeat(2,1fr)}.proofitem:nth-child(2){border-right:0}.proofitem:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+@media(max-width:600px){.wrap{width:calc(100% - 28px)}header{height:64px}.brand{font-size:22px}.brand svg{width:32px;height:32px}nav{gap:12px}nav a:not(.navbtn){display:none}.hero{padding:48px 0 52px}h1{font-size:43px;letter-spacing:-1.7px}.intro{font-size:15px}.actions{display:grid;grid-template-columns:1fr}.btn{width:100%}section.content{padding:53px 0}.cards,.downloads,.steps{grid-template-columns:1fr}.card{min-height:0}.proofitem{font-size:11px;justify-content:flex-start;padding:14px 7px}.prooficon{width:29px;height:29px}.download{padding:24px}.sibling{align-items:flex-start;flex-direction:column}.sibling a{white-space:normal}}
+</style></head><body>
+<header><div class="wrap head">
+<a class="brand" href="./" aria-label="OtroCAD inicio"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="34" fill="none" stroke="#62b8e8" stroke-width="10" stroke-dasharray="154 60" stroke-linecap="round" transform="rotate(48 50 50)"/><path d="M50 16A34 34 0 0 1 84 50" fill="none" stroke="#f3c83e" stroke-width="10" stroke-linecap="round"/><path d="M50 31v38M31 50h38" stroke="#fff" stroke-width="3" opacity=".85"/><circle cx="50" cy="50" r="5" fill="#f3c83e"/></svg><span>otro<span>CAD</span></span></a>
+<nav><a href="#herramientas">Herramientas</a><a href="#descargas">Descargas</a><a href="#instalar">Instalación</a><a href="#creditos">Créditos</a><a class="navbtn" href="./editor/">Abrir editor</a></nav>
+</div></header>
 <main>
-<section class="hero">
-<small style="color:var(--y);font-weight:800;letter-spacing:2px">DISEÑA · DIBUJA · CREA</small>
-<h1>Tu CAD,<br>sin límites.</h1>
-<p>Dibujo técnico para arquitectura e ingeniería. Trabaja desde computadora, tablet o teléfono con herramientas de precisión, edición y anotación.</p>
-<a class="btn" href="./editor/index.html">Abrir editor CAD →</a>
-<a class="btn" href="#instalar" style="background:white">Instalar aplicación</a>
-<p><small>Versión alfa · Proyecto gratuito · Desarrollo abierto</small></p>
-</section>
-<section class="section" id="herramientas">
-<h2>Herramientas para crear</h2>
-<div class="grid">
-<div class="card"><h3>Dibujo 2D</h3>Líneas, polilíneas, rectángulos, círculos, arcos, elipses, textos y directrices.</div>
-<div class="card"><h3>Precisión</h3>Entrada dinámica de longitud y ángulo, coordenadas absolutas y relativas, ORTHO, POLAR y referencias a objetos.</div>
-<div class="card"><h3>Edición</h3>Mover, copiar, OFFSET, rotar, simetría, escala, recortar, alargar y descomponer entidades compatibles. Selección CAD por ventana y cruce con grupos de objetos.</div>
-<div class="card"><h3>Anotación y capas</h3>Cotas, hatch, colores, grosores de línea y organización por capas.</div>
-<div class="card"><h3>Archivos</h3>Proyectos JSON, importación/exportación DXF, SVG y salida PDF/impresión.</div>
-<div class="card"><h3>Diseño adaptable</h3>Interfaz web para PC y dispositivos táctiles, con guardado local y modo PWA.</div>
-</div>
-</section>
-<section class="section" id="instalar" style="background:#e9eef5">
-<h2>Diseña en cualquier dispositivo</h2>
-<p>La versión web funciona en Chrome, Edge, Firefox y Safari. La PWA puede instalarse desde el navegador y conserva los recursos del editor para trabajar sin conexión después de la primera carga.</p>
-<a class="btn" href="./editor/">Usar OtroCAD Web</a>
-<a class="btn" href="https://github.com/chichoarq1212/otrocad/releases" style="background:white">Consultar compilaciones Android</a>
-<a class="btn" href="https://github.com/chichoarq1212/otrocad" style="background:white">Código fuente</a>
-<div class="grid" style="margin-top:18px">
-<div class="card"><h3>Android nativo</h3>La versión 0.4.0 usa Android Canvas nativo, sin WebView ni permiso de Internet. Incluye selección CAD, grips arrastrables para editar geometría, autoguardado local y deshacer cambios. El APK debe superar la compilación y validación antes de instalarse. No uses el APK antiguo 0.1.0, que todavía dependía de WebView. El DWG directo aún no está disponible en el motor nativo.</div>
-<div class="card"><h3>iPhone y iPad</h3>Abre OtroCAD Web en Safari, pulsa Compartir y elige “Añadir a pantalla de inicio”. Es una instalación PWA; no es una aplicación nativa de App Store.</div>
-<div class="card"><h3>Computadora</h3>Abre el editor en Chrome, Edge o Firefox. Puedes abrir JSON y DXF. La conversión de DWG en la versión web carga un módulo externo y requiere conexión a Internet.</div>
-</div>
-<p><small>Versión alfa: las funciones CAD y la compatibilidad DXF aún son parciales. El APK Android de pruebas es debug y no está firmado para distribución de tienda. Verifica cotas, escala y archivos antes de utilizarlos en obra.</small></p>
-</section>
-<section class="section">
-<h2>Del plano al espacio</h2>
-<p>OtroCAD es proyecto hermano de ESQUECHAT 3D, con una misma visión de diseño accesible.</p>
-<a class="btn" href="https://esquechat.com/">Descubrir ESQUECHAT 3D ↗</a>
-</section>
-<section class="section" style="background:#f2f5f9">
-<h2>Apoya el desarrollo</h2>
-<p>El proyecto busca mantener el acceso gratuito para estudiantes y profesionales. Próximamente se anunciarán los canales oficiales para aportes voluntarios.</p>
-</section>
+<section class="hero"><div class="wrap hero-grid">
+<div><div class="eyebrow">CAD 2D · ARQUITECTURA · INGENIERÍA</div><h1>Dibuja con precisión.<br><em>Diseña sin límites.</em></h1>
+<p class="intro">Herramientas de dibujo técnico para arquitectura, topografía y vialidad. Trabaja desde tu computadora, tablet o teléfono con un editor gratuito y en constante desarrollo.</p>
+<div class="actions"><a class="btn primary" href="./editor/">Abrir editor web ↗</a><a class="btn secondary" href="https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.4.1/OtroCAD-Android-0.4.1.apk">Descargar APK Android ↓</a></div>
+<div class="meta"><span><b>●</b> Gratuito y sin suscripción</span><span><b>●</b> Android nativo</span><span><b>●</b> Web instalable</span></div></div>
+<div class="mock"><div class="mockbar"><i></i><i></i><i></i><span>OTROCAD · MODEL SPACE</span><strong>MODEL</strong></div>
+<svg class="plan" viewBox="0 0 620 410" role="img" aria-label="Plano arquitectónico ilustrativo en cuadrícula CAD"><rect width="620" height="410" fill="#0b1522"/>
+<g stroke="#20374d" stroke-width="1"><path d="M0 40H620M0 80H620M0 120H620M0 160H620M0 200H620M0 240H620M0 280H620M0 320H620M0 360H620M40 0V410M80 0V410M120 0V410M160 0V410M200 0V410M240 0V410M280 0V410M320 0V410M360 0V410M400 0V410M440 0V410M480 0V410M520 0V410M560 0V410M600 0V410"/></g>
+<g fill="none" stroke="#f3c83e" stroke-width="3"><path d="M115 72H470V338H115Z M270 72V202H470 M115 230H270V338 M270 202H355V338 M190 72V165H270 M355 202V265H470"/></g>
+<g fill="none" stroke="#62b8e8" stroke-width="2"><path d="M95 50H490M95 50V72M490 50V72M95 358H490M95 338V358M490 338V358M95 72V338M95 72H115M95 338H115"/></g>
+<g fill="#dce8f5" font-family="monospace" font-size="11"><text x="292" y="42" text-anchor="middle">12.40 m</text><text x="74" y="205" transform="rotate(-90 74 205)" text-anchor="middle">9.20 m</text><text x="300" y="187">ESTAR</text><text x="140" y="135">DORM.</text><text x="385" y="140">COCINA</text><text x="148" y="294">BAÑO</text><text x="388" y="300">PATIO</text></g>
+<g fill="#f3c83e"><circle cx="115" cy="72" r="4"/><circle cx="470" cy="338" r="4"/><circle cx="270" cy="202" r="4"/></g></svg></div>
+</div></section>
+<section class="proof"><div class="wrap proofgrid"><div class="proofitem"><span class="prooficon">⌖</span>Dibujo CAD 2D</div><div class="proofitem"><span class="prooficon">◫</span>Precisión y capas</div><div class="proofitem"><span class="prooficon">↗</span>PC · Tablet · Móvil</div><div class="proofitem"><span class="prooficon">↓</span>Android nativo</div></div></section>
+<section class="content" id="herramientas"><div class="wrap"><div class="sectionhead"><span class="kicker">Herramientas de trabajo</span><h2>Todo empieza con una buena geometría.</h2><p>Un espacio de dibujo pensado para crear, modificar y organizar planos técnicos desde diferentes dispositivos.</p></div>
+<div class="cards">
+<article class="card"><span class="cardicon">／</span><h3>Dibujo 2D</h3><p>Líneas, polilíneas, rectángulos, círculos, arcos, elipses, polígonos, textos y directrices.</p></article>
+<article class="card"><span class="cardicon">⌖</span><h3>Precisión CAD</h3><p>Coordenadas, longitud y ángulo dinámicos, ORTHO, POLAR, SNAP y referencias a objetos.</p></article>
+<article class="card"><span class="cardicon">✥</span><h3>Edición geométrica</h3><p>Selección por ventana y cruce, grips arrastrables, mover, copiar, OFFSET, rotar y más.</p></article>
+<article class="card"><span class="cardicon">▤</span><h3>Capas y propiedades</h3><p>Organiza entidades por capas y controla color, grosor y tipo de línea.</p></article>
+<article class="card"><span class="cardicon">▧</span><h3>Anotación</h3><p>Cotas, textos, sombreados y herramientas para documentar tus dibujos.</p></article>
+<article class="card"><span class="cardicon">⇩</span><h3>Archivos</h3><p>Proyectos JSON, importación y exportación DXF, SVG e impresión PDF.</p></article>
+</div></div></section>
+<section class="content soft" id="descargas"><div class="wrap"><div class="sectionhead"><span class="kicker">Acceso multiplataforma</span><h2>Elige cómo quieres trabajar.</h2><p>Abre el editor en el navegador o instala la aplicación nativa de Android.</p></div>
+<div class="downloads"><article class="download"><span class="pill">ANDROID · VERSIÓN 0.4.1 ALPHA</span><h3>OtroCAD para Android</h3><p>Aplicación nativa con motor Canvas, sin WebView. Dibuja y edita localmente, incluso sin conexión.</p><a class="btn primary" href="https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.4.1/OtroCAD-Android-0.4.1.apk">Descargar APK ↓</a><a class="btn secondary" href="https://github.com/chichoarq1212/otrocad/releases/tag/android-native-0.4.1">Notas de versión</a><small>Compilación alfa de pruebas. Android puede solicitar autorización para instalar aplicaciones descargadas fuera de Play Store. No es una versión firmada para distribución comercial.</small></article>
+<article class="download web"><span class="pill">WEB · PWA</span><h3>Editor web instalable</h3><p>Usa OtroCAD desde Chrome, Edge, Firefox o Safari. En dispositivos compatibles puedes añadirlo a la pantalla de inicio.</p><a class="btn primary" href="./editor/">Abrir OtroCAD Web ↗</a><a class="btn secondary" style="color:#17243a;border-color:#a8bacb" href="https://github.com/chichoarq1212/otrocad">Código fuente</a><small>Los dibujos se guardan localmente en el dispositivo. Exporta tus archivos periódicamente.</small></article></div></div></section>
+<section class="content" id="instalar"><div class="wrap"><div class="sectionhead"><span class="kicker">Instalación sencilla</span><h2>Empieza en pocos pasos.</h2></div><div class="steps"><div class="step"><b>01 · COMPUTADORA</b><p>Abre el editor en Chrome, Edge o Firefox. No necesitas instalar programas adicionales.</p></div><div class="step"><b>02 · IPHONE / IPAD</b><p>Abre la página en Safari, pulsa Compartir y selecciona “Añadir a pantalla de inicio”. Es una PWA, no una app de App Store.</p></div><div class="step"><b>03 · ANDROID</b><p>Descarga el APK, ábrelo y autoriza la instalación si Android lo solicita. La aplicación nativa no requiere WebView.</p></div></div></div></section>
+<section class="content soft"><div class="wrap"><div class="sibling"><div><h3>Del plano al espacio.</h3><p>OtroCAD es proyecto hermano de ESQUECHAT 3D: herramientas para dibujar, diseñar y construir ideas.</p></div><a href="https://esquechat.com/">Conocer ESQUECHAT 3D ↗</a></div></div></section>
 </main>
-<footer id="creditos">
-<strong>OtroCAD</strong> · Arq. Cristhian Torres R., Mgs. · VITTA Online<br>
-Proyecto hermano: <a href="https://esquechat.com/">ESQUECHAT 3D</a> · <a href="https://github.com/chichoarq1212/otrocad">Código fuente</a><br>
-<small>Versión alfa: verifica siempre las medidas antes de utilizar planos en obra.</small>
-</footer>
-<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});</script>
-</body>
-</html>
+<footer id="creditos"><div class="wrap foot"><div><strong>OtroCAD · CAD técnico libre</strong><div>Arq. Cristhian Torres R., Mgs. · VITTA Online</div><div class="fine">Versión alfa en desarrollo. Comprueba cotas, escalas y compatibilidad de archivos antes de utilizar planos para ejecución de obra.</div></div><div><a href="https://github.com/chichoarq1212/otrocad">GitHub</a> · <a href="https://github.com/chichoarq1212/otrocad/releases">Descargas</a> · <a href="https://esquechat.com/">ESQUECHAT 3D</a></div></div></footer>
+<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});</script></body></html>
