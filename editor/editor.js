@@ -159,17 +159,30 @@ document.addEventListener('keydown',e=>{
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){$('#undo').click();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){$('#redo').click();return}
 });
-const aliases={L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',REC:'rect',RECT:'rect',RECTANG:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select'};
-function runCommand(raw){const c=raw.trim().toUpperCase().split(/\s+/)[0];if(!c)return;
+const aliases={L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select'};
+function parseCoordinate(raw,base){
+ const s=raw.trim().replace(/\\s+/g,'');let m;
+ if((m=s.match(/^@?(-?\\d+(?:[.,]\\d+)?),(-?\\d+(?:[.,]\\d+)?)$/))){const x=Number(m[1].replace(',','.')),y=Number(m[2].replace(',','.'));return s.startsWith('@')?{x:base.x+x,y:base.y+y}:{x,y}}
+ if((m=s.match(/^@?(-?\\d+(?:[.,]\\d+)?)<(-?\\d+(?:[.,]\\d+)?)$/))){const len=Number(m[1].replace(',','.')),ang=Number(m[2].replace(',','.'))*Math.PI/180;return {x:base.x+len*Math.cos(ang),y:base.y+len*Math.sin(ang)}}
+ return null;
+}
+function runCommand(raw){
+ const textValue=raw.trim(),upper=textValue.toUpperCase(),coordinate=parseCoordinate(textValue,start||{x:0,y:0});
+ if(coordinate&&(/^[+-]?(?:\\d|\\.)/.test(textValue)||textValue.startsWith('@'))){
+  if(!start){start=round(coordinate);temp={type:tool,a:clone(start),b:clone(start),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Punto inicial fijado · introduce el siguiente punto';}
+  else commitEntity(round(coordinate));
+  return;
+ }
+ const c=upper.split(/\\s+/)[0];if(!c)return;
  if(c==='F7'||c==='GRID'){toggle('gridToggle');return}if(c==='F8'||c==='ORTHO'){toggle('orthoToggle');return}if(c==='F9'||c==='SNAP'){toggle('snapToggle');return}if(c==='F10'||c==='POLAR'){toggle('polarToggle');return}if(c==='F3'||c==='OSNAP'){toggle('osnapToggle');return}
  if(c==='U'||c==='UNDO'){$('#undo').click();return}if(c==='REDO'){$('#redo').click();return}
- if(c==='HP'||c==='DSETTINGS'||c==='SETTINGS'){alert('CONFIGURACIÓN DE DIBUJO\nF7 Rejilla: '+(gridOn?'ACTIVA':'INACTIVA')+'\nF8 Orto: '+(orthoOn?'ACTIVO':'INACTIVO')+'\nF9 Snap: '+(snapOn?'ACTIVO':'INACTIVO')+'\nF10 Polar: '+(polarOn?'ACTIVO':'INACTIVO')+'\nF3 Referencias: '+(osnapOn?'ACTIVAS':'INACTIVAS'));return}
+ if(c==='HP'||c==='DSETTINGS'||c==='SETTINGS'){alert('CONFIGURACIÓN DE DIBUJO\\nF7 Rejilla: '+(gridOn?'ACTIVA':'INACTIVA')+'\\nF8 Orto: '+(orthoOn?'ACTIVO':'INACTIVO')+'\\nF9 Snap: '+(snapOn?'ACTIVO':'INACTIVO')+'\\nF10 Polar: '+(polarOn?'ACTIVO':'INACTIVO')+'\\nF3 Referencias: '+(osnapOn?'ACTIVAS':'INACTIVAS'));return}
  if(c==='PR'||c==='PROPERTIES'||c==='CTRL+1'){$('#properties').classList.toggle('open');showProperties();return}
  if(c==='E'||c==='ERASE'||c==='DELETE'){if(selected>=0){checkpoint();objects.splice(selected,1);selected=-1;save();render()}return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
  if(c==='EX'||c==='EXPLODE'){status.textContent='EXPLODE: selección de bloques y polilíneas en desarrollo';return}
- if(c==='TR'||c==='TRIM'||c==='EX'||c==='EXTEND'||c==='RO'||c==='ROTATE'||c==='SC'||c==='SCALE'||c==='MI'||c==='MIRROR'||c==='F'||c==='FILLET'||c==='CHA'||c==='CHAMFER'){status.textContent=c+' reconocido · herramienta en desarrollo';return}
+ if(c==='TR'||c==='TRIM'||c==='EXTEND'||c==='RO'||c==='ROTATE'||c==='SC'||c==='SCALE'||c==='MI'||c==='MIRROR'||c==='F'||c==='FILLET'||c==='CHA'||c==='CHAMFER'){status.textContent=c+' reconocido · herramienta en desarrollo';return}
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
