@@ -152,7 +152,7 @@ public class CadView extends View {
         drawSelectionGrips(c);
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         if(tool.equals("POLY")&&poly.size()>0){Entity e=new Entity();e.type="POLY";e.pts.addAll(poly);drawEntity(c,e,false,false);}
-        if(base!=null){PointF end=constrain(snap(world(cursor.x,cursor.y)));Paint p=new Paint(3);p.setColor(Color.rgb(98,184,232));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f %s  <  %.1f°",dist(base,end),units,angle(base,end)),b.x+10,b.y-10,p);}
+        if(base!=null){PointF end=constrain(snap(world(cursor.x,cursor.y)));Paint p=new Paint(3);p.setColor(resolveCanvasColor(drawColor,false));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f %s  <  %.1f°",dist(base,end),units,angle(base,end)),b.x+10,b.y-10,p);}
         if(selectionStartScreen!=null&&selectionDragging&&selectionEndScreen!=null){boolean win=selectionEndScreen.x>=selectionStartScreen.x;float l=Math.min(selectionStartScreen.x,selectionEndScreen.x),r=Math.max(selectionStartScreen.x,selectionEndScreen.x),t=Math.min(selectionStartScreen.y,selectionEndScreen.y),b=Math.max(selectionStartScreen.y,selectionEndScreen.y);Paint fill=new Paint(3);fill.setColor(win?0x223b82f6:0x2234d399);fill.setStyle(Paint.Style.FILL);c.drawRect(l,t,r,b,fill);Paint edge=new Paint(3);edge.setColor(win?0xff4a9bff:0xff35d28a);edge.setStyle(Paint.Style.STROKE);edge.setStrokeWidth(1.5f);edge.setPathEffect(win?null:new DashPathEffect(new float[]{8,5},0));c.drawRect(l,t,r,b,edge);edge.setStyle(Paint.Style.FILL);edge.setPathEffect(null);edge.setTextSize(12);c.drawText(win?"VENTANA":"CRUCE",l+5,Math.max(14,t-5),edge);}
         if(crosshair){Paint p=new Paint(3);p.setColor(0x885cb7e8);p.setStrokeWidth(1);c.drawLine(cursor.x,0,cursor.x,getHeight(),p);c.drawLine(0,cursor.y,getWidth(),cursor.y,p);}
     }
@@ -164,8 +164,9 @@ public class CadView extends View {
         for(float y=oy;y<getHeight();y+=gap)c.drawLine(0,y,getWidth(),y,p);
         p.setColor(0xff46637b);p.setStrokeWidth(1.3f);PointF o=screen(new PointF(0,0));c.drawLine(o.x,0,o.x,getHeight(),p);c.drawLine(0,o.y,getWidth(),o.y,p);
     }
+    private int resolveCanvasColor(int color,boolean lightBackground){return color==0xffdce8f5?(lightBackground?Color.BLACK:Color.WHITE):color;}
     private void drawEntity(Canvas c,Entity e,boolean chosen,boolean print){
-        if(e.pts.isEmpty())return;Paint p=new Paint(3);p.setColor(chosen?0xfff3c83e:e.color);p.setStrokeWidth(chosen?2.6f:Math.max(1f,e.weight*3.0f));p.setStyle(Paint.Style.STROKE);
+        if(e.pts.isEmpty())return;Paint p=new Paint(3);p.setColor(resolveCanvasColor(e.color,print));p.setStrokeWidth(chosen?2.6f:Math.max(1f,e.weight*3.0f));p.setStyle(Paint.Style.STROKE);
         if("DASHED".equals(e.linetype))p.setPathEffect(new DashPathEffect(new float[]{8,5},0));
         ArrayList<PointF> pts=e.pts;Path path=new Path();PointF first=screen(pts.get(0));path.moveTo(first.x,first.y);
         if("CIRCLE".equals(e.type)&&pts.size()>1){PointF center=screen(pts.get(0));float r=dist(pts.get(0),pts.get(1))*zoom;c.drawCircle(center.x,center.y,r,p);}
