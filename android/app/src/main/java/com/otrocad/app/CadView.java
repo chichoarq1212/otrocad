@@ -30,6 +30,8 @@ public class CadView extends View {
 
     public CadView(Context c){super(c);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
     public void setStatusListener(StatusListener l){listener=l;}
+    private void persistLocal(){try{getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).edit().putString("drawing",toJson().toString()).apply();}catch(Exception ignored){}}
+    public void restoreLocal(){String raw=getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).getString("drawing","");if(raw!=null&&!raw.isEmpty())try{loadJson(raw);say("Dibujo local recuperado");}catch(Exception ignored){}}
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
     public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;panning=false;say("Herramienta: "+tool);invalidate();}
@@ -39,10 +41,10 @@ public class CadView extends View {
     public void togglePolar(){polar=!polar;invalidate();}
     public void toggleSnap(){snap=!snap;invalidate();}
     public void toggleCrosshair(){crosshair=!crosshair;invalidate();}
-    public void undo(){if(undo.isEmpty())return;redo.add(copyAll());entities.clear();entities.addAll(undo.remove(undo.size()-1));selected=-1;invalidate();say("Deshacer");}
-    public void redo(){if(redo.isEmpty())return;undo.add(copyAll());entities.clear();entities.addAll(redo.remove(redo.size()-1));selected=-1;invalidate();say("Rehacer");}
-    public void deleteSelected(){if(selected>=0&&selected<entities.size()){checkpoint();entities.remove(selected);selected=-1;invalidate();say("Objeto eliminado");}}
-    public void clearAll(){checkpoint();entities.clear();selected=-1;invalidate();}
+    public void undo(){if(undo.isEmpty())return;redo.add(copyAll());entities.clear();entities.addAll(undo.remove(undo.size()-1));selected=-1;persistLocal();invalidate();say("Deshacer");}
+    public void redo(){if(redo.isEmpty())return;undo.add(copyAll());entities.clear();entities.addAll(redo.remove(redo.size()-1));selected=-1;persistLocal();invalidate();say("Rehacer");}
+    public void deleteSelected(){if(selected>=0&&selected<entities.size()){checkpoint();entities.remove(selected);selected=-1;persistLocal();invalidate();say("Objeto eliminado");}}
+    public void clearAll(){checkpoint();entities.clear();selected=-1;persistLocal();invalidate();}
     private ArrayList<Entity> copyAll(){ArrayList<Entity> a=new ArrayList<>();for(Entity e:entities)a.add(e.copy());return a;}
     private void checkpoint(){undo.add(copyAll());if(undo.size()>80)undo.remove(0);redo.clear();}
     private PointF world(float x,float y){return new PointF((x-getWidth()/2f-panX)/zoom,(getHeight()/2f+panY-y)/zoom);}
@@ -93,9 +95,9 @@ public class CadView extends View {
         if("LEADER".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));p.setStyle(Paint.Style.FILL);p.setPathEffect(null);Path arrow=new Path();arrow.moveTo(first.x,first.y);arrow.lineTo(first.x+8,first.y-4);arrow.lineTo(first.x+8,first.y+4);arrow.close();c.drawPath(arrow,p);if(e.text!=null&&!e.text.isEmpty())c.drawText(e.text,b.x+5,b.y-5,p);}
     }
     private void addEntity(String type,PointF a,PointF b){
-        checkpoint();Entity e=new Entity();e.type=type;e.layer=layer;e.color=drawColor;e.weight=weight;e.pts.add(new PointF(a.x,a.y));if(b!=null)e.pts.add(new PointF(b.x,b.y));entities.add(e);selected=entities.size()-1;anchor=null;invalidate();say(type+" creado");
+        checkpoint();Entity e=new Entity();e.type=type;e.layer=layer;e.color=drawColor;e.weight=weight;e.pts.add(new PointF(a.x,a.y));if(b!=null)e.pts.add(new PointF(b.x,b.y));entities.add(e);selected=entities.size()-1;anchor=null;persistLocal();invalidate();say(type+" creado");
     }
-    private void finishPoly(){if(poly.size()>1){checkpoint();Entity e=new Entity();e.type="POLY";e.layer=layer;e.color=drawColor;e.weight=weight;for(PointF p:poly)e.pts.add(new PointF(p.x,p.y));entities.add(e);selected=entities.size()-1;}poly.clear();anchor=null;invalidate();say("Polilínea terminada");}
+    private void finishPoly(){if(poly.size()>1){checkpoint();Entity e=new Entity();e.type="POLY";e.layer=layer;e.color=drawColor;e.weight=weight;for(PointF p:poly)e.pts.add(new PointF(p.x,p.y));entities.add(e);selected=entities.size()-1;}poly.clear();anchor=null;persistLocal();invalidate();say("Polilínea terminada");}
     public void finish(){finishPoly();}
     private void handle(PointF raw){
         PointF q=constrain(snap(raw));
@@ -104,11 +106,11 @@ public class CadView extends View {
         if(tool.equals("MOVE")||tool.equals("COPY")){
             if(selected<0){selected=hit(q);if(selected<0){say("Selecciona un objeto");return;}moveBase=null;say("Indica punto base");invalidate();return;}
             if(moveBase==null){moveBase=q;say("Indica punto destino");return;}
-            PointF d=new PointF(q.x-moveBase.x,q.y-moveBase.y);checkpoint();Entity src=entities.get(selected);if(tool.equals("COPY")){Entity copy=src.copy();for(PointF p:copy.pts){p.x+=d.x;p.y+=d.y;}entities.add(copy);selected=entities.size()-1;}else for(PointF p:src.pts){p.x+=d.x;p.y+=d.y;}moveBase=null;invalidate();say("Edición aplicada");return;
+            PointF d=new PointF(q.x-moveBase.x,q.y-moveBase.y);checkpoint();Entity src=entities.get(selected);if(tool.equals("COPY")){Entity copy=src.copy();for(PointF p:copy.pts){p.x+=d.x;p.y+=d.y;}entities.add(copy);selected=entities.size()-1;}else for(PointF p:src.pts){p.x+=d.x;p.y+=d.y;}moveBase=null;persistLocal();invalidate();say("Edición aplicada");return;
         }
         if(tool.equals("POLY")){poly.add(q);cursor=new PointF(q.x,q.y);invalidate();say("Vértice añadido · pulsa Terminar PL");return;}
-        if(tool.equals("ARC")){arcPoints.add(q);if(arcPoints.size()==3){ArrayList<PointF> a=arcPoints;checkpoint();Entity e=new Entity();e.type="ARC";e.layer=layer;e.color=drawColor;e.weight=weight;for(int i=0;i<=24;i++){float t=i/24f;PointF p=new PointF(a.get(0).x*(1-t)*(1-t)+a.get(1).x*2*(1-t)*t+a.get(2).x*t*t,a.get(0).y*(1-t)*(1-t)+a.get(1).y*2*(1-t)*t+a.get(2).y*t*t);e.pts.add(p);}entities.add(e);selected=entities.size()-1;arcPoints.clear();say("Arco creado");}else say("Marca el siguiente punto del arco");invalidate();return;}
-        if(tool.equals("TEXT")){Entity e=new Entity();e.type="TEXT";e.layer=layer;e.color=drawColor;e.text=textValue;e.pts.add(q);checkpoint();entities.add(e);selected=entities.size()-1;invalidate();say("Texto colocado");return;}
+        if(tool.equals("ARC")){arcPoints.add(q);if(arcPoints.size()==3){ArrayList<PointF> a=arcPoints;checkpoint();Entity e=new Entity();e.type="ARC";e.layer=layer;e.color=drawColor;e.weight=weight;for(int i=0;i<=24;i++){float t=i/24f;PointF p=new PointF(a.get(0).x*(1-t)*(1-t)+a.get(1).x*2*(1-t)*t+a.get(2).x*t*t,a.get(0).y*(1-t)*(1-t)+a.get(1).y*2*(1-t)*t+a.get(2).y*t*t);e.pts.add(p);}entities.add(e);selected=entities.size()-1;arcPoints.clear();persistLocal();say("Arco creado");}else say("Marca el siguiente punto del arco");invalidate();return;}
+        if(tool.equals("TEXT")){Entity e=new Entity();e.type="TEXT";e.layer=layer;e.color=drawColor;e.text=textValue;e.pts.add(q);checkpoint();entities.add(e);selected=entities.size()-1;persistLocal();invalidate();say("Texto colocado");return;}
         if(tool.equals("LINE")||tool.equals("RECT")||tool.equals("CIRCLE")||tool.equals("DIM")||tool.equals("HATCH")||tool.equals("LEADER")||tool.equals("ELLIPSE")){
             if(anchor==null){anchor=q;cursor=q;invalidate();say("Marca el punto final");}else{addEntity(tool,anchor,q);}return;
         }
@@ -134,7 +136,7 @@ public class CadView extends View {
         if(src.type.equals("CIRCLE")){PointF center=src.pts.get(0);float radius=dist(center,src.pts.get(1));float nr=radius+(dist(side,center)>=radius?d:-d);if(nr<=0){say("El desfase dejaría un radio no válido");return;}e.pts.clear();e.pts.add(new PointF(center.x,center.y));e.pts.add(new PointF(center.x+nr,center.y));}
         else if(src.type.equals("LINE")){PointF a=src.pts.get(0),b=src.pts.get(1);float dx=b.x-a.x,dy=b.y-a.y,len=(float)Math.hypot(dx,dy);if(len<1e-6){say("Entidad demasiado corta");return;}float sign=((side.x-a.x)*(-dy/len)+(side.y-a.y)*(dx/len))>=0?1:-1,ox=-dy/len*d*sign,oy=dx/len*d*sign;for(PointF p:e.pts){p.x+=ox;p.y+=oy;}}
         else {say("OFFSET nativo admite líneas y círculos en esta alfa");return;}
-        checkpoint();entities.add(e);selected=entities.size()-1;invalidate();say("OFFSET creado");
+        checkpoint();entities.add(e);selected=entities.size()-1;persistLocal();invalidate();say("OFFSET creado");
     }
     @Override public boolean onTouchEvent(MotionEvent ev){
         int action=ev.getActionMasked();
@@ -167,7 +169,7 @@ public class CadView extends View {
             JSONArray ps=o.optJSONArray("pts");if(ps==null)ps=o.optJSONArray("points");if(ps!=null){for(int j=0;j<ps.length();j++){JSONObject p=ps.getJSONObject(j);e.pts.add(new PointF((float)p.optDouble("x"),(float)p.optDouble("y")));}}
             else{JSONObject p=o.optJSONObject("a"),q=o.optJSONObject("b");if(p!=null)e.pts.add(new PointF((float)p.optDouble("x"),(float)p.optDouble("y")));if(q!=null)e.pts.add(new PointF((float)q.optDouble("x"),(float)q.optDouble("y")));}
             if(!e.pts.isEmpty())next.add(e);
-        }checkpoint();entities.clear();entities.addAll(next);selected=-1;invalidate();say("Proyecto abierto · "+entities.size()+" entidades");
+        }checkpoint();entities.clear();entities.addAll(next);selected=-1;persistLocal();invalidate();say("Proyecto abierto · "+entities.size()+" entidades");
     }
     public void loadDxf(String raw){
         String[] lines=raw.replace("\r","").split("\n");ArrayList<String[]> pairs=new ArrayList<>();for(int i=0;i+1<lines.length;i+=2)pairs.add(new String[]{lines[i].trim(),lines[i+1].trim()});
@@ -181,7 +183,7 @@ public class CadView extends View {
             else if(e.type.equals("TEXT"))e.text=first(v,"1","Texto");
             String col=first(v,"420","");if(!col.isEmpty())try{e.color=Color.rgb((int)(Long.parseLong(col)>>16)&255,(int)(Long.parseLong(col)>>8)&255,(int)Long.parseLong(col)&255);}catch(Exception ignored){}
             e.weight=num(v,"370",25)/100f;out.add(e);i=j-1;
-        }checkpoint();entities.clear();entities.addAll(out);selected=-1;invalidate();say("DXF abierto · "+out.size()+" entidades");
+        }checkpoint();entities.clear();entities.addAll(out);selected=-1;persistLocal();invalidate();say("DXF abierto · "+out.size()+" entidades");
     }
     private static String first(HashMap<String,ArrayList<String>> m,String k,String d){return m.containsKey(k)&&!m.get(k).isEmpty()?m.get(k).get(0):d;}
     private static float num(HashMap<String,ArrayList<String>> m,String k,float d){return m.containsKey(k)&&!m.get(k).isEmpty()?parse(m.get(k).get(0)):d;}
