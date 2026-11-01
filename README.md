@@ -15,7 +15,8 @@ Proyecto hermano de [ESQUECHAT 3D](https://esquechat.com/). Identidad visual azu
 - Dibujo 2D: línea, polilínea, rectángulo, círculo, arco, elipse, polígono, cotas, hatch, texto y directrices.
 - Precisión: entrada dinámica, coordenadas absolutas/relativas, ORTHO, POLAR, GRID, SNAP, OSNAP y cruceta.
 - Edición: mover, copiar, OFFSET, rotar, espejo, escalar, TRIM, EXTEND y EXPLODE para entidades compatibles.
-- Capas básicas, color, tipo y grosor de línea.
+- Capas básicas con visibilidad y bloqueo, color, tipo y grosor de línea.
+- Ventana de configuración HP: unidades, rejilla, incremento POLAR, radio OSNAP, ORTHO, SNAP y cruceta.
 - Abrir/guardar JSON; importar/exportar DXF; exportar SVG e imprimir/guardar PDF.
 - PWA con recursos locales cacheados para volver a abrir el editor sin conexión después de la primera carga.
 
