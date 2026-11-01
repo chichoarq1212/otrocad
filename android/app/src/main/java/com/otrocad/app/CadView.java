@@ -119,9 +119,11 @@ public class CadView extends View {
     private float segmentDistance(PointF p,PointF a,PointF b){float dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy+1e-8f)));return (float)Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);}
     private void offsetSelected(float d,PointF side){
         if(selected<0)return;Entity src=entities.get(selected);if(src.pts.size()<2){say("OFFSET requiere una entidad lineal");return;}
-        PointF a=src.pts.get(0),b=src.pts.get(1);float dx=b.x-a.x,dy=b.y-a.y,len=(float)Math.hypot(dx,dy);if(len<1e-6){say("Entidad demasiado corta");return;}
-        float sign=((side.x-a.x)*(-dy/len)+(side.y-a.y)*(dx/len))>=0?1:-1,ox=-dy/len*d*sign,oy=dx/len*d*sign;
-        Entity e=src.copy();for(PointF p:e.pts){p.x+=ox;p.y+=oy;}checkpoint();entities.add(e);selected=entities.size()-1;invalidate();say("OFFSET creado");
+        Entity e=src.copy();
+        if(src.type.equals("CIRCLE")){PointF center=src.pts.get(0);float radius=dist(center,src.pts.get(1));float nr=radius+(dist(side,center)>=radius?d:-d);if(nr<=0){say("El desfase dejaría un radio no válido");return;}e.pts.clear();e.pts.add(new PointF(center.x,center.y));e.pts.add(new PointF(center.x+nr,center.y));}
+        else if(src.type.equals("LINE")){PointF a=src.pts.get(0),b=src.pts.get(1);float dx=b.x-a.x,dy=b.y-a.y,len=(float)Math.hypot(dx,dy);if(len<1e-6){say("Entidad demasiado corta");return;}float sign=((side.x-a.x)*(-dy/len)+(side.y-a.y)*(dx/len))>=0?1:-1,ox=-dy/len*d*sign,oy=dx/len*d*sign;for(PointF p:e.pts){p.x+=ox;p.y+=oy;}}
+        else {say("OFFSET nativo admite líneas y círculos en esta alfa");return;}
+        checkpoint();entities.add(e);selected=entities.size()-1;invalidate();say("OFFSET creado");
     }
     @Override public boolean onTouchEvent(MotionEvent ev){
         int action=ev.getActionMasked();
