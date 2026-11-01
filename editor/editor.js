@@ -306,13 +306,13 @@ function explodeAt(q){
  const parts=segments.map(([a,b])=>({type:'line',a:clone(a),b:clone(b),...style}));
  objects.splice(i,1,...parts);applySelection(parts.map((_,k)=>i+k));save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
 }
-let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false;
+let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false,multiSelectOn=false;
 canvas.addEventListener('pointerdown',e=>{
  if(e.button===2){e.preventDefault();return}
  canvas.setPointerCapture(e.pointerId);const p=pointer(e);pointers.set(e.pointerId,p);
  if(pointers.size===2){const v=[...pointers.values()];pinch={dist:distance(v[0],v[1]),zoom};start=null;temp=null;selectionStart=null;selectionBox=null;return}
  if(tool==='pan'){drag={point:p,offset:clone(offset)};return}
- if(tool==='select'){selectionStart=p;selectionBox=null;selectionAdditive=!!(e.shiftKey||e.ctrlKey||e.metaKey);return}
+ if(tool==='select'){selectionStart=p;selectionBox=null;selectionAdditive=multiSelectOn||!!(e.shiftKey||e.ctrlKey||e.metaKey);return}
  handleTap(p);
 });
 canvas.addEventListener('pointermove',e=>{
@@ -349,6 +349,7 @@ function updateToggle(id,on){$(id).classList.toggle('active',on)}
 function toggle(id){const map={gridToggle:'gridOn',orthoToggle:'orthoOn',snapToggle:'snapOn',polarToggle:'polarOn',osnapToggle:'osnapOn',crossToggle:'crossOn'};const k=map[id];if(k==='gridOn')gridOn=!gridOn;if(k==='orthoOn')orthoOn=!orthoOn;if(k==='snapOn')snapOn=!snapOn;if(k==='polarOn')polarOn=!polarOn;if(k==='osnapOn')osnapOn=!osnapOn;if(k==='crossOn')crossOn=!crossOn;const values={gridOn,orthoOn,snapOn,polarOn,osnapOn,crossOn};updateToggle('#'+id,values[k]);render()}
 [['gridToggle',gridOn],['orthoToggle',orthoOn],['snapToggle',snapOn],['polarToggle',polarOn],['osnapToggle',osnapOn],['crossToggle',crossOn]].forEach(([id,on])=>updateToggle('#'+id,on));
 ['gridToggle','orthoToggle','snapToggle','polarToggle','osnapToggle','crossToggle'].forEach(id=>$('#'+id).onclick=()=>toggle(id));
+$('#multiSelectToggle').onclick=()=>{multiSelectOn=!multiSelectOn;$('#multiSelectToggle').textContent='MULTI: '+(multiSelectOn?'ON':'OFF');$('#multiSelectToggle').setAttribute('aria-pressed',String(multiSelectOn));$('#multiSelectToggle').classList.toggle('active',multiSelectOn);status.textContent='Selección múltiple '+(multiSelectOn?'activada':'desactivada')};
 document.addEventListener('keydown',e=>{
  if(e.key==='Escape'){e.preventDefault();start=null;temp=null;poly=[];moveBase=null;modifyTarget=-1;modifyTargets=[];selectionStart=null;selectionBox=null;clearSelection();if(document.activeElement?.id==='cmd')document.activeElement.blur();showProperties();render();return}
  if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){if(e.key==='Enter'&&document.activeElement.id==='dynLen'){e.preventDefault();$('#dynAngle').focus()}else if(e.key==='Enter'&&document.activeElement.id==='dynAngle'){e.preventDefault();const q=pointFromInputs();if(q){if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)}}return}
