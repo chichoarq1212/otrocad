@@ -30,5 +30,5 @@ for (const relativePath of ['index.html', 'manifest.webmanifest', 'sw.js', 'icon
 
 fs.cpSync(path.join(root, 'editor'), path.join(output, 'editor'), { recursive: true });
 
-console.log('OtroCAD listo para Cloudflare Pages: solo se publican los archivos web en /dist.');
+console.log('OtroCAD listo para Cloudflare Workers: solo se publican los archivos web en /dist.');
 console.log('Se excluyen android/, .github/, tests/ y el resto del código de desarrollo.');
