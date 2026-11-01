@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: otrocad-android-alpha-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,6 +30,8 @@ jobs:
         run: |
           node --check editor/editor.js
           node --check sw.js
+          node --check tests/grips.test.cjs
+          node tests/grips.test.cjs
           node -e "JSON.parse(require('fs').readFileSync('manifest.webmanifest', 'utf8'))"
       - name: Compilar APK nativo
         run: gradle -p android assembleDebug --no-daemon
