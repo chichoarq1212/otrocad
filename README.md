@@ -24,7 +24,13 @@ Proyecto hermano de [ESQUECHAT 3D](https://esquechat.com/). Identidad visual azu
 - PWA con recursos locales cacheados para volver a abrir el editor sin conexión después de la primera carga.
 
 ### Android nativo
-La versión Android 0.4.2 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, edición geométrica mediante grips arrastrables, mover/copiar/borrar, undo/redo, configuración HP, ORTHO/POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF.
+La versión Android 0.4.3 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, edición geométrica mediante grips arrastrables, mover/copiar/borrar, undo/redo, configuración HP, ORTHO/POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF.
+
+### Entrada de longitud en Android 0.4.3
+- En LÍNEA: marca el inicio, toca hacia la dirección deseada e introduce la longitud exacta en las unidades activas.
+- En POLILÍNEA: marca el primer vértice y repite dirección + longitud para cada tramo; usa FIN PL para cerrar el trazado.
+- ORTHO ON restringe la dirección a horizontal/vertical; ORTHO OFF permite dibujar libremente. El estado se muestra en el botón de la barra superior.
+- El isotipo geométrico amarillo y blanco se usa en el icono adaptativo de Android y en la cabecera de la aplicación.
 
 ## Limitaciones importantes
 - No es todavía un reemplazo completo de AutoCAD ni de Civil 3D.
@@ -33,7 +39,7 @@ La versión Android 0.4.2 alfa reemplaza la envoltura WebView por una vista Andr
 - En Android nativo faltan operaciones avanzadas como TRIM, EXTEND, FILLET, CHAMFER, bloques dinámicos, layouts y plot styles.
 - Los archivos PDF y las medidas deben revisarse antes de usarse como documentación de obra.
 - Los APK de CI son compilaciones debug para pruebas, no paquetes firmados para Google Play.
-- El APK nativo 0.4.2 se compila y publica como versión alfa de pruebas; no está firmado para distribución comercial ni para Google Play.
+- El APK nativo 0.4.3 se compila y publica como versión alfa de pruebas; no está firmado para distribución comercial ni para Google Play.
 
 ## Compilar Android
 Requiere JDK 17, Gradle 8.9 y Android SDK 35:
@@ -50,5 +56,5 @@ Por definir antes de la distribución pública del producto.
 
 ## Descarga Android
 
-- [Descargar OtroCAD Android 0.4.2 (APK)](https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.4.2/OtroCAD-Android-0.4.2.apk)
-- [Ver notas de la versión](https://github.com/chichoarq1212/otrocad/releases/tag/android-native-0.4.2)
+- [Descargar OtroCAD Android 0.4.3 (APK)](https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.4.3/OtroCAD-Android-0.4.3.apk)
+- [Ver notas de la versión](https://github.com/chichoarq1212/otrocad/releases/tag/android-native-0.4.3)

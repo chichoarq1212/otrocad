@@ -9,6 +9,7 @@ import org.json.*;
 
 public class CadView extends View {
     public interface StatusListener { void onStatus(String text); }
+    public interface LengthRequestListener { void onLengthRequested(float suggestedLength,String units,boolean polyline,boolean ortho); }
     static class Entity {
         String type="LINE", layer="General", text="", linetype="CONTINUOUS";
         int color=Color.rgb(220,232,245);
@@ -41,17 +42,21 @@ public class CadView extends View {
     private boolean panning=false,pinching=false;
     private float pinchStart=0,pinchZoom=36f;
     private StatusListener listener;
+    private LengthRequestListener lengthListener;
+    private PointF pendingDirection=null;
+    private boolean pendingLength=false;
 
-    public CadView(Context c){super(c);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
+    public CadView(Context c){super(c);setFocusable(true);setFocusableInTouchMode(true);}
     public void setStatusListener(StatusListener l){listener=l;}
+    public void setLengthRequestListener(LengthRequestListener l){lengthListener=l;}
     private void persistLocal(){try{getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).edit().putString("drawing",toJson().toString()).apply();}catch(Exception ignored){}}
     public void restoreLocal(){String raw=getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).getString("drawing","");if(raw!=null&&!raw.isEmpty())try{loadJson(raw);say("Dibujo local recuperado");}catch(Exception ignored){}}
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
-    public void setTool(String t){if(activeGrip!=null)cancelGripDrag();tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
+    public void setTool(String t){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
-    public void toggleOrtho(){ortho=!ortho;invalidate();}
+    public void toggleOrtho(){ortho=!ortho;say("ORTHO "+(ortho?"activado · líneas horizontales y verticales":"desactivado · dirección libre"));invalidate();}
     public void togglePolar(){polar=!polar;invalidate();}
     public void toggleSnap(){snap=!snap;invalidate();}
     public void toggleGridSnap(){gridSnap=!gridSnap;invalidate();}
@@ -261,8 +266,57 @@ public class CadView extends View {
     private void addEntity(String type,PointF a,PointF b){
         checkpoint();Entity e=new Entity();e.type=type;e.layer=layer;e.color=drawColor;e.weight=weight;e.pts.add(new PointF(a.x,a.y));if(b!=null)e.pts.add(new PointF(b.x,b.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));anchor=null;persistLocal();invalidate();say(type+" creado");
     }
-    private void finishPoly(){if(poly.size()>1){checkpoint();Entity e=new Entity();e.type="POLY";e.layer=layer;e.color=drawColor;e.weight=weight;for(PointF p:poly)e.pts.add(new PointF(p.x,p.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));}poly.clear();anchor=null;persistLocal();invalidate();say("Polilínea terminada");}
+    private void finishPoly(){pendingLength=false;pendingDirection=null;int count=poly.size();if(count>1){checkpoint();Entity e=new Entity();e.type="POLY";e.layer=layer;e.color=drawColor;e.weight=weight;for(PointF p:poly)e.pts.add(new PointF(p.x,p.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));persistLocal();}poly.clear();anchor=null;persistLocal();invalidate();say(count>1?"Polilínea terminada":"No hay suficientes vértices para terminar la polilínea");}
     public void finish(){finishPoly();}
+    private void handleTouch(PointF raw){
+        PointF q=constrain(snap(raw));
+        if(tool.equals("LINE")){
+            if(anchor==null){anchor=q;cursor=screen(q);say("Punto inicial fijado · toca hacia la dirección deseada");invalidate();}
+            else requestLength(q,false);
+            return;
+        }
+        if(tool.equals("POLY")){
+            if(poly.isEmpty()){poly.add(q);cursor=screen(q);say("Primer vértice fijado · toca la dirección del siguiente tramo");invalidate();}
+            else requestLength(q,true);
+            return;
+        }
+        handle(raw);
+    }
+    private void requestLength(PointF direction,boolean isPolyline){
+        PointF base=isPolyline?(poly.isEmpty()?null:poly.get(poly.size()-1)):anchor;
+        if(base==null){say("Primero marca el punto inicial");return;}
+        pendingDirection=new PointF(direction.x,direction.y);
+        pendingLength=true;
+        float suggested=dist(base,direction);
+        if(!Float.isFinite(suggested)||suggested<.01f)suggested=1f;
+        say("Indica la longitud exacta en "+units);
+        if(lengthListener!=null)lengthListener.onLengthRequested(suggested,units,isPolyline,ortho);
+        else commitLength(suggested);
+        invalidate();
+    }
+    public void cancelPendingLength(){
+        pendingLength=false;pendingDirection=null;
+        say("Longitud cancelada · puedes tocar otra dirección");
+        invalidate();
+    }
+    public boolean commitLength(float length){
+        if(!pendingLength||!Float.isFinite(length)||length<=0||length>10000000f){say("Introduce una longitud válida mayor que cero");return false;}
+        boolean isPolyline=tool.equals("POLY");
+        PointF base=isPolyline?(poly.isEmpty()?null:poly.get(poly.size()-1)):anchor;
+        if(base==null||pendingDirection==null){cancelPendingLength();say("No hay un punto inicial válido");return false;}
+        float dx=pendingDirection.x-base.x,dy=pendingDirection.y-base.y;
+        if(ortho){if(Math.abs(dx)>=Math.abs(dy))dy=0;else dx=0;}
+        else if(polar){float step=(float)Math.toRadians(polarStep);float a=(float)Math.atan2(dy,dx);a=Math.round(a/step)*step;dx=(float)Math.cos(a);dy=(float)Math.sin(a);}
+        float magnitude=(float)Math.hypot(dx,dy);
+        if(magnitude<1e-6f){dx=1;dy=0;magnitude=1;}
+        PointF end=new PointF(base.x+(dx/magnitude)*length,base.y+(dy/magnitude)*length);
+        pendingLength=false;pendingDirection=null;cursor=screen(end);
+        if(isPolyline){
+            poly.add(end);say(String.format(Locale.US,"Tramo añadido · %.3f %s · toca la siguiente dirección o FIN PL",length,units));invalidate();return true;
+        }
+        if(tool.equals("LINE")){addEntity("LINE",base,end);return true;}
+        say("La entrada de longitud solo está disponible para LÍNEA y POLILÍNEA");invalidate();return false;
+    }
     private void handle(PointF raw){
         PointF q=constrain(snap(raw));
         if(tool.equals("SELECT")){int h=hit(q);setSelection(h>=0?Arrays.asList(h):Collections.emptyList());say(h<0?"Sin selección":"Objeto seleccionado");invalidate();return;}
@@ -309,7 +363,7 @@ public class CadView extends View {
         if(action==MotionEvent.ACTION_DOWN){
             PointF p=new PointF(ev.getX(),ev.getY());cursor=p;
             if(tool.equals("SELECT")){GripRef g=findGrip(p.x,p.y);if(g!=null){activeGrip=g;gripBeforeAll=copyAll();gripMoved=false;say("Grip seleccionado · arrastra para editar");invalidate();return true;}selectionStartScreen=p;selectionEndScreen=p;selectionDragging=false;int meta=ev.getMetaState();selectionAdditive=multiSelectMode||(meta&(android.view.KeyEvent.META_SHIFT_ON|android.view.KeyEvent.META_CTRL_ON))!=0;invalidate();return true;}
-            if(tool.equals("PAN")){panning=true;panLast=p;}else handle(world(p.x,p.y));invalidate();return true;
+            if(tool.equals("PAN")){panning=true;panLast=p;}else handleTouch(world(p.x,p.y));invalidate();return true;
         }
         if(action==MotionEvent.ACTION_POINTER_DOWN){if(activeGrip!=null)cancelGripDrag();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;pinching=true;pinchStart=spacing(ev);pinchZoom=zoom;return true;}
         if(action==MotionEvent.ACTION_MOVE){
@@ -378,7 +432,7 @@ public class CadView extends View {
     public void setDrawColor(int c){drawColor=c;}
     public void setWeight(float w){weight=w;}
     public void runCommand(String raw){
-        String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);if(u.equals("MULTI")){toggleMultiSelect();return;}if(u.equals("ESC")||u.equals("CANCEL")){if(activeGrip!=null)cancelGripDrag();setSelection(Collections.emptyList());anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;say("Comando cancelado · selección limpia");invalidate();return;}String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
+        String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);if(u.equals("MULTI")){toggleMultiSelect();return;}if(u.equals("ESC")||u.equals("CANCEL")){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;setSelection(Collections.emptyList());anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;say("Comando cancelado · selección limpia");invalidate();return;}String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
         if(u.equals("F7")||u.equals("GRID")){toggleGrid();return;}if(u.equals("F8")||u.equals("ORTHO")){toggleOrtho();return;}if(u.equals("F9")||u.equals("SNAP")){toggleGridSnap();return;}if(u.equals("F3")||u.equals("OSNAP")){toggleSnap();return;}if(u.equals("F10")||u.equals("POLAR")){togglePolar();return;}
         String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
         String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE").contains(t)){setTool(t);return;}
