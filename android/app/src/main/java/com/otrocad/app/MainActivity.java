@@ -36,17 +36,49 @@ public class MainActivity extends Activity {
         LinearLayout brandRow=new LinearLayout(this);brandRow.setOrientation(LinearLayout.HORIZONTAL);brandRow.setGravity(Gravity.CENTER_VERTICAL);brandRow.setPadding(10,5,8,5);ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.ic_otrocad);logo.setContentDescription("Isotipo original de OtroCAD");logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brandRow.addView(logo,new LinearLayout.LayoutParams(40,40));TextView title=new TextView(this);title.setText("otroCAD  ·  CAD NATIVO OFFLINE");title.setTextColor(Color.WHITE);title.setTextSize(16);title.setTypeface(null,1);title.setPadding(9,0,4,0);brandRow.addView(title,new LinearLayout.LayoutParams(-1,-2));root.addView(brandRow,new LinearLayout.LayoutParams(-1,-2));
         status=new TextView(this);status.setText("Listo · Dibujo y archivos procesados localmente");status.setTextColor(0xffdce8f5);status.setTextSize(11);status.setPadding(10,4,10,7);
         cad=new CadView(this);cad.setStatusListener(s->status.setText(s));cad.setLengthRequestListener((suggested,unit,isPoly,ortho)->showLengthDialog(suggested,unit,isPoly,ortho));
-        root.addView(toolbar(new String[][]{{"SELEC","SELECT"},{"LINE","LINE"},{"PLINE","POLY"},{"FIN PL","FINISH_POLY"},{"RECT","RECT"},{"CIRCLE","CIRCLE"},{"ARC","ARC"},{"ELIPSE","ELLIPSE"},{"COTA","DIM"},{"HATCH","HATCH"},{"TEXTO","TEXT"},{"DIRECTRIZ","LEADER"}}),new LinearLayout.LayoutParams(-1,52));
-        root.addView(toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"OFFSET","OFFSET"},{"BORRAR","ERASE"},{"PAN","PAN"},{"DESHACER","UNDO"},{"REHACER","REDO"},{"ABRIR","OPEN"},{"GUARDAR","SAVE"},{"DXF","DXF"},{"PDF","PDF"}}),new LinearLayout.LayoutParams(-1,52));
+        // Native Android ribbon: each category owns its own visible tools.
+        LinearLayout tabStrip=new LinearLayout(this);tabStrip.setOrientation(LinearLayout.HORIZONTAL);
+        HorizontalScrollView tabScroll=new HorizontalScrollView(this);tabScroll.setHorizontalScrollBarEnabled(false);tabScroll.addView(tabStrip);
+        root.addView(tabScroll,new LinearLayout.LayoutParams(-1,44));
+        android.widget.FrameLayout ribbonPanels=new android.widget.FrameLayout(this);
+        final String[] tabNames={"DIBUJO","MODIFICAR","ANOTAR","CAPAS","VISTA","CONFIG.","ARCHIVOS"};
+        final View[] panels=new View[tabNames.length];
+        final Button[] tabs=new Button[tabNames.length];
+        panels[0]=toolbar(new String[][]{{"SELEC","SELECT"},{"LINE","LINE"},{"PLINE","POLY"},{"FIN PL","FINISH_POLY"},{"RECT","RECT"},{"CIRCLE","CIRCLE"},{"ARC","ARC"},{"ELIPSE","ELLIPSE"}});
+        panels[1]=toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"OFFSET","OFFSET"},{"BORRAR","ERASE"},{"DESHACER","UNDO"},{"REHACER","REDO"}});
+        panels[2]=toolbar(new String[][]{{"COTA","DIM"},{"HATCH","HATCH"},{"TEXTO","TEXT"},{"DIRECTRIZ","LEADER"}});
+        panels[6]=toolbar(new String[][]{{"ABRIR","OPEN"},{"GUARDAR","SAVE"},{"DXF","DXF"},{"PDF","PDF"}});
         LinearLayout settings=new LinearLayout(this);settings.setGravity(Gravity.CENTER_VERTICAL);settings.setPadding(6,3,6,3);
         addToggle(settings,"GRID",()->cad.toggleGrid());addOrthoToggle(settings);addToggle(settings,"POLAR",()->cad.togglePolar());addToggle(settings,"SNAP",()->cad.toggleGridSnap());addToggle(settings,"OSNAP",()->cad.toggleSnap());addToggle(settings,"CRUZ",()->cad.toggleCrosshair());Button multi=smallButton(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setOnClickListener(v->{cad.toggleMultiSelect();multi.setText(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setBackgroundTintList(android.content.res.ColorStateList.valueOf(cad.isMultiSelectEnabled()?0xffffcf23:0xffe7efff));});settings.addView(multi,new LinearLayout.LayoutParams(0,-1,1));Button hp=smallButton("HP");hp.setOnClickListener(v->showSettings());settings.addView(hp,new LinearLayout.LayoutParams(0,-1,1));
-        root.addView(settings,new LinearLayout.LayoutParams(-1,42));
+        panels[4]=settings;
         LinearLayout options=new LinearLayout(this);options.setGravity(Gravity.CENTER_VERTICAL);options.setPadding(8,2,8,2);
         Spinner layers=new Spinner(this);String[] layerNames={"General","Muros","Cotas","Detalles","Topografía","Vialidad"};ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,layerNames);layers.setAdapter(adapter);layers.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){cad.setLayer(layerNames[pos]);}});
         options.addView(layers,new LinearLayout.LayoutParams(0,42,1));
         Button color=smallButton("COLOR");color.setOnClickListener(v->chooseColor());options.addView(color);
         Spinner weights=new Spinner(this);String[] w={"0.13 mm","0.18 mm","0.25 mm","0.35 mm","0.50 mm","0.70 mm","1.00 mm"};ArrayAdapter<String> wa=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,w);weights.setAdapter(wa);weights.setSelection(2);weights.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){cad.setWeight(Float.parseFloat(w[pos].split(" ")[0]));}});
-        options.addView(weights,new LinearLayout.LayoutParams(0,42,1));root.addView(options,new LinearLayout.LayoutParams(-1,46));
+        options.addView(weights,new LinearLayout.LayoutParams(0,42,1));panels[3]=options;
+        LinearLayout configPanel=new LinearLayout(this);configPanel.setPadding(8,3,8,3);
+        Button hpConfig=smallButton("HP · UNIDADES / OSNAP / PRECISIÓN");
+        hpConfig.setOnClickListener(v->showSettings());
+        configPanel.addView(hpConfig,new LinearLayout.LayoutParams(-1,-1));
+        panels[5]=configPanel;
+        for(int i=0;i<tabNames.length;i++){
+            final int tabIndex=i;
+            ribbonPanels.addView(panels[i],new android.widget.FrameLayout.LayoutParams(-1,-1));
+            panels[i].setVisibility(i==0?View.VISIBLE:View.GONE);
+            Button tab=smallButton(tabNames[i]);tabs[i]=tab;
+            tab.setTextColor(i==0?0xff173665:Color.WHITE);
+            tab.setBackgroundTintList(android.content.res.ColorStateList.valueOf(i==0?0xffffcf23:0xff185be8));
+            tab.setOnClickListener(v->{
+                for(int j=0;j<panels.length;j++){
+                    panels[j].setVisibility(j==tabIndex?View.VISIBLE:View.GONE);
+                    tabs[j].setTextColor(j==tabIndex?0xff173665:Color.WHITE);
+                    tabs[j].setBackgroundTintList(android.content.res.ColorStateList.valueOf(j==tabIndex?0xffffcf23:0xff185be8));
+                }
+            });
+            tabStrip.addView(tab,new LinearLayout.LayoutParams(-2,-1));
+        }
+        root.addView(ribbonPanels,new LinearLayout.LayoutParams(-1,52));
         root.addView(cad,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout cmdrow=new LinearLayout(this);cmdrow.setPadding(7,5,7,5);cmdrow.setGravity(Gravity.CENTER_VERTICAL);
         command=new EditText(this);command.setSingleLine(true);command.setTextColor(Color.WHITE);command.setHintTextColor(0xff9fb0c3);command.setHint("Comando: LINE, PLINE, OFFSET, MOVE, @10,0");command.setTextSize(13);command.setPadding(10,5,10,5);command.setBackgroundColor(0xffe7efff);cmdrow.addView(command,new LinearLayout.LayoutParams(0,44,1));
