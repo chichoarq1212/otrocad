@@ -94,11 +94,11 @@ public class MainActivity extends Activity {
         for(int i=0;i<items.length;i++){final String[] item=items[i];Button b=smallButton(item[0]);b.setTextSize(11);b.setOnClickListener(v->toolAction(item[1]));GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=38;lp.columnSpec=GridLayout.spec(i%4,1f);lp.rowSpec=GridLayout.spec(i/4);lp.setMargins(3,2,3,2);grid.addView(b,lp);}return grid;
     }
     private Button smallButton(String label){Button b=new Button(this);b.setText(label);b.setTextSize(11);b.setTextColor(0xff153665);b.setAllCaps(false);b.setIncludeFontPadding(false);b.setMinHeight(0);b.setMinimumHeight(0);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(14,3,14,3);b.setGravity(Gravity.CENTER);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffe7efff));return b;}
-    private void addToggle(LinearLayout row,String label,Runnable action){Button b=smallButton(label);b.setOnClickListener(v->{action.run();b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffffcf23));});GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=38;lp.columnSpec=GridLayout.spec(row.getChildCount()%4,1f);lp.rowSpec=GridLayout.spec(row.getChildCount()/4);lp.setMargins(2,2,2,2);row.addView(b,lp);}
-    private void addOrthoToggle(LinearLayout row){
+    private void addToggle(GridLayout row,String label,Runnable action){Button b=smallButton(label);b.setOnClickListener(v->{action.run();b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffffcf23));});GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=38;lp.columnSpec=GridLayout.spec(row.getChildCount()%4,1f);lp.rowSpec=GridLayout.spec(row.getChildCount()/4);lp.setMargins(2,2,2,2);row.addView(b,lp);}
+    private void addOrthoToggle(GridLayout row){
         orthoButton=smallButton(cad.isOrthoEnabled()?"ORTHO ON":"ORTHO OFF");
         orthoButton.setOnClickListener(v->{cad.toggleOrtho();refreshOrthoToggle();});
-        refreshOrthoToggle();row.addView(orthoButton,new LinearLayout.LayoutParams(0,-1,1));
+        refreshOrthoToggle();GridLayout.LayoutParams olp=new GridLayout.LayoutParams();olp.width=0;olp.height=38;olp.columnSpec=GridLayout.spec(row.getChildCount()%4,1f);olp.rowSpec=GridLayout.spec(row.getChildCount()/4);olp.setMargins(2,2,2,2);row.addView(orthoButton,olp);
     }
     private void refreshOrthoToggle(){
         if(orthoButton==null)return;
