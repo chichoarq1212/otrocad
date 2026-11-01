@@ -37,7 +37,6 @@ public class HybridActivity extends Activity {
         indicator=new TextView(this);indicator.setTextColor(Color.WHITE);indicator.setTextSize(12);indicator.setGravity(17);
         notice("OtroCAD · conectando…");bar.addView(indicator,new LinearLayout.LayoutParams(0,44,1));
         Button reload=new Button(this);reload.setText("↻");reload.setTextColor(Color.WHITE);reload.setAllCaps(false);reload.setOnClickListener(v->loadOnline());bar.addView(reload,new LinearLayout.LayoutParams(52,44));
-        Button nativeMode=new Button(this);nativeMode.setText("Nativo");nativeMode.setTextColor(Color.WHITE);nativeMode.setAllCaps(false);nativeMode.setTextSize(11);nativeMode.setOnClickListener(v->startActivity(new Intent(this,MainActivity.class)));bar.addView(nativeMode,new LinearLayout.LayoutParams(90,44));
         root.addView(bar,new LinearLayout.LayoutParams(-1,50));
         web=new WebView(this);web.setBackgroundColor(0xff101820);
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
@@ -63,7 +62,6 @@ public class HybridActivity extends Activity {
         });
         root.addView(web,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
-        if(getIntent()!=null&&getIntent().getData()!=null){startActivity(new Intent(this,MainActivity.class).setData(getIntent().getData()));}
         loadOnline();
     }
     private void loadOnline(){
