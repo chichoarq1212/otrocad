@@ -14,7 +14,7 @@ La interfaz actual de Cloudflare puede guiar la creación como Worker. Esto es v
 | Project name | `otrocad` |
 | Build command | `node scripts/build-pages.cjs` |
 | Deploy command | `npx wrangler deploy` |
-| Preview command | `npx wrangler versions upload` |
+| Preview command | Dejar el valor predeterminado de Cloudflare |
 | Production branch | `main` |
 | Root directory | `/` o dejar vacío |
 
