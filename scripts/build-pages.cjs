@@ -12,7 +12,9 @@ const requiredFiles = [
   'icon.svg',
   'editor/index.html',
   'editor/editor.js',
-  'tutorial/index.html'
+  'tutorial/index.html',
+  'descargas/index.html',
+  'herramientas/index.html'
 ];
 
 for (const relativePath of requiredFiles) {
@@ -31,6 +33,8 @@ for (const relativePath of ['index.html', 'manifest.webmanifest', 'sw.js', 'icon
 
 fs.cpSync(path.join(root, 'editor'), path.join(output, 'editor'), { recursive: true });
 fs.cpSync(path.join(root, 'tutorial'), path.join(output, 'tutorial'), { recursive: true });
+fs.cpSync(path.join(root, 'descargas'), path.join(output, 'descargas'), { recursive: true });
+fs.cpSync(path.join(root, 'herramientas'), path.join(output, 'herramientas'), { recursive: true });
 
 console.log('OtroCAD listo para Cloudflare Workers: solo se publican los archivos web en /dist.');
 console.log('Se excluyen android/, .github/, tests/ y el resto del código de desarrollo.');
