@@ -21,6 +21,9 @@ Esta rama reemplaza la envoltura WebView por una vista de dibujo Android basada 
 - El PDF exporta una vista de dibujo básica; se deben revisar escala, textos y grosores antes de usarlo como plano de construcción.
 - El APK de CI es una compilación debug para pruebas, no una firma de distribución de Play Store.
 
+## Validaciones automáticas
+El workflow valida la sintaxis JavaScript del editor/PWA y compila el APK Android debug antes de publicar una compilación de pruebas.
+
 ## Compilación
 Requiere JDK 17, Gradle 8.9 y Android SDK 35. Desde la raíz del repositorio:
 
