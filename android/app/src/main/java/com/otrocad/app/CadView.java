@@ -21,7 +21,8 @@ public class CadView extends View {
     private final ArrayList<PointF> poly=new ArrayList<>(),arcPoints=new ArrayList<>();
     private String tool="LINE", layer="General", textValue="Texto";
     private int drawColor=Color.rgb(220,232,245), selected=-1;
-    private float weight=.25f, zoom=36f, panX=0, panY=0, offsetDistance=1f;
+    private float weight=.25f, zoom=36f, panX=0, panY=0, offsetDistance=1f,gridStep=10f,polarStep=15f,snapRadius=18f;
+    private String units="m";
     private boolean grid=true, ortho=false, polar=false, snap=true, crosshair=true;
     private PointF anchor=null,cursor=new PointF(0,0),panLast=null,moveBase=null;
     private boolean panning=false,pinching=false;
@@ -41,6 +42,24 @@ public class CadView extends View {
     public void togglePolar(){polar=!polar;invalidate();}
     public void toggleSnap(){snap=!snap;invalidate();}
     public void toggleCrosshair(){crosshair=!crosshair;invalidate();}
+    public boolean isGridEnabled(){return grid;}
+    public boolean isOrthoEnabled(){return ortho;}
+    public boolean isPolarEnabled(){return polar;}
+    public boolean isSnapEnabled(){return snap;}
+    public boolean isCrosshairEnabled(){return crosshair;}
+    public float getGridStep(){return gridStep;}
+    public float getPolarStep(){return polarStep;}
+    public float getSnapRadius(){return snapRadius;}
+    public String getUnits(){return units;}
+    public void setGridEnabled(boolean v){grid=v;invalidate();}
+    public void setOrthoEnabled(boolean v){ortho=v;invalidate();}
+    public void setPolarEnabled(boolean v){polar=v;invalidate();}
+    public void setSnapEnabled(boolean v){snap=v;invalidate();}
+    public void setCrosshairEnabled(boolean v){crosshair=v;invalidate();}
+    public void setGridStep(float v){if(Float.isFinite(v)&&v>0)gridStep=Math.max(.001f,Math.min(100000f,v));invalidate();}
+    public void setPolarStep(float v){if(Float.isFinite(v)&&v>=1&&v<=90)polarStep=v;invalidate();}
+    public void setSnapRadius(float v){if(Float.isFinite(v)&&v>=2&&v<=60)snapRadius=v;invalidate();}
+    public void setUnits(String v){if("m".equals(v)||"cm".equals(v)||"mm".equals(v))units=v;invalidate();}
     public void undo(){if(undo.isEmpty())return;redo.add(copyAll());entities.clear();entities.addAll(undo.remove(undo.size()-1));selected=-1;persistLocal();invalidate();say("Deshacer");}
     public void redo(){if(redo.isEmpty())return;undo.add(copyAll());entities.clear();entities.addAll(redo.remove(redo.size()-1));selected=-1;persistLocal();invalidate();say("Rehacer");}
     public void deleteSelected(){if(selected>=0&&selected<entities.size()){checkpoint();entities.remove(selected);selected=-1;persistLocal();invalidate();say("Objeto eliminado");}}
@@ -51,7 +70,7 @@ public class CadView extends View {
     private PointF screen(PointF p){return new PointF(getWidth()/2f+panX+p.x*zoom,getHeight()/2f+panY-p.y*zoom);}
     private static float dist(PointF a,PointF b){return (float)Math.hypot(b.x-a.x,b.y-a.y);}
     private PointF snap(PointF p){
-        if(!snap)return p;PointF best=null;float limit=18f/zoom;
+        if(!snap)return p;PointF best=null;float limit=snapRadius/zoom;
         for(Entity e:entities){ArrayList<PointF> ps=e.pts;if(ps.size()>0){for(PointF q:ps){float d=dist(p,q);if(d<limit){limit=d;best=q;}}}
             if(ps.size()>=2){PointF a=ps.get(0),b=ps.get(1);PointF mid=new PointF((a.x+b.x)/2,(a.y+b.y)/2);float d=dist(p,mid);if(d<limit){limit=d;best=mid;}}
             if("CIRCLE".equals(e.type)&&ps.size()>0){float d=dist(p,ps.get(0));if(d<limit){limit=d;best=ps.get(0);}}
@@ -62,7 +81,7 @@ public class CadView extends View {
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         if(base==null)return p;float dx=p.x-base.x,dy=p.y-base.y;
         if(ortho){if(Math.abs(dx)>=Math.abs(dy))dy=0;else dx=0;}
-        else if(polar){float len=(float)Math.hypot(dx,dy),a=(float)Math.round(Math.atan2(dy,dx)/(Math.PI/12))*(float)(Math.PI/12);dx=len*(float)Math.cos(a);dy=len*(float)Math.sin(a);}
+        else if(polar){float len=(float)Math.hypot(dx,dy),step=(float)(polarStep*Math.PI/180),a=(float)Math.round(Math.atan2(dy,dx)/step)*step;dx=len*(float)Math.cos(a);dy=len*(float)Math.sin(a);}
         return new PointF(base.x+dx,base.y+dy);
     }
     @Override protected void onDraw(Canvas c){
@@ -70,12 +89,12 @@ public class CadView extends View {
         for(int i=0;i<entities.size();i++)drawEntity(c,entities.get(i),i==selected,false);
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         if(tool.equals("POLY")&&poly.size()>0){Entity e=new Entity();e.type="POLY";e.pts.addAll(poly);drawEntity(c,e,false,false);}
-        if(base!=null){PointF end=constrain(snap(world(cursor.x,cursor.y)));Paint p=new Paint(3);p.setColor(Color.rgb(98,184,232));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f  <  %.1f°",dist(base,end),angle(base,end)),b.x+10,b.y-10,p);}
+        if(base!=null){PointF end=constrain(snap(world(cursor.x,cursor.y)));Paint p=new Paint(3);p.setColor(Color.rgb(98,184,232));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f %s  <  %.1f°",dist(base,end),units,angle(base,end)),b.x+10,b.y-10,p);}
         if(crosshair){Paint p=new Paint(3);p.setColor(0x885cb7e8);p.setStrokeWidth(1);c.drawLine(cursor.x,0,cursor.x,getHeight(),p);c.drawLine(0,cursor.y,getWidth(),cursor.y,p);}
     }
     private float angle(PointF a,PointF b){return (float)((Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI+360)%360);}
     private void drawGrid(Canvas c){
-        if(!grid)return;Paint p=new Paint(3);p.setColor(0x223e607d);p.setStrokeWidth(1);float gap=zoom*10;if(gap<18)gap=zoom*50;if(gap>130)gap=zoom*5;
+        if(!grid)return;Paint p=new Paint(3);p.setColor(0x223e607d);p.setStrokeWidth(1);float gap=zoom*gridStep;if(gap<18)gap=zoom*gridStep*5;if(gap>130)gap=zoom*gridStep/2;
         float ox=(getWidth()/2f+panX)%gap,oy=(getHeight()/2f+panY)%gap;
         for(float x=ox;x<getWidth();x+=gap)c.drawLine(x,0,x,getHeight(),p);
         for(float y=oy;y<getHeight();y+=gap)c.drawLine(0,y,getWidth(),y,p);
@@ -91,7 +110,7 @@ public class CadView extends View {
         else if("HATCH".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));float l=Math.min(first.x,b.x),r=Math.max(first.x,b.x),t=Math.min(first.y,b.y),bt=Math.max(first.y,b.y);c.drawRect(l,t,r,bt,p);c.save();Path clip=new Path();clip.addRect(l,t,r,bt,Path.Direction.CW);c.clipPath(clip);Paint hp=new Paint(3);hp.setColor(chosen?0xfff3c83e:e.color);hp.setStrokeWidth(1);for(float x=l-(bt-t);x<r;x+=10)c.drawLine(x,bt,x+(bt-t),t,hp);c.restore();}
         else if("TEXT".equals(e.type)){p.setStyle(Paint.Style.FILL);p.setTextSize(Math.max(12f,e.textHeight*zoom*.35f));c.drawText(e.text==null?"Texto":e.text,first.x,first.y,p);}
         else {for(int i=1;i<pts.size();i++){PointF q=screen(pts.get(i));path.lineTo(q.x,q.y);}if("POLYGON".equals(e.type)||"RECT".equals(e.type))path.close();c.drawPath(path,p);}
-        if("DIM".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));p.setStyle(Paint.Style.FILL);p.setPathEffect(null);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f",dist(pts.get(0),pts.get(1))),(first.x+b.x)/2+5,(first.y+b.y)/2-6,p);}
+        if("DIM".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));p.setStyle(Paint.Style.FILL);p.setPathEffect(null);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f %s",dist(pts.get(0),pts.get(1)),units),(first.x+b.x)/2+5,(first.y+b.y)/2-6,p);}
         if("LEADER".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));p.setStyle(Paint.Style.FILL);p.setPathEffect(null);Path arrow=new Path();arrow.moveTo(first.x,first.y);arrow.lineTo(first.x+8,first.y-4);arrow.lineTo(first.x+8,first.y+4);arrow.close();c.drawPath(arrow,p);if(e.text!=null&&!e.text.isEmpty())c.drawText(e.text,b.x+5,b.y-5,p);}
     }
     private void addEntity(String type,PointF a,PointF b){
@@ -225,7 +244,7 @@ public class CadView extends View {
             if(e.type.equals("CIRCLE")&&e.pts.size()>1)c.drawCircle(x,y,dist(a,e.pts.get(1))*s,p);
             else if((e.type.equals("RECT")||e.type.equals("HATCH")||e.type.equals("ELLIPSE"))&&e.pts.size()>1){PointF b=e.pts.get(1);float bx=ox+(b.x-minX)*s,by=oy+(maxY-b.y)*s;RectF r=new RectF(Math.min(x,bx),Math.min(y,by),Math.max(x,bx),Math.max(y,by));if(e.type.equals("ELLIPSE"))c.drawOval(new RectF(x-Math.abs(bx-x),y-Math.abs(by-y),x+Math.abs(bx-x),y+Math.abs(by-y)),p);else{c.drawRect(r,p);if(e.type.equals("HATCH")){c.save();c.clipRect(r);Paint hp=new Paint(3);hp.setColor(e.color);hp.setStrokeWidth(.7f);for(float xx=r.left-r.height();xx<r.right;xx+=8)c.drawLine(xx,r.bottom,xx+r.height(),r.top,hp);c.restore();}}}
             else if(e.type.equals("TEXT")){p.setStyle(Paint.Style.FILL);p.setPathEffect(null);p.setTextSize(Math.max(10,e.textHeight*s*.35f));c.drawText(e.text==null?"Texto":e.text,x,y,p);}
-            else{Path path=new Path();path.moveTo(x,y);for(int j=1;j<e.pts.size();j++){PointF q=e.pts.get(j);path.lineTo(ox+(q.x-minX)*s,oy+(maxY-q.y)*s);}if(e.type.equals("POLYGON"))path.close();c.drawPath(path,p);if(e.type.equals("DIM")&&e.pts.size()>1){PointF b=e.pts.get(1);p.setStyle(Paint.Style.FILL);p.setPathEffect(null);p.setTextSize(10);c.drawText(String.format(Locale.US,"%.3f",dist(a,b)),(x+ox+(b.x-minX)*s)/2,(y+oy+(maxY-b.y)*s)/2-5,p);}}
+            else{Path path=new Path();path.moveTo(x,y);for(int j=1;j<e.pts.size();j++){PointF q=e.pts.get(j);path.lineTo(ox+(q.x-minX)*s,oy+(maxY-q.y)*s);}if(e.type.equals("POLYGON"))path.close();c.drawPath(path,p);if(e.type.equals("DIM")&&e.pts.size()>1){PointF b=e.pts.get(1);p.setStyle(Paint.Style.FILL);p.setPathEffect(null);p.setTextSize(10);c.drawText(String.format(Locale.US,"%.3f %s",dist(a,b),units),(x+ox+(b.x-minX)*s)/2,(y+oy+(maxY-b.y)*s)/2-5,p);}}
         }
     }
 }
