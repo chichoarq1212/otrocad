@@ -10,6 +10,9 @@ Proyecto hermano de [ESQUECHAT 3D](https://esquechat.com/). Identidad visual azu
 - Código fuente: https://github.com/chichoarq1212/otrocad
 - APK y compilaciones: https://github.com/chichoarq1212/otrocad/releases
 
+## Validación automatizada
+Cada cambio de esta rama se valida con Node.js (sintaxis del editor web y service worker), JSON del manifiesto y compilación Gradle del APK Android nativo.
+
 ## Estado actual
 ### Web / PWA
 - Dibujo 2D: línea, polilínea, rectángulo, círculo, arco, elipse, polígono, cotas, hatch, texto y directrices.
