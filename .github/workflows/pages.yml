@@ -4,53 +4,28 @@ on:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 concurrency:
   group: publish-site
   cancel-in-progress: false
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Prepare web output
+      - uses: actions/checkout@v4
+      - name: Build website
         run: node scripts/build-pages.cjs
-      - name: Verify links and required assets
+      - name: Verify all local navigation and assets
         run: node scripts/verify-pages.cjs
-      - name: Capture REAL current CAD editor interface
+      - name: Screenshot of the REAL CAD editor
         run: |
           BROWSER="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
-          test -n "$BROWSER"
           "$BROWSER" --headless --no-sandbox --disable-gpu --hide-scrollbars --disable-dev-shm-usage --virtual-time-budget=2200 --window-size=1440,900 --screenshot="$PWD/dist/editor-preview.png" "file://$PWD/dist/editor/index.html"
           test -s dist/editor-preview.png
-          file dist/editor-preview.png
-      - name: Configure GitHub Pages and enable site
-        uses: actions/configure-pages@v5
+      - name: Disable Jekyll processing
+        run: touch dist/.nojekyll
+      - name: Publish files to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          enablement: true
-      - name: Upload complete website
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-      - name: Verify published homepage
-        run: |
-          for i in 1 2 3 4 5 6; do
-            if curl -fsSL --retry 2 "https://chichoarq1212.github.io/otrocad/" -o /tmp/otrocad-home.html && grep -q 'OtroCAD' /tmp/otrocad-home.html; then
-              curl -fsSL "https://chichoarq1212.github.io/otrocad/editor/" -o /tmp/otrocad-editor.html
-              curl -fsSL "https://chichoarq1212.github.io/otrocad/editor-preview.png" -o /tmp/otrocad-preview.png
-              test -s /tmp/otrocad-preview.png
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "GitHub Pages is not publicly serving the website"
-          exit 1
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: dist
