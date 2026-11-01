@@ -162,10 +162,20 @@ function handleTap(p){
  if(tool==='pan'){return}
  if(tool==='offset'){doOffset(q);return}
  if(tool==='poly'){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Polilínea: marca otro vértice o pulsa Enter';return}
- if(tool==='move'||tool==='copy'){
-  if(modifyTarget<0){modifyTarget=selectAt(q);selected=modifyTarget;if(modifyTarget<0){status.textContent='Selecciona el objeto';return}moveBase=null;status.textContent='Indica punto base';return}
-  if(!moveBase){moveBase=q;status.textContent='Indica punto destino';return}
-  const dx=q.x-moveBase.x,dy=q.y-moveBase.y;checkpoint();const src=objects[modifyTarget];if(tool==='copy'){const c=clone(src);translate(c,dx,dy);objects.push(c);selected=objects.length-1}else{translate(src,dx,dy);selected=modifyTarget}save();modifyTarget=-1;moveBase=null;render();return;
+ if(tool==='explode'){explodeAt(q);return}
+ if(tool==='trim'||tool==='extend'){
+  if(modifyTarget<0){modifyTarget=selectAt(q);selected=modifyTarget;if(modifyTarget<0){status.textContent='Selecciona la línea que deseas modificar';return}status.textContent='Marca el extremo que deseas '+(tool==='trim'?'recortar':'alargar');return}
+  const idx=modifyTarget;trimOrExtend(idx,q,tool);return;
+ }
+ if(['move','copy','rotate','mirror','scale'].includes(tool)){
+  if(modifyTarget<0){modifyTarget=selectAt(q);selected=modifyTarget;if(modifyTarget<0){status.textContent='Selecciona el objeto';return}moveBase=null;status.textContent='Indica punto base o inicio del eje';return}
+  if(!moveBase){moveBase=q;status.textContent=tool==='mirror'?'Indica el segundo punto del eje':tool==='rotate'?'Indica el ángulo de giro':tool==='scale'?'Indica el factor de escala con la distancia':'Indica punto destino';return}
+  const dx=q.x-moveBase.x,dy=q.y-moveBase.y,src=objects[modifyTarget];checkpoint();
+  if(tool==='move'||tool==='copy'){if(tool==='copy'){const cp=clone(src);translate(cp,dx,dy);objects.push(cp);selected=objects.length-1}else{translate(src,dx,dy);selected=modifyTarget}}
+  else if(tool==='rotate'){const ang=Math.atan2(dy,dx),co=Math.cos(ang),si=Math.sin(ang);const rotate=p=>{const x=p.x-moveBase.x,y=p.y-moveBase.y;return{x:moveBase.x+x*co-y*si,y:moveBase.y+x*si+y*co}};if(src.a)src.a=rotate(src.a);if(src.b)src.b=rotate(src.b);if(src.pts)src.pts=src.pts.map(rotate);selected=modifyTarget}
+  else if(tool==='mirror'){const len=Math.hypot(dx,dy);if(len<1e-9){status.textContent='Eje de simetría demasiado corto';return}const ux=dx/len,uy=dy/len,mirror=p=>{const x=p.x-moveBase.x,y=p.y-moveBase.y,t=x*ux+y*uy,px=moveBase.x+t*ux,py=moveBase.y+t*uy;return{x:2*px-p.x,y:2*py-p.y}};if(src.a)src.a=mirror(src.a);if(src.b)src.b=mirror(src.b);if(src.pts)src.pts=src.pts.map(mirror);selected=modifyTarget}
+  else if(tool==='scale'){const factor=Math.hypot(dx,dy);if(factor<1e-6){status.textContent='Factor de escala no válido';return}const scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);selected=modifyTarget}
+  save();modifyTarget=-1;moveBase=null;render();status.textContent=tool.toUpperCase()+' aplicado';return;
  }
  if(!start){start=q;temp={type:tool,a:clone(q),b:clone(q),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';updatePrompt();render();return}
  let end=pointFromInputs();if(!end)end=q;else if(document.activeElement!==$('#dynLen')&&document.activeElement!==$('#dynAngle'))end=q;
@@ -173,6 +183,42 @@ function handleTap(p){
  if(tool==='line'||tool==='dim'||tool==='rect'||tool==='hatch'||tool==='circle'||tool==='ellipse'||tool==='polygon'){commitEntity(end)}
 }
 function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy})}
+function entitySegments(s){
+ const pts=[];
+ if(s.type==='line'||s.type==='dim'||s.type==='leader'){if(s.a&&s.b)pts.push([s.a,s.b]);return pts}
+ if(s.type==='rect'||s.type==='hatch'){const a=s.a,b=s.b;return [[a,{x:b.x,y:a.y}],[{x:b.x,y:a.y},b],[b,{x:a.x,y:b.y}],[{x:a.x,y:b.y},a]]}
+ if(s.type==='circle'){const r=distance(s.a,s.b);let prev=null;for(let i=0;i<=64;i++){const t=i*Math.PI*2/64,p={x:s.a.x+r*Math.cos(t),y:s.a.y+r*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
+ if(s.type==='ellipse'){let prev=null;for(let i=0;i<=48;i++){const t=i*Math.PI*2/48,p={x:s.a.x+(s.b.x-s.a.x)*Math.cos(t),y:s.a.y+(s.b.y-s.a.y)*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
+ if(s.pts&&s.pts.length>1){for(let i=1;i<s.pts.length;i++)pts.push([s.pts[i-1],s.pts[i]]);if(s.type==='polygon')pts.push([s.pts[s.pts.length-1],s.pts[0]])}
+ return pts
+}
+function lineIntersection(a,b,c,d,segments=true){
+ const rx=b.x-a.x,ry=b.y-a.y,sx=d.x-c.x,sy=d.y-c.y,den=rx*sy-ry*sx;
+ if(Math.abs(den)<1e-10)return null;
+ const qx=c.x-a.x,qy=c.y-a.y,t=(qx*sy-qy*sx)/den,u=(qx*ry-qy*rx)/den;
+ if(segments&&(t< -1e-8||t>1+1e-8||u< -1e-8||u>1+1e-8))return null;
+ return {x:a.x+t*rx,y:a.y+t*ry,t,u};
+}
+function trimOrExtend(index,q,mode){
+ const s=objects[index];if(!s||s.type!=='line'){status.textContent=mode.toUpperCase()+' en esta alfa requiere una línea';return}
+ const endpoint=distance(q,s.a)<=distance(q,s.b)?'a':'b',a=s.a,b=s.b,other=[];
+ objects.forEach((o,i)=>{if(i!==index)entitySegments(o).forEach(seg=>other.push(seg))});
+ const hits=[];
+ for(const [c,d] of other){const h=lineIntersection(a,b,c,d,mode==='trim');if(!h||distance(h,endpoint==='a'?a:b)<1e-6)continue;
+  if(mode==='extend'&&(h.u< -1e-8||h.u>1+1e-8||(endpoint==='a'?h.t>=0:h.t<=1)))continue;
+  hits.push(h);
+ }
+ if(!hits.length){status.textContent='No se encontró una intersección compatible';return}
+ hits.sort((x,y)=>distance(x,endpoint==='a'?a:b)-distance(y,endpoint==='a'?a:b));
+ checkpoint();s[endpoint]={x:hits[0].x,y:hits[0].y};save();selected=index;modifyTarget=-1;render();status.textContent=mode.toUpperCase()+' aplicado';
+}
+function explodeAt(q){
+ const i=selectAt(q);if(i<0){status.textContent='Selecciona una polilínea o rectángulo';return}
+ const s=objects[i],segments=entitySegments(s);if(!segments.length||s.type==='line'){status.textContent='Esta entidad no requiere EXPLODE';return}
+ checkpoint();const style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype};
+ const parts=segments.map(([a,b])=>({type:'line',a:clone(a),b:clone(b),...style}));
+ objects.splice(i,1,...parts);selected=parts.length?i+parts.length-1:-1;save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
+}
 let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null;
 canvas.addEventListener('pointerdown',e=>{
  if(e.button===2){e.preventDefault();return}
@@ -216,7 +262,7 @@ document.addEventListener('keydown',e=>{
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){$('#undo').click();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){$('#redo').click();return}
 });
-const aliases={L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select'};
+const aliases={L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode'};
 function parseCoordinate(raw,base){
  const s=raw.trim().replace(/\s+/g,'');let m;
  if((m=s.match(/^@?(-?\d+(?:[.,]\d+)?),(-?\d+(?:[.,]\d+)?)$/))){const x=Number(m[1].replace(',','.')),y=Number(m[2].replace(',','.'));return s.startsWith('@')?{x:base.x+x,y:base.y+y}:{x,y}}
@@ -238,8 +284,7 @@ function runCommand(raw){
  if(c==='E'||c==='ERASE'||c==='DELETE'){if(selected>=0){checkpoint();objects.splice(selected,1);selected=-1;save();render()}return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
- if(c==='EX'||c==='EXPLODE'){status.textContent='EXPLODE: selección de bloques y polilíneas en desarrollo';return}
- if(c==='TR'||c==='TRIM'||c==='EXTEND'||c==='RO'||c==='ROTATE'||c==='SC'||c==='SCALE'||c==='MI'||c==='MIRROR'||c==='F'||c==='FILLET'||c==='CHA'||c==='CHAMFER'){status.textContent=c+' reconocido · herramienta en desarrollo';return}
+ if(c==='F'||c==='FILLET'||c==='CHA'||c==='CHAMFER'){status.textContent=c+' · empalme/chaflán aún no implementado';return}
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
