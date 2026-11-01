@@ -1,3 +1,5 @@
+> **Actualización importante (noviembre de 2026):** para publicar la versión actual de OtroCAD desde la interfaz que muestra tu cuenta, utiliza [CLOUDFLARE_WORKERS_SETUP.md](./CLOUDFLARE_WORKERS_SETUP.md). La configuración actual sirve el sitio como archivos estáticos de Cloudflare Workers. No continúes el flujo anterior de Pages si Cloudflare te dirige al asistente de Workers.
+
 # Publicar OtroCAD gratis con Cloudflare Pages
 
 ## Configuración inicial (solo una vez)
