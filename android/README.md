@@ -5,7 +5,7 @@ Esta rama reemplaza la envoltura WebView por una vista de dibujo Android basada 
 ## Incluido en la versión nativa 0.2.0 alfa
 - Dibujo táctil por puntos: línea, polilínea, rectángulo, círculo, arco, elipse, cota, hatch, texto y directriz.
 - Selección, mover, copiar, borrar, deshacer y rehacer.
-- Rejilla, ORTHO, POLAR, referencias a objetos y cruceta.
+- Configuración HP: unidades, rejilla, ORTHO, POLAR, SNAP F9, OSNAP F3, radio de referencia y cruceta.
 - Coordenadas absolutas y relativas en la línea de comandos.
 - Capas básicas, colores y grosores de línea.
 - Abrir/guardar proyectos JSON, importar/exportar DXF y exportar PDF.
