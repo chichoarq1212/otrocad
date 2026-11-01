@@ -50,5 +50,5 @@ Por definir antes de la distribución pública del producto.
 
 ## Descarga Android
 
-- [Descargar OtroCAD Android 0.4.1 (APK)](https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.4.1/OtroCAD-Android-0.4.1.apk)
-- [Ver notas de la versión](https://github.com/chichoarq1212/otrocad/releases/tag/android-native-0.4.1)
+- [Descargar OtroCAD Android 0.4.0 (APK)](https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.4.0/app-debug.apk)
+- [Ver notas de la versión](https://github.com/chichoarq1212/otrocad/releases/tag/android-native-0.4.0)
