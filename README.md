@@ -24,7 +24,7 @@ Proyecto hermano de [ESQUECHAT 3D](https://esquechat.com/). Identidad visual azu
 - PWA con recursos locales cacheados para volver a abrir el editor sin conexión después de la primera carga.
 
 ### Android nativo
-La versión Android 0.4.0 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, edición geométrica mediante grips arrastrables, mover/copiar/borrar, undo/redo, configuración HP, ORTHO/POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF.
+La versión Android 0.4.2 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, edición geométrica mediante grips arrastrables, mover/copiar/borrar, undo/redo, configuración HP, ORTHO/POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF.
 
 ## Limitaciones importantes
 - No es todavía un reemplazo completo de AutoCAD ni de Civil 3D.
@@ -33,7 +33,7 @@ La versión Android 0.4.0 alfa reemplaza la envoltura WebView por una vista Andr
 - En Android nativo faltan operaciones avanzadas como TRIM, EXTEND, FILLET, CHAMFER, bloques dinámicos, layouts y plot styles.
 - Los archivos PDF y las medidas deben revisarse antes de usarse como documentación de obra.
 - Los APK de CI son compilaciones debug para pruebas, no paquetes firmados para Google Play.
-- No instalar el APK antiguo 0.1.0 (basado en WebView); el APK nativo 0.4.0 debe pasar la compilación y validación antes de publicarse.
+- El APK nativo 0.4.2 se compila y publica como versión alfa de pruebas; no está firmado para distribución comercial ni para Google Play.
 
 ## Compilar Android
 Requiere JDK 17, Gradle 8.9 y Android SDK 35:
