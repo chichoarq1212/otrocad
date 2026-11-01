@@ -14,7 +14,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: otrocad-android-alpha-${{ github.ref }}
+  group: otrocad-android-native-v041-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
