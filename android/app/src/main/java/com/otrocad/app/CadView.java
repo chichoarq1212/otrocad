@@ -73,11 +73,16 @@ public class CadView extends View {
     private PointF screen(PointF p){return new PointF(getWidth()/2f+panX+p.x*zoom,getHeight()/2f+panY-p.y*zoom);}
     private static float dist(PointF a,PointF b){return (float)Math.hypot(b.x-a.x,b.y-a.y);}
     private PointF snap(PointF p){
-        PointF q=new PointF(p.x,p.y);if(gridSnap){q.x=Math.round(q.x/gridStep)*gridStep;q.y=Math.round(q.y/gridStep)*gridStep;}
-        if(!snap)return q;PointF best=null;float limit=snapRadius/zoom;
-        for(Entity e:entities){ArrayList<PointF> ps=e.pts;if(ps.size()>0){for(PointF q:ps){float d=dist(q,q);if(d<limit){limit=d;best=q;}}}
-            if(ps.size()>=2){PointF a=ps.get(0),b=ps.get(1);PointF mid=new PointF((a.x+b.x)/2,(a.y+b.y)/2);float d=dist(p,mid);if(d<limit){limit=d;best=mid;}}
-            if("CIRCLE".equals(e.type)&&ps.size()>0){float d=dist(p,ps.get(0));if(d<limit){limit=d;best=ps.get(0);}}
+        PointF q=new PointF(p.x,p.y);
+        if(gridSnap){q.x=Math.round(q.x/gridStep)*gridStep;q.y=Math.round(q.y/gridStep)*gridStep;}
+        if(!snap)return q;
+        PointF best=null;float limit=snapRadius/zoom;
+        for(Entity e:entities){
+            ArrayList<PointF> ps=e.pts;
+            for(PointF v:ps){float d=dist(q,v);if(d<limit){limit=d;best=v;}}
+            if(ps.size()>=2&&(e.type.equals("LINE")||e.type.equals("DIM")||e.type.equals("LEADER"))){
+                PointF a=ps.get(0),b=ps.get(1),mid=new PointF((a.x+b.x)/2,(a.y+b.y)/2);float d=dist(q,mid);if(d<limit){limit=d;best=mid;}
+            }
         }
         return best==null?q:new PointF(best.x,best.y);
     }
