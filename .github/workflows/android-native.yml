@@ -1,0 +1,39 @@
+name: Compilar OtroCAD Nativo alfa
+on:
+  push:
+    branches: ['otrocad-native-alpha-*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compilar APK nativo de prueba
+        run: gradle -p android-native assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OtroCAD-Nativo-Alfa
+          path: android-native/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Publicar APK nativo alfa
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-nativo-alpha-0.2.0
+          target_commitish: ${{ github.sha }}
+          name: OtroCAD Nativo Alpha 0.2.0
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: android-native/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
