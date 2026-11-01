@@ -1,7 +1,7 @@
 (()=>{
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
-let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,printing=false;
+let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,offsetDistancePreset=false,printing=false;
 const colors={General:'#dce8f5',Muros:'#56b7e8',Cotas:'#f3c83e',Detalles:'#c69cff',Topografía:'#70d6a3',Vialidad:'#ff9b6b'};
 const clone=x=>JSON.parse(JSON.stringify(x));
 function checkpoint(){undo.push(clone(objects));if(undo.length>100)undo.shift();redo=[]}
@@ -125,12 +125,10 @@ function doOffset(q){
  if(selected<0){
   selected=selectAt(q);
   if(selected<0){status.textContent='Selecciona una entidad para OFFSET';return}
-  const raw=prompt('Distancia de desfase','1');
-  if(raw===null){selected=-1;return}
-  const d=Number(raw);if(!Number.isFinite(d)||d<=0){selected=-1;status.textContent='Introduce una distancia positiva';return}
-  offsetDistance=d;status.textContent='Indica el lado del desfase';return;
+  if(!offsetDistancePreset){const raw=prompt('Distancia de desfase','1');if(raw===null){selected=-1;return}const d=Number(raw);if(!Number.isFinite(d)||d<=0){selected=-1;status.textContent='Introduce una distancia positiva';return}offsetDistance=d}
+  offsetDistancePreset=false;status.textContent='Indica el lado del desfase';return;
  }
- const s=objects[selected],d=offsetDistance,style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype};
+ const s=objects[selected],d=offsetDistance,style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype},before=objects.length;
  checkpoint();
  if(s.type==='line'){
   const dx=s.b.x-s.a.x,dy=s.b.y-s.a.y,L=Math.hypot(dx,dy)||1;
@@ -138,12 +136,12 @@ function doOffset(q){
   objects.push({type:'line',a:{x:s.a.x+ox,y:s.a.y+oy},b:{x:s.b.x+ox,y:s.b.y+oy},...style});
  }else if(s.type==='circle'){
   const r=distance(s.a,s.b),newR=r+(distance(q,s.a)>r?d:-d);
-  if(newR>0)objects.push({type:'circle',a:clone(s.a),b:{x:s.a.x+newR,y:s.a.y},...style});
+  if(newR<=0){status.textContent='El desfase dejaría un radio no válido';return}objects.push({type:'circle',a:clone(s.a),b:{x:s.a.x+newR,y:s.a.y},...style});
  }else if(s.type==='rect'){
   const cx=(s.a.x+s.b.x)/2,cy=(s.a.y+s.b.y)/2,expand=distance(q,{x:cx,y:cy})>Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y)/2?d:-d;
-  if(Math.abs(s.b.x-s.a.x)>2*Math.abs(expand)&&Math.abs(s.b.y-s.a.y)>2*Math.abs(expand))objects.push({type:'rect',a:{x:s.a.x-expand,y:s.a.y-expand},b:{x:s.b.x+expand,y:s.b.y+expand},...style});
+  if(Math.abs(s.b.x-s.a.x)<=2*Math.abs(expand)||Math.abs(s.b.y-s.a.y)<=2*Math.abs(expand)){status.textContent='El desfase dejaría un rectángulo no válido';return}objects.push({type:'rect',a:{x:s.a.x-expand,y:s.a.y-expand},b:{x:s.b.x+expand,y:s.b.y+expand},...style});
  }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
- save();selected=objects.length-1;render();status.textContent='OFFSET creado';
+ if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();selected=objects.length-1;render();status.textContent='OFFSET creado';
 }
 function handleTap(p){
  let q=snapPoint(world(p));q=constrain(q);
@@ -262,7 +260,7 @@ document.addEventListener('keydown',e=>{
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){$('#undo').click();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){$('#redo').click();return}
 });
-const aliases={L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode'};
+const aliases={L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
 function parseCoordinate(raw,base){
  const s=raw.trim().replace(/\s+/g,'');let m;
  if((m=s.match(/^@?(-?\d+(?:[.,]\d+)?),(-?\d+(?:[.,]\d+)?)$/))){const x=Number(m[1].replace(',','.')),y=Number(m[2].replace(',','.'));return s.startsWith('@')?{x:base.x+x,y:base.y+y}:{x,y}}
@@ -270,21 +268,27 @@ function parseCoordinate(raw,base){
  return null;
 }
 function runCommand(raw){
- const textValue=raw.trim(),upper=textValue.toUpperCase(),coordinate=parseCoordinate(textValue,start||{x:0,y:0});
+ const textValue=raw.trim(),upper=textValue.toUpperCase(),parts=upper.split(/\s+/),c=parts[0];if(!c)return;
+ if(c==='O'||c==='OFFSET'){const d=Number(parts[1]);if(parts[1]&&Number.isFinite(d)&&d>0){offsetDistance=d;offsetDistancePreset=true}setTool('offset');return}
+ const coordinate=parseCoordinate(textValue,activeAnchor()||{x:0,y:0});
  if(coordinate&&(/^[+-]?(?:\d|\.)/.test(textValue)||textValue.startsWith('@'))){
-  if(!start){start=round(coordinate);temp={type:tool,a:clone(start),b:clone(start),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Punto inicial fijado · introduce el siguiente punto';}
-  else commitEntity(round(coordinate));
+  const point=round(coordinate);
+  if(tool==='poly'){poly.push(point);temp=null;render();status.textContent='Polilínea: vértice añadido · Enter para terminar';return}
+  if(tool==='arc'){arcPoints.push(point);if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();selected=objects.length-1;arcPoints=[];status.textContent='Arco creado'}else status.textContent='Arco: introduce el siguiente punto';render();return}
+  if(tool==='leader'){if(!start){start=point;temp={type:'line',a:clone(point),b:clone(point),...currentStyle($('#layer').value)};status.textContent='Introduce el extremo de la directriz';render()}else{const label=prompt('Texto de la directriz','');checkpoint();objects.push({type:'leader',a:clone(start),b:point,text:label||'',...currentStyle($('#layer').value)});save();selected=objects.length-1;start=null;temp=null;render();status.textContent='Directriz creada'}return}
+  if(!start){start=point;temp={type:tool,a:clone(start),b:clone(start),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Punto inicial fijado · introduce el siguiente punto'}
+  else commitEntity(point);
   return;
  }
- const c=upper.split(/\s+/)[0];if(!c)return;
  if(c==='F7'||c==='GRID'){toggle('gridToggle');return}if(c==='F8'||c==='ORTHO'){toggle('orthoToggle');return}if(c==='F9'||c==='SNAP'){toggle('snapToggle');return}if(c==='F10'||c==='POLAR'){toggle('polarToggle');return}if(c==='F3'||c==='OSNAP'){toggle('osnapToggle');return}
  if(c==='U'||c==='UNDO'){$('#undo').click();return}if(c==='REDO'){$('#redo').click();return}
- if(c==='HP'||c==='DSETTINGS'||c==='SETTINGS'){alert('CONFIGURACIÓN DE DIBUJO\\nF7 Rejilla: '+(gridOn?'ACTIVA':'INACTIVA')+'\\nF8 Orto: '+(orthoOn?'ACTIVO':'INACTIVO')+'\\nF9 Snap: '+(snapOn?'ACTIVO':'INACTIVO')+'\\nF10 Polar: '+(polarOn?'ACTIVO':'INACTIVO')+'\\nF3 Referencias: '+(osnapOn?'ACTIVAS':'INACTIVAS'));return}
+ if(c==='HP'||c==='DSETTINGS'||c==='SETTINGS'){alert('CONFIGURACIÓN DE DIBUJO\nF7 Rejilla: '+(gridOn?'ACTIVA':'INACTIVA')+'\nF8 Orto: '+(orthoOn?'ACTIVO':'INACTIVO')+'\nF9 Snap: '+(snapOn?'ACTIVO':'INACTIVO')+'\nF10 Polar: '+(polarOn?'ACTIVO':'INACTIVO')+'\nF3 Referencias: '+(osnapOn?'ACTIVAS':'INACTIVAS'));return}
  if(c==='PR'||c==='PROPERTIES'||c==='CTRL+1'){$('#properties').classList.toggle('open');showProperties();return}
  if(c==='E'||c==='ERASE'||c==='DELETE'){if(selected>=0){checkpoint();objects.splice(selected,1);selected=-1;save();render()}return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
  if(c==='F'||c==='FILLET'||c==='CHA'||c==='CHAMFER'){status.textContent=c+' · empalme/chaflán aún no implementado';return}
+ const aliases={L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
