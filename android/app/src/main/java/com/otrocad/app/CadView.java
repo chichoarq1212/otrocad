@@ -85,6 +85,7 @@ public class CadView extends View {
         ArrayList<PointF> pts=e.pts;Path path=new Path();PointF first=screen(pts.get(0));path.moveTo(first.x,first.y);
         if("CIRCLE".equals(e.type)&&pts.size()>1){PointF center=screen(pts.get(0));float r=dist(pts.get(0),pts.get(1))*zoom;c.drawCircle(center.x,center.y,r,p);}
         else if("RECT".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));c.drawRect(Math.min(first.x,b.x),Math.min(first.y,b.y),Math.max(first.x,b.x),Math.max(first.y,b.y),p);}
+        else if("ELLIPSE".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));float rx=Math.abs(b.x-first.x),ry=Math.abs(b.y-first.y);c.drawOval(first.x-rx,first.y-ry,first.x+rx,first.y+ry,p);}
         else if("HATCH".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));float l=Math.min(first.x,b.x),r=Math.max(first.x,b.x),t=Math.min(first.y,b.y),bt=Math.max(first.y,b.y);c.drawRect(l,t,r,bt,p);c.save();Path clip=new Path();clip.addRect(l,t,r,bt,Path.Direction.CW);c.clipPath(clip);Paint hp=new Paint(3);hp.setColor(chosen?0xfff3c83e:e.color);hp.setStrokeWidth(1);for(float x=l-(bt-t);x<r;x+=10)c.drawLine(x,bt,x+(bt-t),t,hp);c.restore();}
         else if("TEXT".equals(e.type)){p.setStyle(Paint.Style.FILL);p.setTextSize(Math.max(12f,e.textHeight*zoom*.35f));c.drawText(e.text==null?"Texto":e.text,first.x,first.y,p);}
         else {for(int i=1;i<pts.size();i++){PointF q=screen(pts.get(i));path.lineTo(q.x,q.y);}if("POLYGON".equals(e.type)||"RECT".equals(e.type))path.close();c.drawPath(path,p);}
@@ -193,6 +194,7 @@ public class CadView extends View {
             else if(e.type.equals("CIRCLE")&&e.pts.size()>1)b.append("0\nCIRCLE\n").append(common).append("10\n").append(a.x).append("\n20\n").append(a.y).append("\n40\n").append(dist(a,e.pts.get(1))).append("\n");
             else if(e.type.equals("RECT")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("90\n4\n70\n1\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(q.y).append("\n10\n").append(a.x).append("\n20\n").append(q.y).append("\n");}
             else if(e.type.equals("TEXT"))b.append("0\nTEXT\n").append(common).append("10\n").append(a.x).append("\n20\n").append(a.y).append("\n40\n").append(e.textHeight).append("\n1\n").append(e.text.replace("\n"," ")).append("\n");
+            else if(e.type.equals("ELLIPSE")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("90\n36\n70\n1\n");for(int k=0;k<36;k++){double t=k*Math.PI*2/36;b.append("10\n").append(a.x+(q.x-a.x)*Math.cos(t)).append("\n20\n").append(a.y+(q.y-a.y)*Math.sin(t)).append("\n");}}
             else if(e.pts.size()>1){b.append("0\nLWPOLYLINE\n").append(common).append("90\n").append(e.pts.size()).append("\n70\n").append(e.type.equals("POLYGON")?1:0).append("\n");for(PointF p:e.pts)b.append("10\n").append(p.x).append("\n20\n").append(p.y).append("\n");}
         }return b.append("0\nENDSEC\n0\nEOF\n").toString();
     }
