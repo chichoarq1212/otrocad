@@ -1,0 +1,17 @@
+{
+  "name": "OtroCAD",
+  "short_name": "OtroCAD",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#101b2e",
+  "background_color": "#101b2e",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
