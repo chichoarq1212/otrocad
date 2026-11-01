@@ -21,6 +21,10 @@ public class CadView extends View {
     private final ArrayList<PointF> poly=new ArrayList<>(),arcPoints=new ArrayList<>();
     private String tool="LINE", layer="General", textValue="Texto";
     private int drawColor=Color.rgb(220,232,245), selected=-1;
+    private final LinkedHashSet<Integer> selectedItems=new LinkedHashSet<>();
+    private final ArrayList<Integer> moveTargets=new ArrayList<>();
+    private PointF selectionStartScreen=null,selectionEndScreen=null;
+    private boolean selectionDragging=false,selectionAdditive=false;
     private float weight=.25f, zoom=36f, panX=0, panY=0, offsetDistance=1f,gridStep=10f,polarStep=15f,snapRadius=18f;
     private String units="m";
     private boolean grid=true, gridSnap=false, ortho=false, polar=false, snap=true, crosshair=true;
@@ -35,7 +39,7 @@ public class CadView extends View {
     public void restoreLocal(){String raw=getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).getString("drawing","");if(raw!=null&&!raw.isEmpty())try{loadJson(raw);say("Dibujo local recuperado");}catch(Exception ignored){}}
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
-    public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;selected=-1;panning=false;say("Herramienta: "+tool);invalidate();}
+    public void setTool(String t){tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say("Herramienta: "+tool);invalidate();}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
     public void toggleOrtho(){ortho=!ortho;invalidate();}
@@ -63,10 +67,48 @@ public class CadView extends View {
     public void setPolarStep(float v){if(Float.isFinite(v)&&v>=1&&v<=90)polarStep=v;invalidate();}
     public void setSnapRadius(float v){if(Float.isFinite(v)&&v>=2&&v<=60)snapRadius=v;invalidate();}
     public void setUnits(String v){if("m".equals(v)||"cm".equals(v)||"mm".equals(v))units=v;invalidate();}
-    public void undo(){if(undo.isEmpty())return;redo.add(copyAll());entities.clear();entities.addAll(undo.remove(undo.size()-1));selected=-1;persistLocal();invalidate();say("Deshacer");}
-    public void redo(){if(redo.isEmpty())return;undo.add(copyAll());entities.clear();entities.addAll(redo.remove(redo.size()-1));selected=-1;persistLocal();invalidate();say("Rehacer");}
-    public void deleteSelected(){if(selected>=0&&selected<entities.size()){checkpoint();entities.remove(selected);selected=-1;persistLocal();invalidate();say("Objeto eliminado");}}
-    public void clearAll(){checkpoint();entities.clear();selected=-1;persistLocal();invalidate();}
+    public void undo(){if(undo.isEmpty())return;redo.add(copyAll());entities.clear();entities.addAll(undo.remove(undo.size()-1));setSelection(Collections.emptyList());persistLocal();invalidate();say("Deshacer");}
+    public void redo(){if(redo.isEmpty())return;undo.add(copyAll());entities.clear();entities.addAll(redo.remove(redo.size()-1));setSelection(Collections.emptyList());persistLocal();invalidate();say("Rehacer");}
+    public void deleteSelected(){ArrayList<Integer> ids=selectedIndices();if(ids.isEmpty())return;checkpoint();Collections.sort(ids,Collections.reverseOrder());for(int i:ids)if(i>=0&&i<entities.size())entities.remove(i);setSelection(Collections.emptyList());persistLocal();invalidate();say(ids.size()==1?"Objeto eliminado":ids.size()+" objetos eliminados");}
+    public void clearAll(){checkpoint();entities.clear();setSelection(Collections.emptyList());persistLocal();invalidate();}
+    private ArrayList<Integer> selectedIndices(){ArrayList<Integer> ids=new ArrayList<>(selectedItems);if(selected>=0&&!ids.contains(selected))ids.add(selected);ids.removeIf(i->i<0||i>=entities.size());Collections.sort(ids);return ids;}
+    private void setSelection(Collection<Integer> ids){selectedItems.clear();for(Integer i:ids)if(i!=null&&i>=0&&i<entities.size())selectedItems.add(i);selected=-1;for(Integer i:selectedItems)selected=i;}
+    private ArrayList<PointF> selectionSamples(Entity e){
+        ArrayList<PointF> out=new ArrayList<>();if(e.pts.isEmpty())return out;
+        if(e.type.equals("CIRCLE")&&e.pts.size()>1){PointF a=e.pts.get(0);float r=dist(a,e.pts.get(1));for(int k=0;k<72;k++){double t=k*Math.PI*2/72;out.add(new PointF(a.x+r*(float)Math.cos(t),a.y+r*(float)Math.sin(t)));}return out;}
+        if(e.type.equals("ELLIPSE")&&e.pts.size()>1){PointF a=e.pts.get(0),b=e.pts.get(1);for(int k=0;k<64;k++){double t=k*Math.PI*2/64;out.add(new PointF(a.x+(b.x-a.x)*(float)Math.cos(t),a.y+(b.y-a.y)*(float)Math.sin(t)));}return out;}
+        if((e.type.equals("RECT")||e.type.equals("HATCH"))&&e.pts.size()>1){PointF a=e.pts.get(0),b=e.pts.get(1);out.add(new PointF(a.x,a.y));out.add(new PointF(b.x,a.y));out.add(new PointF(b.x,b.y));out.add(new PointF(a.x,b.y));return out;}
+        for(PointF p:e.pts)out.add(new PointF(p.x,p.y));return out;
+    }
+    private boolean insideRect(PointF p,float l,float r,float b,float t){return p.x>=l-1e-6f&&p.x<=r+1e-6f&&p.y>=b-1e-6f&&p.y<=t+1e-6f;}
+    private boolean segmentRect(PointF a,PointF b,float l,float r,float bottom,float top){
+        float dx=b.x-a.x,dy=b.y-a.y,t0=0,t1=1;float[] p={-dx,dx,-dy,dy},q={a.x-l,r-a.x,a.y-bottom,top-a.y};
+        for(int i=0;i<4;i++){if(Math.abs(p[i])<1e-8f){if(q[i]<0)return false;}else{float t=q[i]/p[i];if(p[i]<0){if(t>t1)return false;if(t>t0)t0=t;}else{if(t<t0)return false;if(t<t1)t1=t;}}}return true;
+    }
+    private boolean pointInPolygon(PointF p,ArrayList<PointF> pts){boolean in=false;for(int i=0,j=pts.size()-1;i<pts.size();j=i++){PointF a=pts.get(i),b=pts.get(j);if((a.y>p.y)!=(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y+1e-12f)+a.x)in=!in;}return in;}
+    private boolean containsPoint(Entity e,PointF p){
+        if(e.pts.size()<2)return false;PointF a=e.pts.get(0),b=e.pts.get(1);
+        if(e.type.equals("CIRCLE"))return dist(a,p)<=dist(a,b);
+        if(e.type.equals("ELLIPSE")){float rx=Math.abs(b.x-a.x),ry=Math.abs(b.y-a.y);if(rx<1e-8f||ry<1e-8f)return false;float x=(p.x-a.x)/rx,y=(p.y-a.y)/ry;return x*x+y*y<=1;}
+        if(e.type.equals("RECT")||e.type.equals("HATCH"))return p.x>=Math.min(a.x,b.x)&&p.x<=Math.max(a.x,b.x)&&p.y>=Math.min(a.y,b.y)&&p.y<=Math.max(a.y,b.y);
+        if(e.type.equals("POLYGON"))return pointInPolygon(p,e.pts);return false;
+    }
+    private ArrayList<Integer> selectByWindow(float l,float r,float bottom,float top,boolean window){
+        ArrayList<Integer> found=new ArrayList<>();PointF center=new PointF((l+r)/2,(bottom+top)/2);
+        for(int i=0;i<entities.size();i++){Entity e=entities.get(i);ArrayList<PointF> pts=selectionSamples(e);if(pts.isEmpty())continue;boolean all=true,any=false;
+            for(PointF p:pts){boolean inside=insideRect(p,l,r,bottom,top);all&=inside;any|=inside;}
+            if(window){if(all)found.add(i);continue;}
+            boolean edge=false;boolean closed=e.type.equals("CIRCLE")||e.type.equals("ELLIPSE")||e.type.equals("RECT")||e.type.equals("HATCH")||e.type.equals("POLYGON");
+            if(pts.size()>1){int n=pts.size()-1+(closed?1:0);for(int k=0;k<n;k++)if(segmentRect(pts.get(k),pts.get((k+1)%pts.size()),l,r,bottom,top)){edge=true;break;}}
+            if(any||edge||containsPoint(e,center))found.add(i);
+        }return found;
+    }
+    private void finishSelection(){
+        if(selectionStartScreen==null)return;
+        if(selectionDragging&&selectionEndScreen!=null){PointF a=world(selectionStartScreen.x,selectionStartScreen.y),b=world(selectionEndScreen.x,selectionEndScreen.y);boolean window=selectionEndScreen.x>=selectionStartScreen.x;ArrayList<Integer> hits=selectByWindow(Math.min(a.x,b.x),Math.max(a.x,b.x),Math.min(a.y,b.y),Math.max(a.y,b.y),window);ArrayList<Integer> result=selectionAdditive?selectedIndices():new ArrayList<>();for(int i:hits)if(!result.contains(i))result.add(i);setSelection(result);say(hits.size()+" objeto(s) "+(window?"dentro de ventana":"cruzados por ventana"));}
+        else{int hit=hit(world(selectionStartScreen.x,selectionStartScreen.y));ArrayList<Integer> result=selectedIndices();if(!selectionAdditive)result.clear();if(hit>=0){if(selectionAdditive&&result.contains(hit))result.remove(Integer.valueOf(hit));else if(!result.contains(hit))result.add(hit);}setSelection(result);say(hit>=0?"Objeto seleccionado":(selectionAdditive?"Selección conservada":"Sin selección"));}
+        selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;invalidate();
+    }
     private ArrayList<Entity> copyAll(){ArrayList<Entity> a=new ArrayList<>();for(Entity e:entities)a.add(e.copy());return a;}
     private void checkpoint(){undo.add(copyAll());if(undo.size()>80)undo.remove(0);redo.clear();}
     private PointF world(float x,float y){return new PointF((x-getWidth()/2f-panX)/zoom,(getHeight()/2f+panY-y)/zoom);}
@@ -95,10 +137,11 @@ public class CadView extends View {
     }
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);c.drawColor(Color.rgb(16,24,32));drawGrid(c);
-        for(int i=0;i<entities.size();i++)drawEntity(c,entities.get(i),i==selected,false);
+        for(int i=0;i<entities.size();i++)drawEntity(c,entities.get(i),i==selected||selectedItems.contains(i),false);
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         if(tool.equals("POLY")&&poly.size()>0){Entity e=new Entity();e.type="POLY";e.pts.addAll(poly);drawEntity(c,e,false,false);}
         if(base!=null){PointF end=constrain(snap(world(cursor.x,cursor.y)));Paint p=new Paint(3);p.setColor(Color.rgb(98,184,232));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f %s  <  %.1f°",dist(base,end),units,angle(base,end)),b.x+10,b.y-10,p);}
+        if(selectionStartScreen!=null&&selectionDragging&&selectionEndScreen!=null){boolean win=selectionEndScreen.x>=selectionStartScreen.x;float l=Math.min(selectionStartScreen.x,selectionEndScreen.x),r=Math.max(selectionStartScreen.x,selectionEndScreen.x),t=Math.min(selectionStartScreen.y,selectionEndScreen.y),b=Math.max(selectionStartScreen.y,selectionEndScreen.y);Paint fill=new Paint(3);fill.setColor(win?0x223b82f6:0x2234d399);fill.setStyle(Paint.Style.FILL);c.drawRect(l,t,r,b,fill);Paint edge=new Paint(3);edge.setColor(win?0xff4a9bff:0xff35d28a);edge.setStyle(Paint.Style.STROKE);edge.setStrokeWidth(1.5f);edge.setPathEffect(win?null:new DashPathEffect(new float[]{8,5},0));c.drawRect(l,t,r,b,edge);edge.setStyle(Paint.Style.FILL);edge.setPathEffect(null);edge.setTextSize(12);c.drawText(win?"VENTANA":"CRUCE",l+5,Math.max(14,t-5),edge);}
         if(crosshair){Paint p=new Paint(3);p.setColor(0x885cb7e8);p.setStrokeWidth(1);c.drawLine(cursor.x,0,cursor.x,getHeight(),p);c.drawLine(0,cursor.y,getWidth(),cursor.y,p);}
     }
     private float angle(PointF a,PointF b){return (float)((Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI+360)%360);}
@@ -123,18 +166,20 @@ public class CadView extends View {
         if("LEADER".equals(e.type)&&pts.size()>1){PointF b=screen(pts.get(1));p.setStyle(Paint.Style.FILL);p.setPathEffect(null);Path arrow=new Path();arrow.moveTo(first.x,first.y);arrow.lineTo(first.x+8,first.y-4);arrow.lineTo(first.x+8,first.y+4);arrow.close();c.drawPath(arrow,p);if(e.text!=null&&!e.text.isEmpty())c.drawText(e.text,b.x+5,b.y-5,p);}
     }
     private void addEntity(String type,PointF a,PointF b){
-        checkpoint();Entity e=new Entity();e.type=type;e.layer=layer;e.color=drawColor;e.weight=weight;e.pts.add(new PointF(a.x,a.y));if(b!=null)e.pts.add(new PointF(b.x,b.y));entities.add(e);selected=entities.size()-1;anchor=null;persistLocal();invalidate();say(type+" creado");
+        checkpoint();Entity e=new Entity();e.type=type;e.layer=layer;e.color=drawColor;e.weight=weight;e.pts.add(new PointF(a.x,a.y));if(b!=null)e.pts.add(new PointF(b.x,b.y));entities.add(e);setSelection(Arrays.asList(entities.size()-1));anchor=null;persistLocal();invalidate();say(type+" creado");
     }
     private void finishPoly(){if(poly.size()>1){checkpoint();Entity e=new Entity();e.type="POLY";e.layer=layer;e.color=drawColor;e.weight=weight;for(PointF p:poly)e.pts.add(new PointF(p.x,p.y));entities.add(e);selected=entities.size()-1;}poly.clear();anchor=null;persistLocal();invalidate();say("Polilínea terminada");}
     public void finish(){finishPoly();}
     private void handle(PointF raw){
         PointF q=constrain(snap(raw));
-        if(tool.equals("SELECT")){selected=hit(q);say(selected<0?"Sin selección":"Objeto seleccionado");invalidate();return;}
-        if(tool.equals("ERASE")){selected=hit(q);deleteSelected();return;}
+        if(tool.equals("SELECT")){int h=hit(q);setSelection(h>=0?Arrays.asList(h):Collections.emptyList());say(h<0?"Sin selección":"Objeto seleccionado");invalidate();return;}
+        if(tool.equals("ERASE")){if(selectedIndices().isEmpty()){int h=hit(q);if(h>=0)setSelection(Arrays.asList(h));}deleteSelected();return;}
         if(tool.equals("MOVE")||tool.equals("COPY")){
-            if(selected<0){selected=hit(q);if(selected<0){say("Selecciona un objeto");return;}moveBase=null;say("Indica punto base");invalidate();return;}
+            if(moveTargets.isEmpty()){moveTargets.addAll(selectedIndices());if(moveTargets.isEmpty()){int h=hit(q);if(h>=0){setSelection(Arrays.asList(h));moveTargets.add(h);}else{say("Selecciona uno o varios objetos");return;}say("Objeto seleccionado · indica punto base");invalidate();return;}}
             if(moveBase==null){moveBase=q;say("Indica punto destino");return;}
-            PointF d=new PointF(q.x-moveBase.x,q.y-moveBase.y);checkpoint();Entity src=entities.get(selected);if(tool.equals("COPY")){Entity copy=src.copy();for(PointF p:copy.pts){p.x+=d.x;p.y+=d.y;}entities.add(copy);selected=entities.size()-1;}else for(PointF p:src.pts){p.x+=d.x;p.y+=d.y;}moveBase=null;persistLocal();invalidate();say("Edición aplicada");return;
+            PointF d=new PointF(q.x-moveBase.x,q.y-moveBase.y);checkpoint();ArrayList<Integer> created=new ArrayList<>();
+            for(int idx:moveTargets){if(idx<0||idx>=entities.size())continue;Entity src=entities.get(idx);if(tool.equals("COPY")){Entity copy=src.copy();for(PointF p:copy.pts){p.x+=d.x;p.y+=d.y;}entities.add(copy);created.add(entities.size()-1);}else for(PointF p:src.pts){p.x+=d.x;p.y+=d.y;}}
+            if(tool.equals("COPY"))setSelection(created);moveTargets.clear();moveBase=null;persistLocal();invalidate();say("Edición aplicada a "+(tool.equals("COPY")?created.size():selectedIndices().size())+" objeto(s)");return;
         }
         if(tool.equals("POLY")){poly.add(q);cursor=new PointF(q.x,q.y);invalidate();say("Vértice añadido · pulsa Terminar PL");return;}
         if(tool.equals("ARC")){arcPoints.add(q);if(arcPoints.size()==3){ArrayList<PointF> a=arcPoints;checkpoint();Entity e=new Entity();e.type="ARC";e.layer=layer;e.color=drawColor;e.weight=weight;for(int i=0;i<=24;i++){float t=i/24f;PointF p=new PointF(a.get(0).x*(1-t)*(1-t)+a.get(1).x*2*(1-t)*t+a.get(2).x*t*t,a.get(0).y*(1-t)*(1-t)+a.get(1).y*2*(1-t)*t+a.get(2).y*t*t);e.pts.add(p);}entities.add(e);selected=entities.size()-1;arcPoints.clear();persistLocal();say("Arco creado");}else say("Marca el siguiente punto del arco");invalidate();return;}
@@ -142,7 +187,7 @@ public class CadView extends View {
         if(tool.equals("LINE")||tool.equals("RECT")||tool.equals("CIRCLE")||tool.equals("DIM")||tool.equals("HATCH")||tool.equals("LEADER")||tool.equals("ELLIPSE")){
             if(anchor==null){anchor=q;cursor=q;invalidate();say("Marca el punto final");}else{addEntity(tool,anchor,q);}return;
         }
-        if(tool.equals("OFFSET")){if(selected<0){selected=hit(q);say(selected<0?"Selecciona una línea o círculo":"Seleccionado · introduce distancia en CMD");invalidate();return;}offsetSelected(offsetDistance,q);return;}
+        if(tool.equals("OFFSET")){if(selectedIndices().isEmpty()){int h=hit(q);if(h>=0)setSelection(Arrays.asList(h));say(selected<0?"Selecciona una línea o círculo":"Seleccionado · introduce distancia en CMD");invalidate();return;}offsetSelected(offsetDistance,q);return;}
         if(tool.equals("PAN")){panLast=q;return;}
         say("Herramienta aún no disponible en esta versión nativa");
     }
@@ -168,16 +213,22 @@ public class CadView extends View {
     }
     @Override public boolean onTouchEvent(MotionEvent ev){
         int action=ev.getActionMasked();
-        if(action==MotionEvent.ACTION_DOWN){PointF p=new PointF(ev.getX(),ev.getY());cursor=p;if(tool.equals("PAN")){panning=true;panLast=p;}else handle(world(p.x,p.y));invalidate();return true;}
-        if(action==MotionEvent.ACTION_POINTER_DOWN){pinching=true;pinchStart=spacing(ev);pinchZoom=zoom;return true;}
+        if(action==MotionEvent.ACTION_DOWN){
+            PointF p=new PointF(ev.getX(),ev.getY());cursor=p;
+            if(tool.equals("SELECT")){selectionStartScreen=p;selectionEndScreen=p;selectionDragging=false;int meta=ev.getMetaState();selectionAdditive=(meta&(android.view.KeyEvent.META_SHIFT_ON|android.view.KeyEvent.META_CTRL_ON))!=0;invalidate();return true;}
+            if(tool.equals("PAN")){panning=true;panLast=p;}else handle(world(p.x,p.y));invalidate();return true;
+        }
+        if(action==MotionEvent.ACTION_POINTER_DOWN){selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;pinching=true;pinchStart=spacing(ev);pinchZoom=zoom;return true;}
         if(action==MotionEvent.ACTION_MOVE){
             if(pinching&&ev.getPointerCount()>=2){float s=spacing(ev);if(pinchStart>0)zoom=Math.max(3,Math.min(400,pinchZoom*s/pinchStart));}
+            else if(selectionStartScreen!=null&&ev.getPointerCount()==1){selectionEndScreen=new PointF(ev.getX(),ev.getY());if(dist(selectionStartScreen,selectionEndScreen)>4)selectionDragging=true;cursor.set(ev.getX(),ev.getY());}
             else if(panning&&ev.getPointerCount()==1){float x=ev.getX(),y=ev.getY();panX+=x-panLast.x;panY+=y-panLast.y;panLast.set(x,y);}
             else {cursor.set(ev.getX(),ev.getY());}
             invalidate();return true;
         }
         if(action==MotionEvent.ACTION_POINTER_UP){pinching=false;return true;}
-        if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){panning=false;pinching=false;return true;}
+        if(action==MotionEvent.ACTION_UP){if(selectionStartScreen!=null)finishSelection();panning=false;pinching=false;return true;}
+        if(action==MotionEvent.ACTION_CANCEL){selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;pinching=false;invalidate();return true;}
         return true;
     }
     private float spacing(MotionEvent e){if(e.getPointerCount()<2)return 0;float x=e.getX(0)-e.getX(1),y=e.getY(0)-e.getY(1);return (float)Math.hypot(x,y);}
@@ -197,7 +248,7 @@ public class CadView extends View {
             JSONArray ps=o.optJSONArray("pts");if(ps==null)ps=o.optJSONArray("points");if(ps!=null){for(int j=0;j<ps.length();j++){JSONObject p=ps.getJSONObject(j);e.pts.add(new PointF((float)p.optDouble("x"),(float)p.optDouble("y")));}}
             else{JSONObject p=o.optJSONObject("a"),q=o.optJSONObject("b");if(p!=null)e.pts.add(new PointF((float)p.optDouble("x"),(float)p.optDouble("y")));if(q!=null)e.pts.add(new PointF((float)q.optDouble("x"),(float)q.optDouble("y")));}
             if(!e.pts.isEmpty())next.add(e);
-        }checkpoint();entities.clear();entities.addAll(next);selected=-1;persistLocal();invalidate();say("Proyecto abierto · "+entities.size()+" entidades");
+        }checkpoint();entities.clear();entities.addAll(next);setSelection(Collections.emptyList());persistLocal();invalidate();say("Proyecto abierto · "+entities.size()+" entidades");
     }
     public void loadDxf(String raw){
         String[] lines=raw.replace("\r","").split("\n");ArrayList<String[]> pairs=new ArrayList<>();for(int i=0;i+1<lines.length;i+=2)pairs.add(new String[]{lines[i].trim(),lines[i+1].trim()});
@@ -211,7 +262,7 @@ public class CadView extends View {
             else if(e.type.equals("TEXT"))e.text=first(v,"1","Texto");
             String col=first(v,"420","");if(!col.isEmpty())try{e.color=Color.rgb((int)(Long.parseLong(col)>>16)&255,(int)(Long.parseLong(col)>>8)&255,(int)Long.parseLong(col)&255);}catch(Exception ignored){}
             e.weight=num(v,"370",25)/100f;e.linetype=first(v,"6","CONTINUOUS");out.add(e);i=j-1;
-        }checkpoint();entities.clear();entities.addAll(out);selected=-1;persistLocal();invalidate();say("DXF abierto · "+out.size()+" entidades");
+        }checkpoint();entities.clear();entities.addAll(out);setSelection(Collections.emptyList());persistLocal();invalidate();say("DXF abierto · "+out.size()+" entidades");
     }
     private static String first(HashMap<String,ArrayList<String>> m,String k,String d){return m.containsKey(k)&&!m.get(k).isEmpty()?m.get(k).get(0):d;}
     private static float num(HashMap<String,ArrayList<String>> m,String k,float d){return m.containsKey(k)&&!m.get(k).isEmpty()?parse(m.get(k).get(0)):d;}
