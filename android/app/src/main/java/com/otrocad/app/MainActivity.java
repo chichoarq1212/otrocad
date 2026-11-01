@@ -14,8 +14,7 @@ import android.view.WindowManager;
 import android.view.View;
 import android.os.Build;
 import android.view.WindowInsets;
-import android.os.Build;
-import android.view.WindowInsets;
+import android.widget.GridLayout;
 import android.widget.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -32,21 +31,18 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(Color.rgb(24,91,232));
         getWindow().setNavigationBarColor(Color.rgb(24,91,232));
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         buildUi();
         cad.restoreLocal();
         if(getIntent()!=null&&getIntent().getData()!=null)openUri(getIntent().getData());
     }
     private void buildUi(){
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(0xfff1f5ff);root.setFitsSystemWindows(true);
-        if(Build.VERSION.SDK_INT>=35){root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);return insets;});}
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(0xfff1f5ff);
         LinearLayout brandRow=new LinearLayout(this);brandRow.setOrientation(LinearLayout.HORIZONTAL);brandRow.setGravity(Gravity.CENTER_VERTICAL);brandRow.setBackgroundColor(0xff185be8);brandRow.setPadding(12,7,10,7);ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.ic_otrocad);logo.setContentDescription("Isotipo original de OtroCAD");logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brandRow.addView(logo,new LinearLayout.LayoutParams(40,40));TextView title=new TextView(this);title.setText("otroCAD");title.setTextColor(Color.WHITE);title.setTextSize(16);title.setTypeface(null,1);title.setPadding(9,0,4,0);brandRow.addView(title,new LinearLayout.LayoutParams(-1,-2));root.addView(brandRow,new LinearLayout.LayoutParams(-1,54));
         status=new TextView(this);status.setText("Listo · Dibujo y archivos procesados localmente");status.setTextColor(0xff153665);status.setBackgroundColor(0xffe8efff);status.setTextSize(11);status.setPadding(10,4,10,7);
         cad=new CadView(this);cad.setStatusListener(s->status.setText(s));cad.setLengthRequestListener((suggested,unit,isPoly,ortho)->showLengthDialog(suggested,unit,isPoly,ortho));
         // Native Android ribbon: each category owns its own visible tools.
-        LinearLayout tabStrip=new LinearLayout(this);tabStrip.setOrientation(LinearLayout.HORIZONTAL);
-        HorizontalScrollView tabScroll=new HorizontalScrollView(this);tabScroll.setHorizontalScrollBarEnabled(false);tabScroll.addView(tabStrip);
-        tabScroll.setBackgroundColor(0xffe8efff);root.addView(tabScroll,new LinearLayout.LayoutParams(-1,52));
+        GridLayout tabStrip=new GridLayout(this);tabStrip.setColumnCount(4);tabStrip.setRowCount(2);tabStrip.setPadding(5,4,5,4);
+        tabStrip.setBackgroundColor(0xffe8efff);root.addView(tabStrip,new LinearLayout.LayoutParams(-1,78));
         android.widget.FrameLayout ribbonPanels=new android.widget.FrameLayout(this);
         final String[] tabNames={"DIBUJO","MODIFICAR","ANOTAR","CAPAS","VISTA","CONFIG.","ARCHIVOS"};
         final View[] panels=new View[tabNames.length];
@@ -55,15 +51,15 @@ public class MainActivity extends Activity {
         panels[1]=toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"OFFSET","OFFSET"},{"BORRAR","ERASE"},{"DESHACER","UNDO"},{"REHACER","REDO"}});
         panels[2]=toolbar(new String[][]{{"COTA","DIM"},{"HATCH","HATCH"},{"TEXTO","TEXT"},{"DIRECTRIZ","LEADER"}});
         panels[6]=toolbar(new String[][]{{"ABRIR","OPEN"},{"GUARDAR","SAVE"},{"DXF","DXF"},{"PDF","PDF"}});
-        LinearLayout settings=new LinearLayout(this);settings.setGravity(Gravity.CENTER_VERTICAL);settings.setPadding(6,3,6,3);
-        addToggle(settings,"GRID",()->cad.toggleGrid());addOrthoToggle(settings);addToggle(settings,"POLAR",()->cad.togglePolar());addToggle(settings,"SNAP",()->cad.toggleGridSnap());addToggle(settings,"OSNAP",()->cad.toggleSnap());addToggle(settings,"CRUZ",()->cad.toggleCrosshair());Button multi=smallButton(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setOnClickListener(v->{cad.toggleMultiSelect();multi.setText(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setBackgroundTintList(android.content.res.ColorStateList.valueOf(cad.isMultiSelectEnabled()?0xffffcf23:0xffe7efff));});settings.addView(multi,new LinearLayout.LayoutParams(0,-1,1));Button hp=smallButton("HP");hp.setOnClickListener(v->showSettings());settings.addView(hp,new LinearLayout.LayoutParams(0,-1,1));
+        GridLayout settings=new GridLayout(this);settings.setColumnCount(4);settings.setRowCount(2);settings.setPadding(5,4,5,4);
+        addToggle(settings,"GRID",()->cad.toggleGrid());addOrthoToggle(settings);addToggle(settings,"POLAR",()->cad.togglePolar());addToggle(settings,"SNAP",()->cad.toggleGridSnap());addToggle(settings,"OSNAP",()->cad.toggleSnap());addToggle(settings,"CRUZ",()->cad.toggleCrosshair());Button multi=smallButton(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setOnClickListener(v->{cad.toggleMultiSelect();multi.setText(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setBackgroundTintList(android.content.res.ColorStateList.valueOf(cad.isMultiSelectEnabled()?0xffffcf23:0xffe7efff));});GridLayout.LayoutParams mlp=new GridLayout.LayoutParams();mlp.width=0;mlp.height=38;mlp.columnSpec=GridLayout.spec(settings.getChildCount()%4,1f);mlp.rowSpec=GridLayout.spec(settings.getChildCount()/4);mlp.setMargins(2,2,2,2);settings.addView(multi,mlp);Button hp=smallButton("HP");hp.setOnClickListener(v->showSettings());GridLayout.LayoutParams hlp=new GridLayout.LayoutParams();hlp.width=0;hlp.height=38;hlp.columnSpec=GridLayout.spec(settings.getChildCount()%4,1f);hlp.rowSpec=GridLayout.spec(settings.getChildCount()/4);hlp.setMargins(2,2,2,2);settings.addView(hp,hlp);
         panels[4]=settings;
-        LinearLayout options=new LinearLayout(this);options.setGravity(Gravity.CENTER_VERTICAL);options.setPadding(8,2,8,2);
+        GridLayout options=new GridLayout(this);options.setColumnCount(3);options.setRowCount(1);options.setPadding(8,6,8,6);
         Spinner layers=new Spinner(this);String[] layerNames={"General","Muros","Cotas","Detalles","Topografía","Vialidad"};ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,layerNames);layers.setAdapter(adapter);layers.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){cad.setLayer(layerNames[pos]);}});
-        options.addView(layers,new LinearLayout.LayoutParams(0,42,1));
-        Button color=smallButton("COLOR");color.setOnClickListener(v->chooseColor());options.addView(color);
+        GridLayout.LayoutParams ol1=new GridLayout.LayoutParams();ol1.width=0;ol1.height=48;ol1.columnSpec=GridLayout.spec(0,1f);options.addView(layers,ol1);
+        Button color=smallButton("COLOR");color.setOnClickListener(v->chooseColor());GridLayout.LayoutParams ol2=new GridLayout.LayoutParams();ol2.width=0;ol2.height=48;ol2.columnSpec=GridLayout.spec(1,1f);options.addView(color,ol2);
         Spinner weights=new Spinner(this);String[] w={"0.13 mm","0.18 mm","0.25 mm","0.35 mm","0.50 mm","0.70 mm","1.00 mm"};ArrayAdapter<String> wa=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,w);weights.setAdapter(wa);weights.setSelection(2);weights.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){cad.setWeight(Float.parseFloat(w[pos].split(" ")[0]));}});
-        options.addView(weights,new LinearLayout.LayoutParams(0,42,1));panels[3]=options;
+        GridLayout.LayoutParams ol3=new GridLayout.LayoutParams();ol3.width=0;ol3.height=48;ol3.columnSpec=GridLayout.spec(2,1f);options.addView(weights,ol3);panels[3]=options;
         LinearLayout configPanel=new LinearLayout(this);configPanel.setPadding(8,3,8,3);
         Button hpConfig=smallButton("HP · UNIDADES / OSNAP / PRECISIÓN");
         hpConfig.setOnClickListener(v->showSettings());
@@ -83,9 +79,9 @@ public class MainActivity extends Activity {
                     tabs[j].setBackgroundTintList(android.content.res.ColorStateList.valueOf(j==tabIndex?0xffffcf23:0xffdce8fa));
                 }
             });
-            tabStrip.addView(tab,new LinearLayout.LayoutParams(-2,-1));
+            GridLayout.LayoutParams tlp=new GridLayout.LayoutParams();tlp.width=0;tlp.height=32;tlp.columnSpec=GridLayout.spec(i%4,1f);tlp.rowSpec=GridLayout.spec(i/4);tlp.setMargins(3,2,3,2);tabStrip.addView(tab,tlp);
         }
-        ribbonPanels.setBackgroundColor(Color.WHITE);root.addView(ribbonPanels,new LinearLayout.LayoutParams(-1,62));
+        ribbonPanels.setBackgroundColor(Color.WHITE);root.addView(ribbonPanels,new LinearLayout.LayoutParams(-1,94));
         root.addView(cad,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout cmdrow=new LinearLayout(this);cmdrow.setBackgroundColor(Color.WHITE);cmdrow.setPadding(7,5,7,5);cmdrow.setGravity(Gravity.CENTER_VERTICAL);
         command=new EditText(this);command.setSingleLine(true);command.setTextColor(0xff153665);command.setHintTextColor(0xff657b99);command.setHint("Comando: LINE, PLINE, OFFSET, MOVE, @10,0");command.setTextSize(13);command.setPadding(10,5,10,5);command.setBackgroundColor(0xffe7efff);cmdrow.addView(command,new LinearLayout.LayoutParams(0,44,1));
@@ -93,13 +89,12 @@ public class MainActivity extends Activity {
         status.setSingleLine(true);status.setEllipsize(android.text.TextUtils.TruncateAt.END);root.addView(status,new LinearLayout.LayoutParams(-1,32));
         setContentView(root);
     }
-    private HorizontalScrollView toolbar(String[][] items){
-        HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.setHorizontalScrollBarEnabled(false);LinearLayout row=new LinearLayout(this);row.setPadding(5,3,5,3);
-        for(String[] item:items){Button b=smallButton(item[0]);b.setOnClickListener(v->toolAction(item[1]));row.addView(b,new LinearLayout.LayoutParams(-2,-1));}
-        scroll.addView(row,new HorizontalScrollView.LayoutParams(-2,-1));return scroll;
+    private View toolbar(String[][] items){
+        GridLayout grid=new GridLayout(this);grid.setColumnCount(4);grid.setRowCount((items.length+3)/4);grid.setPadding(5,5,5,5);grid.setBackgroundColor(Color.WHITE);
+        for(int i=0;i<items.length;i++){final String[] item=items[i];Button b=smallButton(item[0]);b.setTextSize(11);b.setOnClickListener(v->toolAction(item[1]));GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=38;lp.columnSpec=GridLayout.spec(i%4,1f);lp.rowSpec=GridLayout.spec(i/4);lp.setMargins(3,2,3,2);grid.addView(b,lp);}return grid;
     }
-    private Button smallButton(String label){Button b=new Button(this);b.setText(label);b.setTextSize(12);b.setTextColor(0xff153665);b.setAllCaps(false);b.setIncludeFontPadding(false);b.setMinHeight(0);b.setMinimumHeight(0);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(14,3,14,3);b.setGravity(Gravity.CENTER);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffe7efff));return b;}
-    private void addToggle(LinearLayout row,String label,Runnable action){Button b=smallButton(label);b.setOnClickListener(v->{action.run();b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffffcf23));});row.addView(b,new LinearLayout.LayoutParams(0,-1,1));}
+    private Button smallButton(String label){Button b=new Button(this);b.setText(label);b.setTextSize(11);b.setTextColor(0xff153665);b.setAllCaps(false);b.setIncludeFontPadding(false);b.setMinHeight(0);b.setMinimumHeight(0);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(14,3,14,3);b.setGravity(Gravity.CENTER);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffe7efff));return b;}
+    private void addToggle(LinearLayout row,String label,Runnable action){Button b=smallButton(label);b.setOnClickListener(v->{action.run();b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffffcf23));});GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=38;lp.columnSpec=GridLayout.spec(row.getChildCount()%4,1f);lp.rowSpec=GridLayout.spec(row.getChildCount()/4);lp.setMargins(2,2,2,2);row.addView(b,lp);}
     private void addOrthoToggle(LinearLayout row){
         orthoButton=smallButton(cad.isOrthoEnabled()?"ORTHO ON":"ORTHO OFF");
         orthoButton.setOnClickListener(v->{cad.toggleOrtho();refreshOrthoToggle();});
