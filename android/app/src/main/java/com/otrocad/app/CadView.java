@@ -38,6 +38,8 @@ public class CadView extends View {
     private float weight=.25f, zoom=36f, panX=0, panY=0, offsetDistance=1f,gridStep=10f,polarStep=15f,snapRadius=18f;
     private String units="m";
     private boolean grid=true, gridSnap=false, ortho=false, polar=false, snap=true, crosshair=true;
+    private boolean osEnd=true,osMid=true,osCenter=true,osQuadrant=true,osPerpendicular=false,osTangent=false,osNearest=false,osParallel=false;
+    private int decimalPrecision=3;
     private PointF anchor=null,cursor=new PointF(0,0),panLast=null,moveBase=null;
     private boolean panning=false,pinching=false;
     private float pinchStart=0,pinchZoom=36f;
@@ -73,6 +75,10 @@ public class CadView extends View {
     public float getPolarStep(){return polarStep;}
     public float getSnapRadius(){return snapRadius;}
     public String getUnits(){return units;}
+    public int getDecimalPrecision(){return decimalPrecision;}
+    public void setDecimalPrecision(int v){decimalPrecision=Math.max(2,Math.min(3,v));invalidate();}
+    public boolean isOsEnd(){return osEnd;} public boolean isOsMid(){return osMid;} public boolean isOsCenter(){return osCenter;} public boolean isOsQuadrant(){return osQuadrant;} public boolean isOsPerpendicular(){return osPerpendicular;} public boolean isOsTangent(){return osTangent;} public boolean isOsNearest(){return osNearest;} public boolean isOsParallel(){return osParallel;}
+    public void setOsnapModes(boolean end,boolean mid,boolean center,boolean quadrant,boolean perpendicular,boolean tangent,boolean nearest,boolean parallel){osEnd=end;osMid=mid;osCenter=center;osQuadrant=quadrant;osPerpendicular=perpendicular;osTangent=tangent;osNearest=nearest;osParallel=parallel;invalidate();}
     public void setGridEnabled(boolean v){grid=v;invalidate();}
     public void setOrthoEnabled(boolean v){ortho=v;invalidate();}
     public void setPolarEnabled(boolean v){polar=v;invalidate();}
@@ -135,11 +141,33 @@ public class CadView extends View {
         if(gridSnap){q.x=Math.round(q.x/gridStep)*gridStep;q.y=Math.round(q.y/gridStep)*gridStep;}
         if(!snap)return q;
         PointF best=null;float limit=snapRadius/zoom;
+        PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         for(Entity e:entities){
-            ArrayList<PointF> ps=e.pts;
-            for(PointF v:ps){float d=dist(q,v);if(d<limit){limit=d;best=v;}}
-            if(ps.size()>=2&&(e.type.equals("LINE")||e.type.equals("DIM")||e.type.equals("LEADER"))){
-                PointF a=ps.get(0),b=ps.get(1),mid=new PointF((a.x+b.x)/2,(a.y+b.y)/2);float d=dist(q,mid);if(d<limit){limit=d;best=mid;}
+            ArrayList<PointF> ps=e.pts;if(ps.isEmpty())continue;
+            if(osEnd)for(PointF v:ps){float d=dist(q,v);if(d<limit){limit=d;best=v;}}
+            if(ps.size()>=2&&(e.type.equals("LINE")||e.type.equals("DIM")||e.type.equals("LEADER")||e.type.equals("POLY"))){
+                int segments=e.type.equals("POLY")?ps.size()-1:1;
+                for(int j=0;j<segments;j++){
+                    PointF a=ps.get(j),b=ps.get(e.type.equals("POLY")?j+1:1);
+                    if(osMid){PointF mid=new PointF((a.x+b.x)/2,(a.y+b.y)/2);float d=dist(q,mid);if(d<limit){limit=d;best=mid;}}
+                    PointF v=new PointF(b.x-a.x,b.y-a.y);float len2=v.x*v.x+v.y*v.y;
+                    if(len2>1e-9f&&(osPerpendicular||osNearest)){
+                        float t=((q.x-a.x)*v.x+(q.y-a.y)*v.y)/len2;
+                        if(osNearest)t=Math.max(0,Math.min(1,t));
+                        if(osPerpendicular)t=Math.max(0,Math.min(1,t));
+                        PointF proj=new PointF(a.x+t*v.x,a.y+t*v.y);float d=dist(q,proj);if(d<limit){limit=d;best=proj;}
+                    }
+                    if(osParallel&&base!=null&&len2>1e-9f){
+                        float t=((q.x-base.x)*v.x+(q.y-base.y)*v.y)/len2;
+                        PointF proj=new PointF(base.x+t*v.x,base.y+t*v.y);float d=dist(q,proj);if(d<limit){limit=d;best=proj;}
+                    }
+                }
+            }
+            if(e.type.equals("CIRCLE")&&ps.size()>1){
+                PointF center=ps.get(0);float radius=dist(center,ps.get(1));
+                if(osCenter){float d=dist(q,center);if(d<limit){limit=d;best=center;}}
+                if(osQuadrant)for(int k=0;k<4;k++){double ang=k*Math.PI/2;PointF v=new PointF(center.x+radius*(float)Math.cos(ang),center.y+radius*(float)Math.sin(ang));float d=dist(q,v);if(d<limit){limit=d;best=v;}}
+                if(osTangent&&base!=null){float dx=base.x-center.x,dy=base.y-center.y,d2=dx*dx+dy*dy,r2=radius*radius;if(d2>r2+1e-8f){float root=(float)Math.sqrt(d2-r2);for(int sign:new int[]{-1,1}){PointF t=new PointF(center.x+(r2*dx-sign*radius*root*dy)/d2,center.y+(r2*dy+sign*radius*root*dx)/d2);float d=dist(q,t);if(d<limit){limit=d;best=t;}}}}
             }
         }
         return best==null?q:new PointF(best.x,best.y);
@@ -157,7 +185,7 @@ public class CadView extends View {
         drawSelectionGrips(c);
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         if(tool.equals("POLY")&&poly.size()>0){Entity e=new Entity();e.type="POLY";e.pts.addAll(poly);drawEntity(c,e,false,false);}
-        if(base!=null){PointF end=constrain(snap(world(cursor.x,cursor.y)));Paint p=new Paint(3);p.setColor(resolveCanvasColor(drawColor,false));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%.3f %s  <  %.1f°",dist(base,end),units,angle(base,end)),b.x+10,b.y-10,p);}
+        if(base!=null){PointF end=constrain(snap(world(cursor.x,cursor.y)));Paint p=new Paint(3);p.setColor(resolveCanvasColor(drawColor,false));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);p.setPathEffect(new DashPathEffect(new float[]{9,6},0));PointF a=screen(base),b=screen(end);c.drawLine(a.x,a.y,b.x,b.y,p);p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setTextSize(12);c.drawText(String.format(Locale.US,"%."+decimalPrecision+"f %s  <  %.1f°",dist(base,end),units,angle(base,end)),b.x+10,b.y-10,p);}
         if(selectionStartScreen!=null&&selectionDragging&&selectionEndScreen!=null){boolean win=selectionEndScreen.x>=selectionStartScreen.x;float l=Math.min(selectionStartScreen.x,selectionEndScreen.x),r=Math.max(selectionStartScreen.x,selectionEndScreen.x),t=Math.min(selectionStartScreen.y,selectionEndScreen.y),b=Math.max(selectionStartScreen.y,selectionEndScreen.y);Paint fill=new Paint(3);fill.setColor(win?0x223b82f6:0x2234d399);fill.setStyle(Paint.Style.FILL);c.drawRect(l,t,r,b,fill);Paint edge=new Paint(3);edge.setColor(win?0xff4a9bff:0xff35d28a);edge.setStyle(Paint.Style.STROKE);edge.setStrokeWidth(1.5f);edge.setPathEffect(win?null:new DashPathEffect(new float[]{8,5},0));c.drawRect(l,t,r,b,edge);edge.setStyle(Paint.Style.FILL);edge.setPathEffect(null);edge.setTextSize(12);c.drawText(win?"VENTANA":"CRUCE",l+5,Math.max(14,t-5),edge);}
         if(crosshair){Paint p=new Paint(3);p.setColor(0x885cb7e8);p.setStrokeWidth(1);c.drawLine(cursor.x,0,cursor.x,getHeight(),p);c.drawLine(0,cursor.y,getWidth(),cursor.y,p);}
     }
@@ -312,7 +340,7 @@ public class CadView extends View {
         PointF end=new PointF(base.x+(dx/magnitude)*length,base.y+(dy/magnitude)*length);
         pendingLength=false;pendingDirection=null;cursor=screen(end);
         if(isPolyline){
-            poly.add(end);say(String.format(Locale.US,"Tramo añadido · %.3f %s · toca la siguiente dirección o FIN PL",length,units));invalidate();return true;
+            poly.add(end);say(String.format(Locale.US,"Tramo añadido · %."+decimalPrecision+"f %s · toca la siguiente dirección o FIN PL",length,units));invalidate();return true;
         }
         if(tool.equals("LINE")){addEntity("LINE",base,end);return true;}
         say("La entrada de longitud solo está disponible para LÍNEA y POLILÍNEA");invalidate();return false;

@@ -7,8 +7,8 @@ android {
         applicationId 'com.otrocad.app'
         minSdk 26
         targetSdk 35
-        versionCode 8
-        versionName '0.4.4-alpha'
+        versionCode 9
+        versionName '0.4.5-alpha'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

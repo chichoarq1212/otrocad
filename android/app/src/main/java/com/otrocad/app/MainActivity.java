@@ -75,11 +75,11 @@ public class MainActivity extends Activity {
     private void showLengthDialog(float suggested,String unit,boolean isPolyline,boolean ortho){
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(20,8,20,4);
         TextView info=new TextView(this);info.setText((ortho?"ORTHO ACTIVADO · dirección horizontal o vertical":"ORTHO DESACTIVADO · dirección libre")+"\nLa dirección se toma del último toque en el área de dibujo.");info.setTextColor(0xff536477);info.setPadding(0,0,0,12);panel.addView(info);
-        EditText input=new EditText(this);input.setSingleLine(true);input.setInputType(8194);input.setHint("Ejemplo: 2.00");input.setText(String.format(java.util.Locale.US,"%.2f",Math.max(.01f,suggested)));input.setSelectAllOnFocus(true);panel.addView(input,new LinearLayout.LayoutParams(-1,-2));
+        EditText input=new EditText(this);input.setSingleLine(true);input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);input.setHint("Ejemplo: 2.375");input.setText(String.format(java.util.Locale.US,"%."+cad.getDecimalPrecision()+"f",Math.max(.001f,suggested)));input.setSelectAllOnFocus(true);panel.addView(input,new LinearLayout.LayoutParams(-1,-2));
         TextView unitLabel=new TextView(this);unitLabel.setText("Longitud en "+unit+" · escribe solo el número");unitLabel.setTextColor(0xff536477);unitLabel.setPadding(0,7,0,0);panel.addView(unitLabel);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle(isPolyline?"Longitud del siguiente tramo":"Longitud exacta de la línea").setView(panel).setNegativeButton("Cancelar",(d,w)->cad.cancelPendingLength()).setPositiveButton(isPolyline?"Añadir tramo":"Crear línea",null).create();
         dialog.setOnCancelListener(d->cad.cancelPendingLength());
-        dialog.setOnShowListener(d->{dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{float length=Float.parseFloat(input.getText().toString().trim().replace(',','.'));if(cad.commitLength(length))dialog.dismiss();else input.setError("Ingresa una longitud mayor que cero");}catch(Exception e){input.setError("Escribe una cantidad válida, por ejemplo 2");}});});
+        dialog.setOnShowListener(d->{dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{String raw=input.getText().toString().trim().replace(',','.').replace(" ","");if(raw.isEmpty())throw new NumberFormatException();float length=Float.parseFloat(raw);if(cad.commitLength(length))dialog.dismiss();else input.setError("Ingresa una longitud mayor que cero");}catch(Exception e){input.setError("Escribe una cantidad válida, por ejemplo 2");}});});
         dialog.show();input.requestFocus();
     }
     private void toolAction(String tool){
@@ -101,10 +101,20 @@ public class MainActivity extends Activity {
         EditText polarStep=new EditText(this);polarStep.setSingleLine(true);polarStep.setInputType(8194);polarStep.setHint("Incremento polar en grados");polarStep.setText(String.valueOf(cad.getPolarStep()));panel.addView(polarStep);
         EditText snapRadius=new EditText(this);snapRadius.setSingleLine(true);snapRadius.setInputType(8194);snapRadius.setHint("Radio de referencia en píxeles");snapRadius.setText(String.valueOf(cad.getSnapRadius()));panel.addView(snapRadius);
         Spinner units=new Spinner(this);String[] unitOptions={"Metros (m)","Centímetros (cm)","Milímetros (mm)"};units.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,unitOptions));units.setSelection(cad.getUnits().equals("cm")?1:cad.getUnits().equals("mm")?2:0);panel.addView(units);
+        Spinner precision=new Spinner(this);String[] precisionOptions={"2 decimales","3 decimales"};precision.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,precisionOptions));precision.setSelection(cad.getDecimalPrecision()==2?0:1);panel.addView(precision);
+        TextView osTitle=new TextView(this);osTitle.setText("REFERENCIAS A OBJETOS · OSNAP");osTitle.setTextColor(0xfff3c83e);osTitle.setPadding(0,14,0,5);panel.addView(osTitle);
+        CheckBox osEnd=new CheckBox(this);osEnd.setText("Punto final (Endpoint)");osEnd.setChecked(cad.isOsEnd());panel.addView(osEnd);
+        CheckBox osMid=new CheckBox(this);osMid.setText("Punto medio (Midpoint)");osMid.setChecked(cad.isOsMid());panel.addView(osMid);
+        CheckBox osCenter=new CheckBox(this);osCenter.setText("Centro (Center)");osCenter.setChecked(cad.isOsCenter());panel.addView(osCenter);
+        CheckBox osQuadrant=new CheckBox(this);osQuadrant.setText("Cuadrante (Quadrant)");osQuadrant.setChecked(cad.isOsQuadrant());panel.addView(osQuadrant);
+        CheckBox osPerp=new CheckBox(this);osPerp.setText("Perpendicular");osPerp.setChecked(cad.isOsPerpendicular());panel.addView(osPerp);
+        CheckBox osTangent=new CheckBox(this);osTangent.setText("Tangente (Tangent)");osTangent.setChecked(cad.isOsTangent());panel.addView(osTangent);
+        CheckBox osNearest=new CheckBox(this);osNearest.setText("Más cercano (Nearest)");osNearest.setChecked(cad.isOsNearest());panel.addView(osNearest);
+        CheckBox osParallel=new CheckBox(this);osParallel.setText("Paralelo (Parallel tracking)");osParallel.setChecked(cad.isOsParallel());panel.addView(osParallel);
         new AlertDialog.Builder(this).setTitle("Configuración de pantalla · HP").setView(panel).setNegativeButton("Cancelar",null).setPositiveButton("Aplicar",(d,w)->{
             cad.setGridEnabled(g.isChecked());cad.setOrthoEnabled(o.isChecked());cad.setPolarEnabled(p.isChecked());cad.setGridSnapEnabled(gs.isChecked());cad.setSnapEnabled(s.isChecked());cad.setCrosshairEnabled(x.isChecked());
             cad.setGridStep(readNumber(gridStep,cad.getGridStep()));cad.setPolarStep(readNumber(polarStep,cad.getPolarStep()));cad.setSnapRadius(readNumber(snapRadius,cad.getSnapRadius()));
-            cad.setUnits(units.getSelectedItemPosition()==1?"cm":units.getSelectedItemPosition()==2?"mm":"m");refreshOrthoToggle();status.setText("Configuración de dibujo aplicada");
+            cad.setUnits(units.getSelectedItemPosition()==1?"cm":units.getSelectedItemPosition()==2?"mm":"m");cad.setDecimalPrecision(precision.getSelectedItemPosition()==0?2:3);cad.setOsnapModes(osEnd.isChecked(),osMid.isChecked(),osCenter.isChecked(),osQuadrant.isChecked(),osPerp.isChecked(),osTangent.isChecked(),osNearest.isChecked(),osParallel.isChecked());refreshOrthoToggle();status.setText("Configuración de dibujo y referencias OSNAP aplicada");
         }).show();
     }
     private float readNumber(EditText field,float fallback){try{return Float.parseFloat(field.getText().toString().trim());}catch(Exception e){return fallback;}}
