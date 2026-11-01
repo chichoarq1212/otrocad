@@ -103,7 +103,7 @@ function showDraftSettings(){
  };
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
 }
-function updatePrompt(){promptEl.textContent=(start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase())}
+function updatePrompt(){promptEl.textContent=tool==='select'?'SELECCIÓN · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
 function render(){
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':'#101820';ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
  objects.forEach((s,i)=>{if(!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
