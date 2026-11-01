@@ -46,3 +46,9 @@ El APK se genera en `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Licencia
 Por definir antes de la distribución pública del producto.
+
+
+## Descarga Android
+
+- [Descargar OtroCAD Android 0.4.1 (APK)](https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.4.1/OtroCAD-Android-0.4.1.apk)
+- [Ver notas de la versión](https://github.com/chichoarq1212/otrocad/releases/tag/android-native-0.4.1)
