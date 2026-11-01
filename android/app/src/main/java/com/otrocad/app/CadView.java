@@ -23,7 +23,7 @@ public class CadView extends View {
     private int drawColor=Color.rgb(220,232,245), selected=-1;
     private float weight=.25f, zoom=36f, panX=0, panY=0, offsetDistance=1f,gridStep=10f,polarStep=15f,snapRadius=18f;
     private String units="m";
-    private boolean grid=true, ortho=false, polar=false, snap=true, crosshair=true;
+    private boolean grid=true, gridSnap=false, ortho=false, polar=false, snap=true, crosshair=true;
     private PointF anchor=null,cursor=new PointF(0,0),panLast=null,moveBase=null;
     private boolean panning=false,pinching=false;
     private float pinchStart=0,pinchZoom=36f;
@@ -41,11 +41,13 @@ public class CadView extends View {
     public void toggleOrtho(){ortho=!ortho;invalidate();}
     public void togglePolar(){polar=!polar;invalidate();}
     public void toggleSnap(){snap=!snap;invalidate();}
+    public void toggleGridSnap(){gridSnap=!gridSnap;invalidate();}
     public void toggleCrosshair(){crosshair=!crosshair;invalidate();}
     public boolean isGridEnabled(){return grid;}
     public boolean isOrthoEnabled(){return ortho;}
     public boolean isPolarEnabled(){return polar;}
     public boolean isSnapEnabled(){return snap;}
+    public boolean isGridSnapEnabled(){return gridSnap;}
     public boolean isCrosshairEnabled(){return crosshair;}
     public float getGridStep(){return gridStep;}
     public float getPolarStep(){return polarStep;}
@@ -55,6 +57,7 @@ public class CadView extends View {
     public void setOrthoEnabled(boolean v){ortho=v;invalidate();}
     public void setPolarEnabled(boolean v){polar=v;invalidate();}
     public void setSnapEnabled(boolean v){snap=v;invalidate();}
+    public void setGridSnapEnabled(boolean v){gridSnap=v;invalidate();}
     public void setCrosshairEnabled(boolean v){crosshair=v;invalidate();}
     public void setGridStep(float v){if(Float.isFinite(v)&&v>0)gridStep=Math.max(.001f,Math.min(100000f,v));invalidate();}
     public void setPolarStep(float v){if(Float.isFinite(v)&&v>=1&&v<=90)polarStep=v;invalidate();}
@@ -70,12 +73,13 @@ public class CadView extends View {
     private PointF screen(PointF p){return new PointF(getWidth()/2f+panX+p.x*zoom,getHeight()/2f+panY-p.y*zoom);}
     private static float dist(PointF a,PointF b){return (float)Math.hypot(b.x-a.x,b.y-a.y);}
     private PointF snap(PointF p){
-        if(!snap)return p;PointF best=null;float limit=snapRadius/zoom;
-        for(Entity e:entities){ArrayList<PointF> ps=e.pts;if(ps.size()>0){for(PointF q:ps){float d=dist(p,q);if(d<limit){limit=d;best=q;}}}
+        PointF q=new PointF(p.x,p.y);if(gridSnap){q.x=Math.round(q.x/gridStep)*gridStep;q.y=Math.round(q.y/gridStep)*gridStep;}
+        if(!snap)return q;PointF best=null;float limit=snapRadius/zoom;
+        for(Entity e:entities){ArrayList<PointF> ps=e.pts;if(ps.size()>0){for(PointF q:ps){float d=dist(q,q);if(d<limit){limit=d;best=q;}}}
             if(ps.size()>=2){PointF a=ps.get(0),b=ps.get(1);PointF mid=new PointF((a.x+b.x)/2,(a.y+b.y)/2);float d=dist(p,mid);if(d<limit){limit=d;best=mid;}}
             if("CIRCLE".equals(e.type)&&ps.size()>0){float d=dist(p,ps.get(0));if(d<limit){limit=d;best=ps.get(0);}}
         }
-        return best==null?p:new PointF(best.x,best.y);
+        return best==null?q:new PointF(best.x,best.y);
     }
     private PointF constrain(PointF p){
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
@@ -225,7 +229,7 @@ public class CadView extends View {
     public void setWeight(float w){weight=w;}
     public void runCommand(String raw){
         String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
-        if(u.equals("F7")||u.equals("GRID")){toggleGrid();return;}if(u.equals("F8")||u.equals("ORTHO")){toggleOrtho();return;}if(u.equals("F9")||u.equals("SNAP")){toggleSnap();return;}if(u.equals("F10")||u.equals("POLAR")){togglePolar();return;}
+        if(u.equals("F7")||u.equals("GRID")){toggleGrid();return;}if(u.equals("F8")||u.equals("ORTHO")){toggleOrtho();return;}if(u.equals("F9")||u.equals("SNAP")){toggleGridSnap();return;}if(u.equals("F3")||u.equals("OSNAP")){toggleSnap();return;}if(u.equals("F10")||u.equals("POLAR")){togglePolar();return;}
         String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
         String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE").contains(t)){setTool(t);return;}
         if(c.equals("UNDO")||c.equals("U")){undo();return;}if(c.equals("REDO")){redo();return;}if(c.equals("DELETE")){deleteSelected();return;}
