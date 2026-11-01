@@ -11,6 +11,7 @@ Esta rama reemplaza la envoltura WebView por una vista de dibujo Android basada 
 - Abrir/guardar proyectos JSON, importar/exportar DXF y exportar PDF.
 - Apertura de archivos compartidos desde el selector de archivos Android cuando el proveedor entrega un tipo compatible.
 - Trabajo local sin conexión; el dibujo no depende del editor web.
+- Autoguardado del proyecto en el almacenamiento privado del dispositivo y recuperación al volver a abrir la aplicación.
 
 ## Limitaciones conocidas de esta alfa
 - No es todavía un sustituto completo de AutoCAD ni de Civil 3D.
