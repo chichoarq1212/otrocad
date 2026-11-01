@@ -37,6 +37,34 @@
  #groups{height:60px}
  #workspace{height:calc(100dvh - 44px - 92px - 62px)}
 }
+
+/* ESQUECHAT-inspired light CAD chrome; drawing model-space stays dark for legibility */
+:root{--bg:#eaf1ff;--panel:#f7faff;--panel2:#e7efff;--line:#c8d8f2;--text:#173665;--muted:#597197;--blue:#185BE8;--yellow:#FFCF23;--canvas:#101820}
+html,body{background:var(--bg);color:var(--text)}
+header{background:#185BE8;border-bottom:2px solid #ffcf23;color:#fff}
+#brand .o,#brand .cad{color:#fff}#brand .brandmark{border-radius:7px}
+#filebar button{background:#ffffff1c;color:#fff;border:1px solid #ffffff44}
+#filebar button:hover{background:#ffffff30;border-color:#ffcf23}
+#ribbon{background:#f7faff;border-bottom:1px solid #c7d7f2}
+#tabs{border-bottom:1px solid #d6e2f5}
+#tabs button{color:#35527d}#tabs button.active{background:#185BE8;color:#fff}
+#groups{background:#f7faff}.toolgroup{border-right-color:#d3e0f4}
+.toolgroup button{background:#fff;color:#173665;border-color:#d3def0}
+.toolgroup button:hover{background:#edf3ff;border-color:#185BE8}
+.toolgroup button .ico{color:#185BE8}.toolgroup button.active{background:#FFCF23;color:#173665;border-color:#dba900}
+.toolgroup select,.toolgroup input[type=color]{background:#fff;color:#173665;border-color:#b9cbe7}
+#workspace{background:#eaf1ff}
+#stage{background:#101820;border-left:1px solid #bfd0ed;border-right:1px solid #bfd0ed}
+#commandbar{background:#f6f9ff;border-top:1px solid #c8d8f2;color:#173665}
+#commandbar strong{color:#185BE8}#cmd{background:#fff;color:#173665;border-color:#b9cbe7}
+#statusbar{background:#e7efff;border-top:1px solid #c8d8f2}
+#statusbar button{color:#214b86}#statusbar button.active{background:#FFCF23;color:#173665}
+#status{color:#47648e}
+#properties{background:#f7faff;border-color:#c8d8f2;color:#173665}
+#properties h3{color:#185BE8}#properties input,#properties select{background:#fff;color:#173665;border-color:#c8d8f2}
+#dynamic{background:#16345df0;border-color:#4c83d5;color:#fff}#dynamic label{color:#fff}
+#crossinfo{background:#17365ddc;color:#fff}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #185BE8;outline-offset:2px}
 </style></head><body>
 <header><span id="brand"><svg class="brandmark" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="104" fill="#185BE8"/><circle cx="256" cy="256" r="158" fill="none" stroke="#FFFFFF" stroke-width="42" stroke-dasharray="720 275" stroke-linecap="round" transform="rotate(48 256 256)"/><path d="M256 98a158 158 0 0 1 158 158" fill="none" stroke="#FFCF23" stroke-width="42" stroke-linecap="round"/><path d="M256 177v158M177 256h158" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/><circle cx="256" cy="256" r="22" fill="#FFCF23"/></svg><span><span class="o">O</span><span class="cad">troCAD</span></span></span><div id="filebar"><button onclick="location.href='../index.html'">Inicio</button><button id="undo">↶ Deshacer</button><button id="redo">↷ Rehacer</button><button id="save">Guardar</button><button id="open">Abrir</button><button id="project">Proyecto</button><button id="export">SVG</button><button id="dxf">DXF</button><button id="pdf">PDF</button><button id="erase">Eliminar</button><button id="propertiesBtn">Propiedades</button></div></header>
 <section id="ribbon"><nav id="tabs"><button class="active" data-tab="draw">DIBUJO</button><button data-tab="modify">MODIFICAR</button><button data-tab="annotate">ANOTAR</button><button data-tab="layers">CAPAS</button><button data-tab="view">VISTA</button><button data-tab="settings">CONFIGURACIÓN</button></nav><div id="groups">
