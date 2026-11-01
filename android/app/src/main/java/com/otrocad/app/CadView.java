@@ -141,7 +141,7 @@ public class CadView extends View {
     public JSONObject toJson() throws JSONException {
         JSONObject root=new JSONObject();root.put("version",3);JSONArray shapes=new JSONArray();
         for(Entity e:entities){JSONObject o=new JSONObject();o.put("type",e.type.toLowerCase(Locale.ROOT));o.put("layer",e.layer);o.put("color",String.format(Locale.US,"#%06X",0xffffff&e.color));o.put("lineweight",e.weight);o.put("linetype",e.linetype);
-            if(e.pts.size()>0){if(e.pts.size()==1)o.put("a",pointJson(e.pts.get(0)));else if(e.type.equals("LINE")||e.type.equals("RECT")||e.type.equals("CIRCLE")||e.type.equals("DIM")||e.type.equals("HATCH")||e.type.equals("ELLIPSE")||e.type.equals("LEADER")){o.put("a",pointJson(e.pts.get(0)));o.put("b",pointJson(e.pts.get(1));}else{JSONArray a=new JSONArray();for(PointF p:e.pts)a.put(pointJson(p));o.put("pts",a);}}
+            if(e.pts.size()>0){if(e.pts.size()==1)o.put("a",pointJson(e.pts.get(0)));else if(e.type.equals("LINE")||e.type.equals("RECT")||e.type.equals("CIRCLE")||e.type.equals("DIM")||e.type.equals("HATCH")||e.type.equals("ELLIPSE")||e.type.equals("LEADER")){o.put("a",pointJson(e.pts.get(0)));o.put("b",pointJson(e.pts.get(1)));}else{JSONArray a=new JSONArray();for(PointF p:e.pts)a.put(pointJson(p));o.put("pts",a);}}
             if(e.text!=null)o.put("text",e.text);o.put("textHeight",e.textHeight);shapes.put(o);
         }root.put("shapes",shapes);return root;
     }
@@ -185,6 +185,7 @@ public class CadView extends View {
         }return b.append("0\nENDSEC\n0\nEOF\n").toString();
     }
     public void setLayer(String s){layer=s;}
+    public void setOffsetDistance(float d){if(Float.isFinite(d)&&d>0&&d<1000000)offsetDistance=d;}
     public void setDrawColor(int c){drawColor=c;}
     public void setWeight(float w){weight=w;}
     public void runCommand(String raw){
