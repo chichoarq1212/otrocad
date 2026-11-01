@@ -25,21 +25,21 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(Color.rgb(16,27,46));
-        getWindow().setNavigationBarColor(Color.rgb(16,27,46));
+        getWindow().setStatusBarColor(Color.rgb(24,91,232));
+        getWindow().setNavigationBarColor(Color.rgb(24,91,232));
         buildUi();
         cad.restoreLocal();
         if(getIntent()!=null&&getIntent().getData()!=null)openUri(getIntent().getData());
     }
     private void buildUi(){
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.rgb(16,27,46));
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.rgb(24,91,232));
         LinearLayout brandRow=new LinearLayout(this);brandRow.setOrientation(LinearLayout.HORIZONTAL);brandRow.setGravity(Gravity.CENTER_VERTICAL);brandRow.setPadding(10,5,8,5);ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.ic_otrocad);logo.setContentDescription("Isotipo original de OtroCAD");logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brandRow.addView(logo,new LinearLayout.LayoutParams(40,40));TextView title=new TextView(this);title.setText("otroCAD  ·  CAD NATIVO OFFLINE");title.setTextColor(Color.WHITE);title.setTextSize(16);title.setTypeface(null,1);title.setPadding(9,0,4,0);brandRow.addView(title,new LinearLayout.LayoutParams(-1,-2));root.addView(brandRow,new LinearLayout.LayoutParams(-1,-2));
         status=new TextView(this);status.setText("Listo · Dibujo y archivos procesados localmente");status.setTextColor(0xffdce8f5);status.setTextSize(11);status.setPadding(10,4,10,7);
         cad=new CadView(this);cad.setStatusListener(s->status.setText(s));cad.setLengthRequestListener((suggested,unit,isPoly,ortho)->showLengthDialog(suggested,unit,isPoly,ortho));
         root.addView(toolbar(new String[][]{{"SELEC","SELECT"},{"LINE","LINE"},{"PLINE","POLY"},{"FIN PL","FINISH_POLY"},{"RECT","RECT"},{"CIRCLE","CIRCLE"},{"ARC","ARC"},{"ELIPSE","ELLIPSE"},{"COTA","DIM"},{"HATCH","HATCH"},{"TEXTO","TEXT"},{"DIRECTRIZ","LEADER"}}),new LinearLayout.LayoutParams(-1,52));
         root.addView(toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"OFFSET","OFFSET"},{"BORRAR","ERASE"},{"PAN","PAN"},{"DESHACER","UNDO"},{"REHACER","REDO"},{"ABRIR","OPEN"},{"GUARDAR","SAVE"},{"DXF","DXF"},{"PDF","PDF"}}),new LinearLayout.LayoutParams(-1,52));
         LinearLayout settings=new LinearLayout(this);settings.setGravity(Gravity.CENTER_VERTICAL);settings.setPadding(6,3,6,3);
-        addToggle(settings,"GRID",()->cad.toggleGrid());addOrthoToggle(settings);addToggle(settings,"POLAR",()->cad.togglePolar());addToggle(settings,"SNAP",()->cad.toggleGridSnap());addToggle(settings,"OSNAP",()->cad.toggleSnap());addToggle(settings,"CRUZ",()->cad.toggleCrosshair());Button multi=smallButton(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setOnClickListener(v->{cad.toggleMultiSelect();multi.setText(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setBackgroundTintList(android.content.res.ColorStateList.valueOf(cad.isMultiSelectEnabled()?0xffb38b20:0xff243448));});settings.addView(multi,new LinearLayout.LayoutParams(0,-1,1));Button hp=smallButton("HP");hp.setOnClickListener(v->showSettings());settings.addView(hp,new LinearLayout.LayoutParams(0,-1,1));
+        addToggle(settings,"GRID",()->cad.toggleGrid());addOrthoToggle(settings);addToggle(settings,"POLAR",()->cad.togglePolar());addToggle(settings,"SNAP",()->cad.toggleGridSnap());addToggle(settings,"OSNAP",()->cad.toggleSnap());addToggle(settings,"CRUZ",()->cad.toggleCrosshair());Button multi=smallButton(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setOnClickListener(v->{cad.toggleMultiSelect();multi.setText(cad.isMultiSelectEnabled()?"MULTI ON":"MULTI OFF");multi.setBackgroundTintList(android.content.res.ColorStateList.valueOf(cad.isMultiSelectEnabled()?0xffffcf23:0xffe7efff));});settings.addView(multi,new LinearLayout.LayoutParams(0,-1,1));Button hp=smallButton("HP");hp.setOnClickListener(v->showSettings());settings.addView(hp,new LinearLayout.LayoutParams(0,-1,1));
         root.addView(settings,new LinearLayout.LayoutParams(-1,42));
         LinearLayout options=new LinearLayout(this);options.setGravity(Gravity.CENTER_VERTICAL);options.setPadding(8,2,8,2);
         Spinner layers=new Spinner(this);String[] layerNames={"General","Muros","Cotas","Detalles","Topografía","Vialidad"};ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,layerNames);layers.setAdapter(adapter);layers.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){cad.setLayer(layerNames[pos]);}});
@@ -49,7 +49,7 @@ public class MainActivity extends Activity {
         options.addView(weights,new LinearLayout.LayoutParams(0,42,1));root.addView(options,new LinearLayout.LayoutParams(-1,46));
         root.addView(cad,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout cmdrow=new LinearLayout(this);cmdrow.setPadding(7,5,7,5);cmdrow.setGravity(Gravity.CENTER_VERTICAL);
-        command=new EditText(this);command.setSingleLine(true);command.setTextColor(Color.WHITE);command.setHintTextColor(0xff9fb0c3);command.setHint("Comando: LINE, PLINE, OFFSET, MOVE, @10,0");command.setTextSize(13);command.setPadding(10,5,10,5);command.setBackgroundColor(0xff243448);cmdrow.addView(command,new LinearLayout.LayoutParams(0,44,1));
+        command=new EditText(this);command.setSingleLine(true);command.setTextColor(Color.WHITE);command.setHintTextColor(0xff9fb0c3);command.setHint("Comando: LINE, PLINE, OFFSET, MOVE, @10,0");command.setTextSize(13);command.setPadding(10,5,10,5);command.setBackgroundColor(0xffe7efff);cmdrow.addView(command,new LinearLayout.LayoutParams(0,44,1));
         Button run=smallButton("EJECUTAR");run.setOnClickListener(v->runCommand());cmdrow.addView(run);command.setOnEditorActionListener((v,id,event)->{runCommand();return true;});root.addView(cmdrow,new LinearLayout.LayoutParams(-1,52));
         root.addView(status,new LinearLayout.LayoutParams(-1,-2));
         setContentView(root);
@@ -59,8 +59,8 @@ public class MainActivity extends Activity {
         for(String[] item:items){Button b=smallButton(item[0]);b.setOnClickListener(v->toolAction(item[1]));row.addView(b,new LinearLayout.LayoutParams(-2,-1));}
         scroll.addView(row);return scroll;
     }
-    private Button smallButton(String label){Button b=new Button(this);b.setText(label);b.setTextSize(10);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setPadding(8,3,8,3);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff243448));return b;}
-    private void addToggle(LinearLayout row,String label,Runnable action){Button b=smallButton(label);b.setOnClickListener(v->{action.run();b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffb38b20));});row.addView(b,new LinearLayout.LayoutParams(0,-1,1));}
+    private Button smallButton(String label){Button b=new Button(this);b.setText(label);b.setTextSize(10);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setPadding(8,3,8,3);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffe7efff));return b;}
+    private void addToggle(LinearLayout row,String label,Runnable action){Button b=smallButton(label);b.setOnClickListener(v->{action.run();b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xffffcf23));});row.addView(b,new LinearLayout.LayoutParams(0,-1,1));}
     private void addOrthoToggle(LinearLayout row){
         orthoButton=smallButton(cad.isOrthoEnabled()?"ORTHO ON":"ORTHO OFF");
         orthoButton.setOnClickListener(v->{cad.toggleOrtho();refreshOrthoToggle();});
@@ -70,7 +70,7 @@ public class MainActivity extends Activity {
         if(orthoButton==null)return;
         boolean on=cad.isOrthoEnabled();
         orthoButton.setText(on?"ORTHO ON":"ORTHO OFF");
-        orthoButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(on?0xffb38b20:0xff243448));
+        orthoButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(on?0xffffcf23:0xffe7efff));
     }
     private void showLengthDialog(float suggested,String unit,boolean isPolyline,boolean ortho){
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(20,8,20,4);
@@ -102,7 +102,7 @@ public class MainActivity extends Activity {
         EditText snapRadius=new EditText(this);snapRadius.setSingleLine(true);snapRadius.setInputType(8194);snapRadius.setHint("Radio de referencia en píxeles");snapRadius.setText(String.valueOf(cad.getSnapRadius()));panel.addView(snapRadius);
         Spinner units=new Spinner(this);String[] unitOptions={"Metros (m)","Centímetros (cm)","Milímetros (mm)"};units.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,unitOptions));units.setSelection(cad.getUnits().equals("cm")?1:cad.getUnits().equals("mm")?2:0);panel.addView(units);
         Spinner precision=new Spinner(this);String[] precisionOptions={"2 decimales","3 decimales"};precision.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,precisionOptions));precision.setSelection(cad.getDecimalPrecision()==2?0:1);panel.addView(precision);
-        TextView osTitle=new TextView(this);osTitle.setText("REFERENCIAS A OBJETOS · OSNAP");osTitle.setTextColor(0xfff3c83e);osTitle.setPadding(0,14,0,5);panel.addView(osTitle);
+        TextView osTitle=new TextView(this);osTitle.setText("REFERENCIAS A OBJETOS · OSNAP");osTitle.setTextColor(0xffffcf23);osTitle.setPadding(0,14,0,5);panel.addView(osTitle);
         CheckBox osEnd=new CheckBox(this);osEnd.setText("Punto final (Endpoint)");osEnd.setChecked(cad.isOsEnd());panel.addView(osEnd);
         CheckBox osMid=new CheckBox(this);osMid.setText("Punto medio (Midpoint)");osMid.setChecked(cad.isOsMid());panel.addView(osMid);
         CheckBox osCenter=new CheckBox(this);osCenter.setText("Centro (Center)");osCenter.setChecked(cad.isOsCenter());panel.addView(osCenter);
@@ -120,7 +120,7 @@ public class MainActivity extends Activity {
     private float readNumber(EditText field,float fallback){try{return Float.parseFloat(field.getText().toString().trim());}catch(Exception e){return fallback;}}
     private void chooseColor(){
         String[] names={"Blanco","Azul","Amarillo","Rojo","Verde","Magenta","Cian"};
-        int[] colors={0xffdce8f5,0xff56b7e8,0xfff3c83e,0xffff5555,0xff70d6a3,0xffc69cff,0xff55dddd};
+        int[] colors={0xffdce8f5,0xff185be8,0xffffcf23,0xffff5555,0xff70d6a3,0xffc69cff,0xff55dddd};
         new AlertDialog.Builder(this).setTitle("Color de dibujo").setItems(names,(d,w)->cad.setDrawColor(colors[w])).show();
     }
     private void runCommand(){String s=command.getText().toString().trim();if(s.equalsIgnoreCase("HP")||s.equalsIgnoreCase("DSETTINGS")||s.equalsIgnoreCase("SETTINGS"))showSettings();else cad.runCommand(s);command.setText("");}
