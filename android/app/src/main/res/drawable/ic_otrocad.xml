@@ -1,9 +1,7 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="512"
-    android:viewportHeight="512">
-    <path android:fillColor="#101B2E" android:pathData="M92,0H420A92,92 0,0 1,512 92V420A92,92 0,0 1,420 512H92A92,92 0,0 1,0 420V92A92,92 0,0 1,92 0Z"/>
-    <path android:fillColor="#00000000" android:strokeColor="#F3C83E" android:strokeWidth="24" android:strokeLineJoin="round" android:pathData="M110,365V147h90l112,109 -112,109z"/>
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="24" android:strokeLineJoin="round" android:pathData="M255,147h140v218H255"/>
-</vector>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<rect width="512" height="512" rx="104" fill="#005F9E"/>
+<circle cx="256" cy="256" r="158" fill="none" stroke="#FFFFFF" stroke-width="42" stroke-dasharray="720 275" stroke-linecap="round" transform="rotate(48 256 256)"/>
+<path d="M256 98a158 158 0 0 1 158 158" fill="none" stroke="#F3C83E" stroke-width="42" stroke-linecap="round"/>
+<path d="M256 177v158M177 256h158" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" opacity=".95"/>
+<circle cx="256" cy="256" r="22" fill="#F3C83E"/>
+</svg>
