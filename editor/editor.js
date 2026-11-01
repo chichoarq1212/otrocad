@@ -1,10 +1,14 @@
 (()=>{
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
-let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
+let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,selectedSet=new Set(),modifyTargets=[],poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
 let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,offsetDistancePreset=false,printing=false,units='m',gridStep=1,polarStep=15,snapRadius=12,hiddenLayers=new Set(),lockedLayers=new Set();
 const colors={General:'#dce8f5',Muros:'#56b7e8',Cotas:'#f3c83e',Detalles:'#c69cff',Topografía:'#70d6a3',Vialidad:'#ff9b6b'};
 const clone=x=>JSON.parse(JSON.stringify(x));
 function checkpoint(){undo.push(clone(objects));if(undo.length>100)undo.shift();redo=[]}
+function selectedItems(){const out=new Set(selectedSet);if(selected>=0)out.add(selected);return [...out].filter(i=>i>=0&&i<objects.length).sort((a,b)=>a-b)}
+function applySelection(indices,additive=false){const next=additive?new Set(selectedItems()):new Set();for(const i of indices)if(i>=0&&i<objects.length)next.add(i);selectedSet=next;selected=next.size?[...next].sort((a,b)=>a-b).at(-1):-1}
+function clearSelection(){selected=-1;selectedSet.clear()}
+function deleteSelection(){const ids=selectedItems();if(!ids.length)return;checkpoint();ids.sort((a,b)=>b-a).forEach(i=>objects.splice(i,1));clearSelection();save();render();status.textContent=ids.length===1?'Objeto eliminado':ids.length+' objetos eliminados'}
 function save(){localStorage.setItem('otrocad-drawing',JSON.stringify(objects))}
 function world(p){return{x:(p.x-canvas.clientWidth/2-offset.x)/zoom,y:(canvas.clientHeight/2+offset.y-p.y)/zoom}}
 function screen(p){return{x:canvas.clientWidth/2+offset.x+p.x*zoom,y:canvas.clientHeight/2+offset.y-p.y*zoom}}
@@ -102,7 +106,8 @@ function showDraftSettings(){
 function updatePrompt(){promptEl.textContent=(start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase())}
 function render(){
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':'#101820';ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
- objects.forEach((s,i)=>{if(!hiddenLayers.has(s.layer))drawEntity(s,i===selected)});
+ objects.forEach((s,i)=>{if(!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
+ if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
  if(temp)drawEntity(temp,false,true);
  if(tool==='poly'&&poly.length)drawEntity({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)},false);
  if(!printing&&start&&crossOn){const p=screen(start);ctx.strokeStyle='#f3c83e';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(p.x-8,p.y);ctx.lineTo(p.x+8,p.y);ctx.moveTo(p.x,p.y-8);ctx.lineTo(p.x,p.y+8);ctx.stroke()}
@@ -111,7 +116,7 @@ function render(){
  updateDynamic();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
-function setTool(t){tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;selected=-1;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));updatePrompt();render()}
+function setTool(t){tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));updatePrompt();render()}
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;let d=1e9;
@@ -125,7 +130,8 @@ function selectAt(q){
 }
 function pointLineDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
 function showProperties(){
- const box=$('#properties'),content=$('#propContent');
+ const box=$('#properties'),content=$('#propContent'),ids=selectedItems();
+ if(ids.length>1){box.classList.add('open');content.textContent=ids.length+' objetos seleccionados. Puedes moverlos, copiarlos o eliminarlos como conjunto.';return}
  if(selected<0){content.textContent='Selecciona una entidad para editar sus propiedades.';return}
  const s=objects[selected];box.classList.add('open');content.innerHTML='';
  const addLabel=(txt,node)=>{const l=document.createElement('label');l.textContent=txt;content.append(l,node)};
@@ -197,14 +203,34 @@ function handleTap(p){
   const idx=modifyTarget;trimOrExtend(idx,q,tool);return;
  }
  if(['move','copy','rotate','mirror','scale'].includes(tool)){
-  if(modifyTarget<0){modifyTarget=selectAt(q);selected=modifyTarget;if(modifyTarget<0){status.textContent='Selecciona el objeto';return}moveBase=null;status.textContent='Indica punto base o inicio del eje';return}
+  if(modifyTargets.length===0){
+   modifyTargets=selectedItems();
+   if(!modifyTargets.length){const hit=selectAt(q);if(hit>=0){applySelection([hit]);modifyTargets=[hit]}}
+   if(!modifyTargets.length){status.textContent='Selecciona uno o varios objetos';return}
+   moveBase=null;status.textContent=modifyTargets.length+' objeto(s) seleccionado(s). Indica punto base';return
+  }
   if(!moveBase){moveBase=q;status.textContent=tool==='mirror'?'Indica el segundo punto del eje':tool==='rotate'?'Indica el ángulo de giro':tool==='scale'?'Indica el factor de escala con la distancia':'Indica punto destino';return}
-  const dx=q.x-moveBase.x,dy=q.y-moveBase.y,src=objects[modifyTarget];checkpoint();
-  if(tool==='move'||tool==='copy'){if(tool==='copy'){const cp=clone(src);translate(cp,dx,dy);objects.push(cp);selected=objects.length-1}else{translate(src,dx,dy);selected=modifyTarget}}
-  else if(tool==='rotate'){const ang=Math.atan2(dy,dx),co=Math.cos(ang),si=Math.sin(ang);const rotate=p=>{const x=p.x-moveBase.x,y=p.y-moveBase.y;return{x:moveBase.x+x*co-y*si,y:moveBase.y+x*si+y*co}};if(src.a)src.a=rotate(src.a);if(src.b)src.b=rotate(src.b);if(src.pts)src.pts=src.pts.map(rotate);selected=modifyTarget}
-  else if(tool==='mirror'){const len=Math.hypot(dx,dy);if(len<1e-9){status.textContent='Eje de simetría demasiado corto';return}const ux=dx/len,uy=dy/len,mirror=p=>{const x=p.x-moveBase.x,y=p.y-moveBase.y,t=x*ux+y*uy,px=moveBase.x+t*ux,py=moveBase.y+t*uy;return{x:2*px-p.x,y:2*py-p.y}};if(src.a)src.a=mirror(src.a);if(src.b)src.b=mirror(src.b);if(src.pts)src.pts=src.pts.map(mirror);selected=modifyTarget}
-  else if(tool==='scale'){const factor=Math.hypot(dx,dy);if(factor<1e-6){status.textContent='Factor de escala no válido';return}const scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);selected=modifyTarget}
-  save();modifyTarget=-1;moveBase=null;render();status.textContent=tool.toUpperCase()+' aplicado';return;
+  const dx=q.x-moveBase.x,dy=q.y-moveBase.y,targets=modifyTargets.filter(i=>i>=0&&i<objects.length);
+  if(tool==='mirror'&&Math.hypot(dx,dy)<1e-9){status.textContent='Eje de simetría demasiado corto';return}
+  if(tool==='scale'&&Math.hypot(dx,dy)<1e-6){status.textContent='Factor de escala no válido';return}
+  checkpoint();const created=[];
+  for(const idx of targets){const src=objects[idx];
+   if(tool==='move'||tool==='copy'){
+    if(tool==='copy'){const cp=clone(src);translate(cp,dx,dy);objects.push(cp);created.push(objects.length-1)}
+    else translate(src,dx,dy);
+   }else if(tool==='rotate'){
+    const ang=Math.atan2(dy,dx),co=Math.cos(ang),si=Math.sin(ang),rotate=p=>{const x=p.x-moveBase.x,y=p.y-moveBase.y;return{x:moveBase.x+x*co-y*si,y:moveBase.y+x*si+y*co}};
+    if(src.a)src.a=rotate(src.a);if(src.b)src.b=rotate(src.b);if(src.pts)src.pts=src.pts.map(rotate);
+   }else if(tool==='mirror'){
+    const len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len,mirror=p=>{const x=p.x-moveBase.x,y=p.y-moveBase.y,t=x*ux+y*uy,px=moveBase.x+t*ux,py=moveBase.y+t*uy;return{x:2*px-p.x,y:2*py-p.y}};
+    if(src.a)src.a=mirror(src.a);if(src.b)src.b=mirror(src.b);if(src.pts)src.pts=src.pts.map(mirror);
+   }else if(tool==='scale'){
+    const factor=Math.hypot(dx,dy),scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});
+    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);
+   }
+  }
+  if(tool==='copy')applySelection(created);else applySelection(targets);
+  save();modifyTarget=-1;modifyTargets=[];moveBase=null;render();status.textContent=tool.toUpperCase()+' aplicado a '+targets.length+' objeto(s)';return;
  }
  if(!start){start=q;temp={type:tool,a:clone(q),b:clone(q),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';updatePrompt();render();return}
  let end=pointFromInputs();if(!end)end=q;else if(document.activeElement!==$('#dynLen')&&document.activeElement!==$('#dynAngle'))end=q;
@@ -216,10 +242,43 @@ function entitySegments(s){
  const pts=[];
  if(s.type==='line'||s.type==='dim'||s.type==='leader'){if(s.a&&s.b)pts.push([s.a,s.b]);return pts}
  if(s.type==='rect'||s.type==='hatch'){const a=s.a,b=s.b;return [[a,{x:b.x,y:a.y}],[{x:b.x,y:a.y},b],[b,{x:a.x,y:b.y}],[{x:a.x,y:b.y},a]]}
- if(s.type==='circle'){const r=distance(s.a,s.b);let prev=null;for(let i=0;i<=64;i++){const t=i*Math.PI*2/64,p={x:s.a.x+r*Math.cos(t),y:s.a.y+r*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
- if(s.type==='ellipse'){let prev=null;for(let i=0;i<=48;i++){const t=i*Math.PI*2/48,p={x:s.a.x+(s.b.x-s.a.x)*Math.cos(t),y:s.a.y+(s.b.y-s.a.y)*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
+ if(s.type==='circle'){const r=distance(s.a,s.b);let prev=null;for(let i=0;i<=72;i++){const t=i*Math.PI*2/72,p={x:s.a.x+r*Math.cos(t),y:s.a.y+r*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
+ if(s.type==='ellipse'){let prev=null;for(let i=0;i<=64;i++){const t=i*Math.PI*2/64,p={x:s.a.x+(s.b.x-s.a.x)*Math.cos(t),y:s.a.y+(s.b.y-s.a.y)*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
+ if(s.type==='arc'&&s.pts?.length>=3){let prev=null;for(let i=0;i<=48;i++){const t=i/48,u=1-t,a=s.pts[0],b=s.pts[1],d=s.pts[2],p={x:u*u*a.x+2*u*t*b.x+t*t*d.x,y:u*u*a.y+2*u*t*b.y+t*t*d.y};if(prev)pts.push([prev,p]);prev=p}return pts}
  if(s.pts&&s.pts.length>1){for(let i=1;i<s.pts.length;i++)pts.push([s.pts[i-1],s.pts[i]]);if(s.type==='polygon')pts.push([s.pts[s.pts.length-1],s.pts[0]])}
  return pts
+}
+function inSelectionRect(p,r){return p.x>=r.left-1e-8&&p.x<=r.right+1e-8&&p.y>=r.bottom-1e-8&&p.y<=r.top+1e-8}
+function segmentHitsRect(a,b,r){
+ let t0=0,t1=1,dx=b.x-a.x,dy=b.y-a.y;
+ const tests=[[-dx,a.x-r.left],[dx,r.right-a.x],[-dy,a.y-r.bottom],[dy,r.top-a.y]];
+ for(const [p,q] of tests){if(Math.abs(p)<1e-12){if(q<0)return false;continue}const t=q/p;if(p<0){if(t>t1)return false;if(t>t0)t0=t}else{if(t<t0)return false;if(t<t1)t1=t}}
+ return true
+}
+function pointInPolygon(p,pts){let inside=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];if(((a.y>p.y)!==(b.y>p.y))&&(p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y||1e-12)+a.x))inside=!inside}return inside}
+function objectContainsPoint(s,p){
+ if(s.type==='circle')return distance(s.a,p)<=distance(s.a,s.b);
+ if(s.type==='ellipse'){const rx=Math.abs(s.b.x-s.a.x)||1e-12,ry=Math.abs(s.b.y-s.a.y)||1e-12;return ((p.x-s.a.x)/rx)**2+((p.y-s.a.y)/ry)**2<=1}
+ if(s.type==='rect'||s.type==='hatch')return p.x>=Math.min(s.a.x,s.b.x)&&p.x<=Math.max(s.a.x,s.b.x)&&p.y>=Math.min(s.a.y,s.b.y)&&p.y<=Math.max(s.a.y,s.b.y);
+ if(s.type==='polygon'&&s.pts?.length>2)return pointInPolygon(p,s.pts);
+ return false
+}
+function selectByWindow(rect,windowMode){
+ const hits=[];
+ for(let i=0;i<objects.length;i++){
+  const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;
+  const segs=entitySegments(s),pts=[];
+  if(segs.length){for(const [a,b] of segs)pts.push(a,b)}
+  else {if(s.a)pts.push(s.a);if(s.b)pts.push(s.b);if(s.pts)pts.push(...s.pts)}
+  if(!pts.length)continue;
+  const fully=pts.every(p=>inSelectionRect(p,rect));
+  if(windowMode){if(fully)hits.push(i);continue}
+  const vertexHit=pts.some(p=>inSelectionRect(p,rect));
+  const edgeHit=segs.some(([a,b])=>segmentHitsRect(a,b,rect));
+  const center={x:(rect.left+rect.right)/2,y:(rect.bottom+rect.top)/2};
+  if(vertexHit||edgeHit||objectContainsPoint(s,center))hits.push(i);
+ }
+ return hits
 }
 function lineIntersection(a,b,c,d,segments=true){
  const rx=b.x-a.x,ry=b.y-a.y,sx=d.x-c.x,sy=d.y-c.y,den=rx*sy-ry*sx;
@@ -248,13 +307,13 @@ function explodeAt(q){
  const parts=segments.map(([a,b])=>({type:'line',a:clone(a),b:clone(b),...style}));
  objects.splice(i,1,...parts);selected=parts.length?i+parts.length-1:-1;save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
 }
-let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null;
+let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false;
 canvas.addEventListener('pointerdown',e=>{
  if(e.button===2){e.preventDefault();return}
  canvas.setPointerCapture(e.pointerId);const p=pointer(e);pointers.set(e.pointerId,p);
- if(pointers.size===2){const v=[...pointers.values()];pinch={dist:distance(v[0],v[1]),zoom};start=null;temp=null;return}
+ if(pointers.size===2){const v=[...pointers.values()];pinch={dist:distance(v[0],v[1]),zoom};start=null;temp=null;selectionStart=null;selectionBox=null;return}
  if(tool==='pan'){drag={point:p,offset:clone(offset)};return}
- if(tool==='select'){selectionStart=p;selectionBox=null;return}
+ if(tool==='select'){selectionStart=p;selectionBox=null;selectionAdditive=!!(e.shiftKey||e.ctrlKey||e.metaKey);return}
  handleTap(p);
 });
 canvas.addEventListener('pointermove',e=>{
@@ -262,7 +321,7 @@ canvas.addEventListener('pointermove',e=>{
  if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);
  if(pointers.size===2&&pinch){const v=[...pointers.values()];zoom=Math.max(2,Math.min(500,pinch.zoom*distance(v[0],v[1])/(pinch.dist||1)));render();return}
  if(drag&&tool==='pan'){offset.x=drag.offset.x+p.x-drag.point.x;offset.y=drag.offset.y+p.y-drag.point.y;render();return}
- if(selectionStart){selectionBox={a:selectionStart,b:p};render();return}
+ if(selectionStart){if(distance(selectionStart,p)>4)selectionBox={a:selectionStart,b:p};render();return}
  if(tool==='poly'&&poly.length){const q=constrain(snapPoint(world(p)));temp={type:'line',a:clone(poly[poly.length-1]),b:q,...currentStyle($('#layer').value)};render()}
  else if(tool==='arc'&&arcPoints.length){const q=snapPoint(world(p));temp={type:'line',a:clone(arcPoints[arcPoints.length-1]),b:q,...currentStyle($('#layer').value)};render()}
  else if(start){let q=constrain(snapPoint(world(p)));temp={type:tool,a:clone(start),b:q,...currentStyle($('#layer').value)};render()}
@@ -270,8 +329,17 @@ canvas.addEventListener('pointermove',e=>{
 });
 function pointerEnd(e){
  pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;
- if(selectionStart&&!selectionBox){selected=selectAt(world(selectionStart));showProperties();selectionStart=null}
- if(selectionStart&&selectionBox){const a=world(selectionBox.a),b=world(selectionBox.b),left=Math.min(a.x,b.x),right=Math.max(a.x,b.x),bottom=Math.min(a.y,b.y),top=Math.max(a.y,b.y);selected=-1;for(let i=objects.length-1;i>=0;i--){const s=objects[i],pts=[];if(s.a)pts.push(s.a);if(s.b)pts.push(s.b);if(s.pts)pts.push(...s.pts);if(pts.some(p=>p.x>=left&&p.x<=right&&p.y>=bottom&&p.y<=top)){selected=i;break}}selectionStart=null;selectionBox=null;showProperties()}
+ if(e.type==='pointercancel'){selectionStart=null;selectionBox=null;render();return}
+ if(selectionStart){
+  if(selectionBox){
+   const a=selectionBox.a,b=selectionBox.b,wa=world(a),wb=world(b),rect={left:Math.min(wa.x,wb.x),right:Math.max(wa.x,wb.x),bottom:Math.min(wa.y,wb.y),top:Math.max(wa.y,wb.y)};
+   const windowMode=b.x>=a.x,hits=selectByWindow(rect,windowMode);applySelection(hits,selectionAdditive);status.textContent=hits.length+' objeto(s) '+(windowMode?'dentro de ventana':'cruzados por ventana');
+  }else{
+   const hit=selectAt(world(selectionStart));if(selectionAdditive){const ids=new Set(selectedItems());if(hit>=0){if(ids.has(hit))ids.delete(hit);else ids.add(hit)}applySelection([...ids])}else applySelection(hit>=0?[hit]:[]);
+   status.textContent=hit>=0?'Objeto seleccionado':(selectionAdditive?'Selección conservada':'Selección vacía');
+  }
+  selectionStart=null;selectionBox=null;showProperties();
+ }
  if(drag&&tool==='pan')drag=null;
  render();
 }
@@ -284,7 +352,8 @@ function toggle(id){const map={gridToggle:'gridOn',orthoToggle:'orthoOn',snapTog
 ['gridToggle','orthoToggle','snapToggle','polarToggle','osnapToggle','crossToggle'].forEach(id=>$('#'+id).onclick=()=>toggle(id));
 document.addEventListener('keydown',e=>{
  if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){if(e.key==='Enter'&&document.activeElement.id==='dynLen'){e.preventDefault();$('#dynAngle').focus()}else if(e.key==='Enter'&&document.activeElement.id==='dynAngle'){e.preventDefault();const q=pointFromInputs();if(q){if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)}}return}
- if(e.key==='Escape'){start=null;temp=null;poly=[];moveBase=null;modifyTarget=-1;render();return}
+ if(e.key==='Escape'){start=null;temp=null;poly=[];moveBase=null;modifyTarget=-1;modifyTargets=[];selectionStart=null;selectionBox=null;clearSelection();showProperties();render();return}
+ if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelection();showProperties();return}
  if(e.key==='F7'){e.preventDefault();toggle('gridToggle');return}if(e.key==='F8'){e.preventDefault();toggle('orthoToggle');return}if(e.key==='F9'){e.preventDefault();toggle('snapToggle');return}if(e.key==='F10'){e.preventDefault();toggle('polarToggle');return}if(e.key==='F3'){e.preventDefault();toggle('osnapToggle');return}
  if(e.key==='Enter'){if(poly.length){finishPoly();return}if(start){const q=pointFromInputs();if(q)commitEntity(q);return}}
  if(e.key===' '&&poly.length){finishPoly();return}
