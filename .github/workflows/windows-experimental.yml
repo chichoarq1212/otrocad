@@ -1,5 +1,10 @@
 name: Windows offline experimental
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/windows-experimental.yml'
   pull_request:
     paths:
       - 'desktop/**'
@@ -8,7 +13,7 @@ on:
       - '.github/workflows/windows-experimental.yml'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build-install:
     runs-on: windows-latest
@@ -43,6 +48,18 @@ jobs:
           $smoke = Start-Process $exe -ArgumentList '--smoke-test' -PassThru -Wait
           if ($smoke.ExitCode -ne 0) { throw "Prueba de apertura terminó con $($smoke.ExitCode)" }
           Get-FileHash $installer.FullName -Algorithm SHA256
+      - name: Publicar instalador experimental
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-experimental-${{ github.run_id }}-${{ github.run_attempt }}
+          target_commitish: ${{ github.sha }}
+          name: OtroCAD Windows experimental · ${{ github.run_id }}
+          prerelease: true
+          make_latest: false
+          body: |
+            Instalador experimental sin firma. La compilación instala, abre y prueba dibujo y recuperación con red bloqueada. No incluye DWG auténtico ni validación en un PC físico.
+          files: desktop/release/*-Setup.exe
       - uses: actions/upload-artifact@v4
         with:
           name: OtroCAD-Windows-experimental
