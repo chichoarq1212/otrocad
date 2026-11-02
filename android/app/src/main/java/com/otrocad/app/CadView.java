@@ -376,6 +376,17 @@ public class CadView extends View {
                 if(!Arrays.asList("LINE","POLY","POLYGON","RECT","CIRCLE","ARC").contains(type)){
                     say("Transformación no disponible para "+type+"; no se modificó el dibujo");return;
                 }
+                Entity candidate=entities.get(idx);
+                ArrayList<PointF> points=new ArrayList<>(candidate.pts);
+                if(type.equals("RECT")&&points.size()>=2){
+                    PointF p=points.get(0),r=points.get(1);points.add(new PointF(p.x,r.y));points.add(new PointF(r.x,p.y));
+                }
+                for(PointF point:points){
+                    double[] result=tool.equals("ROTATE")?NativeTransform.rotate(point.x,point.y,q.x,q.y,transformValue):NativeTransform.scale(point.x,point.y,q.x,q.y,transformValue);
+                    if(!Double.isFinite(result[0])||!Double.isFinite(result[1])||Math.abs(result[0])>Float.MAX_VALUE||Math.abs(result[1])>Float.MAX_VALUE){
+                        say("La transformación excede el rango permitido; no se modificó el dibujo");return;
+                    }
+                }
             }
             checkpoint();
             for(int idx:moveTargets){
