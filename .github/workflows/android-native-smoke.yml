@@ -1,5 +1,11 @@
 name: Android nativo experimental
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'tests/android-native-smoke.py'
+      - '.github/workflows/android-native-smoke.yml'
   pull_request:
     branches: [main]
     paths:
@@ -7,7 +13,7 @@ on:
       - '.github/workflows/android-native-smoke.yml'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   native-smoke:
     runs-on: ubuntu-latest
@@ -53,6 +59,20 @@ jobs:
             adb shell pidof com.otrocad.app.nativealpha
             python3 tests/android-native-smoke.py
             adb exec-out screencap -p > OtroCAD-nativo-emulador.png
+      - name: Publish isolated native test APK
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-nativo-experimental-${{ github.run_id }}-${{ github.run_attempt }}
+          target_commitish: ${{ github.sha }}
+          name: OtroCAD Android nativo experimental · ${{ github.run_id }}
+          prerelease: true
+          make_latest: false
+          body: |
+            APK debug experimental con motor Canvas nativo, instalado y probado en emulador sin permiso de Internet.
+            Aún no tiene paridad con la web; DXF es experimental y no escribe DWG.
+            Identificador separado para no sustituir la aplicación híbrida. Puede requerir desinstalar una versión debug previa si la firma cambia.
+          files: OtroCAD-Nativo-experimental-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: OtroCAD-nativo-experimental
