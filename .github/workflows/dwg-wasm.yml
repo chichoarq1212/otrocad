@@ -43,7 +43,7 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack --locked
       - name: Build browser WebAssembly module
-        run: wasm-pack build dwg-wasm --target web --release --no-default-features --out-dir ../editor/vendor/dwg --out-name otrocad_dwg
+        run: wasm-pack build dwg-wasm --target web --release --out-dir ../editor/vendor/dwg --out-name otrocad_dwg --no-gitignore
       - name: Verify generated module
         run: |
           test -s editor/vendor/dwg/otrocad_dwg.js
