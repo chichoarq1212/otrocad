@@ -1,13 +1,35 @@
 'use strict';
-const { app, BrowserWindow, session } = require('electron');
+const { app, BrowserWindow, session, protocol, net } = require('electron');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const smoke = process.argv.includes('--smoke-test');
+
+protocol.registerSchemesAsPrivileged([{
+  scheme: 'otrocad',
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true }
+}]);
+
 if (smoke) app.setPath('userData', path.join(app.getPath('temp'), 'otrocad-smoke-' + process.pid));
+
 app.whenReady().then(async () => {
-  // The desktop editor and all its assets are local. Refuse remote requests.
-  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
-    callback({ cancel: !details.url.startsWith('file:') && !details.url.startsWith('data:') && !details.url.startsWith('blob:') && !details.url.startsWith('devtools:') });
+  const root = path.resolve(__dirname, 'dist');
+  await protocol.handle('otrocad', async request => {
+    const url = new URL(request.url);
+    if (url.hostname !== 'app') return new Response('Not found', { status: 404 });
+    let relative;
+    try { relative = decodeURIComponent(url.pathname).replace(/^\\/+/, ''); }
+    catch (_) { return new Response('Bad path', { status: 400 }); }
+    const target = path.resolve(root, relative || 'index.html');
+    if (target !== root && !target.startsWith(root + path.sep)) return new Response('Forbidden', { status: 403 });
+    try { return await net.fetch(pathToFileURL(target).toString()); }
+    catch (_) { return new Response('Not found', { status: 404 }); }
   });
+
+  // Only the bundled application origin is permitted; the packaged editor works without network access.
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+    callback({ cancel: !details.url.startsWith('otrocad:') && !details.url.startsWith('data:') && !details.url.startsWith('blob:') && !details.url.startsWith('devtools:') });
+  });
+
   const window = new BrowserWindow({
     width: 1440, height: 900, minWidth: 800, minHeight: 600,
     title: 'OtroCAD', show: !smoke,
@@ -15,10 +37,11 @@ app.whenReady().then(async () => {
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith('file:')) event.preventDefault();
+    if (!url.startsWith('otrocad:')) event.preventDefault();
   });
+
   if (smoke) {
-    const timer = setTimeout(() => app.exit(1), 30000);
+    const timer = setTimeout(() => app.exit(1), 45000);
     window.webContents.on('did-fail-load', () => { clearTimeout(timer); app.exit(1); });
     let phase = 0;
     window.webContents.on('did-finish-load', async () => {
@@ -40,6 +63,19 @@ app.whenReady().then(async () => {
           await new Promise(resolve => setTimeout(resolve, 500));
           const saved = await window.webContents.executeJavaScript("JSON.parse(localStorage.getItem('otrocad-drawing') || '[]').some(x => x.type === 'line')");
           if (!saved) throw new Error('No se guardó la línea de prueba');
+          const wasmPath = path.join(root, 'editor', 'vendor', 'dwg', 'otrocad_dwg_bg.wasm');
+          if (require('node:fs').existsSync(wasmPath)) {
+            const dwgCheck = await window.webContents.executeJavaScript(`(async()=>{
+              const engine=await import('./vendor/dwg/otrocad_dwg.js');
+              await engine.default();
+              const dxf=new TextEncoder().encode('0\\nSECTION\\n2\\nHEADER\\n9\\n$ACADVER\\n1\\nAC1021\\n0\\nENDSEC\\n0\\nSECTION\\n2\\nENTITIES\\n0\\nLINE\\n10\\n0\\n20\\n0\\n11\\n10\\n21\\n0\\n0\\nENDSEC\\n0\\nEOF\\n');
+              const dwg=engine.dxf_to_dwg(dxf);
+              const header=new TextDecoder().decode(dwg.subarray(0,6));
+              const back=engine.dwg_to_dxf(dwg);
+              return {header, readable:new TextDecoder().decode(back).includes('LINE')};
+            })()`);
+            if (dwgCheck.header !== 'AC1032' || !dwgCheck.readable) throw new Error('Falló la prueba DWG local: ' + JSON.stringify(dwgCheck));
+          }
           window.reload();
         } else {
           const restored = await window.webContents.executeJavaScript("JSON.parse(localStorage.getItem('otrocad-drawing') || '[]').some(x => x.type === 'line')");
@@ -49,6 +85,7 @@ app.whenReady().then(async () => {
       } catch (_) { clearTimeout(timer); app.exit(1); }
     });
   }
-  await window.loadFile(path.join(__dirname, 'dist', 'editor', 'index.html'));
+  await window.loadURL('otrocad://app/editor/index.html');
 }).catch(() => app.exit(1));
+
 app.on('window-all-closed', () => app.quit());
