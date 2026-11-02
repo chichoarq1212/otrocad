@@ -39,7 +39,7 @@ jobs:
         with:
           workspaces: dwg-wasm
       - name: Run native DWG round-trip tests
-        run: cargo test --manifest-path dwg-wasm/Cargo.toml --locked
+        run: cargo test --manifest-path dwg-wasm/Cargo.toml
       - name: Install wasm-pack
         run: cargo install wasm-pack --locked
       - name: Build browser WebAssembly module
@@ -58,6 +58,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add editor/vendor/dwg
+          if ! grep -q "editor/vendor/dwg/otrocad_dwg.js" sw.js; then
+            sed -i "s|'./editor/library/furnishings.js'|'./editor/library/furnishings.js','./editor/vendor/dwg/otrocad_dwg.js','./editor/vendor/dwg/otrocad_dwg_bg.wasm'|" sw.js
+            git add sw.js
+          fi
           if git diff --cached --quiet; then
             echo "WASM runtime is already current"
             exit 0
