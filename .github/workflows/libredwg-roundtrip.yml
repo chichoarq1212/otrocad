@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: LibreDWG/libredwg
-          ref: e3774bd4020fcfebb68150361db74b8b34d170fe
+          ref: d9468ae948b8f07a08efa756c19f8916052358c0
           path: upstream-libredwg
       - name: Dependencias
         run: |
