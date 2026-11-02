@@ -47,17 +47,17 @@ jobs:
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk | head -n 8
       - name: Prepare named test APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.5.3-test.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.5.4-test.apk
       - name: Publish test APK in GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-native-0.5.3-test
-          name: OtroCAD Android 0.5.3 · Test build
+          tag_name: android-native-0.5.4-test
+          name: OtroCAD Android 0.5.4 · Test build
           prerelease: true
           body: |
             Versión de pruebas. Incluye editor web actualizado empaquetado para uso sin conexión.
             APK debug: la firma puede diferir de versiones anteriores. Respalda tus dibujos antes de instalar.
-          files: OtroCAD-Android-0.5.3-test.apk
+          files: OtroCAD-Android-0.5.4-test.apk
       - uses: actions/upload-artifact@v4
         with:
           name: OtroCAD-Android-debug-verified
