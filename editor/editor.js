@@ -395,7 +395,7 @@ function explodeAt(q){
  const parts=segments.map(([a,b])=>({type:'line',a:clone(a),b:clone(b),...style}));
  objects.splice(i,1,...parts);applySelection(parts.map((_,k)=>i+k));save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
 }
-let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false,multiSelectOn=false,gripDrag=null;
+let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false,multiSelectOn=false,gripDrag=null,middlePan=null;
 
 stage.setAttribute('tabindex','-1');
 const commandUiStyle=document.createElement('style');
@@ -491,6 +491,7 @@ document.addEventListener('pointerdown',e=>{if(contextMenuEl&&!contextMenuEl.con
 contextMenuEl.addEventListener('contextmenu',e=>e.preventDefault());
 
 canvas.addEventListener('pointerdown',e=>{
+ if(e.button===1){e.preventDefault();hideCadContextMenu();middlePan={pointerId:e.pointerId,point:pointer(e),offset:clone(offset)};canvas.setPointerCapture(e.pointerId);canvas.style.cursor='grabbing';status.textContent='PAN temporal · arrastra con la rueda presionada';return}
  if(e.button===2){e.preventDefault();return}
  stage.focus({preventScroll:true});hideCadContextMenu();
  canvas.setPointerCapture(e.pointerId);const p=pointer(e);pointers.set(e.pointerId,p);
@@ -500,7 +501,8 @@ canvas.addEventListener('pointerdown',e=>{
  handleTap(p);
 });
 canvas.addEventListener('pointermove',e=>{
- const p=pointer(e);cursor=p;updateCursorCommand();$('#crossinfo').textContent='X '+world(p).x.toFixed(3)+' '+units+' · Y '+world(p).y.toFixed(3)+' '+units+' · Z 0.000';
+ const p=pointer(e);
+ if(middlePan&&middlePan.pointerId===e.pointerId){offset.x=middlePan.offset.x+p.x-middlePan.point.x;offset.y=middlePan.offset.y+p.y-middlePan.point.y;render();return}cursor=p;updateCursorCommand();$('#crossinfo').textContent='X '+world(p).x.toFixed(3)+' '+units+' · Y '+world(p).y.toFixed(3)+' '+units+' · Z 0.000';
  if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);activeSnap=snapCandidate(world(p));if(activeSnap)status.textContent='OSNAP · '+activeSnap.type+' · clic para conectar';
  if(pointers.size===2&&pinch){const v=[...pointers.values()];zoom=Math.max(2,Math.min(500,pinch.zoom*distance(v[0],v[1])/(pinch.dist||1)));render();return}
  if(drag&&tool==='pan'){offset.x=drag.offset.x+p.x-drag.point.x;offset.y=drag.offset.y+p.y-drag.point.y;render();return}
@@ -512,6 +514,7 @@ canvas.addEventListener('pointermove',e=>{
  else render();
 });
 function pointerEnd(e){
+ if(middlePan&&middlePan.pointerId===e.pointerId){middlePan=null;canvas.style.cursor='';status.textContent='PAN finalizado · herramienta anterior conservada';render();return}
  pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;
  if(e.type==='pointercancel'){if(gripDrag){cancelGripDrag();return}selectionStart=null;selectionBox=null;render();return}
  if(gripDrag){if(gripDrag.moved){save();status.textContent='Grip actualizado · geometría modificada';showProperties()}else if(gripDrag.historyAdded&&undo.length)undo.pop();gripDrag=null;render();return}
@@ -529,6 +532,8 @@ function pointerEnd(e){
  render();
 }
 canvas.addEventListener('pointerup',pointerEnd);canvas.addEventListener('pointercancel',pointerEnd);
+canvas.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault()});
+canvas.addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('contextmenu',e=>{
  e.preventDefault();
  const hasActiveCommand=!!($('#cmd').value.trim()||poly.length||start||arcPoints.length);
