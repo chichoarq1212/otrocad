@@ -12,6 +12,8 @@ assert.match(editor, /engine\.dxf_to_dwg\(/);
 assert.match(editor, /El motor no produjo un DWG binario AC1032 válido/);
 assert.match(editor, /La validación DWG detectó diferencias de entidades/);
 assert.match(html, /id="saveAsDwg"/);
+assert.match(html, /data-tool="chamfer"/);
+assert.match(editor, /function chamferGeometry\(/);
 assert.match(wasmSource, /DwgWriter::write_to_vec/);
 assert.match(wasmSource, /DwgReader::from_stream/);
 assert.match(wasmSource, /writes_real_ac1032_dwg_and_reads_it_back/);
