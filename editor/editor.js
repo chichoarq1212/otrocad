@@ -433,7 +433,8 @@ function trimOrExtend(index,q,mode){
 function explodeAt(q){
  const i=selectAt(q);if(i<0){status.textContent='Selecciona una polilínea o rectángulo';return}
  const s=objects[i];if(s.groupId){const id=s.groupId,ids=objects.map((o,j)=>o.groupId===id?j:-1).filter(j=>j>=0);checkpoint();ids.forEach(j=>delete objects[j].groupId);applySelection(ids);save();render();status.textContent='Bloque desagrupado · '+ids.length+' elementos editables';return}
- const segments=entitySegments(s);if(!segments.length||s.type==='line'){status.textContent='Esta entidad no requiere EXPLODE';return}
+ if(!['poly','polygon','rect'].includes(s.type)){status.textContent='EXPLODE disponible para bloques, polilíneas, polígonos y rectángulos';return}
+ const segments=entitySegments(s);if(!segments.length){status.textContent='Esta entidad no requiere EXPLODE';return}
  checkpoint();const style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype};
  const parts=segments.map(([a,b])=>({type:'line',a:clone(a),b:clone(b),...style}));
  objects.splice(i,1,...parts);applySelection(parts.map((_,k)=>i+k));save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
