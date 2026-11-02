@@ -62,7 +62,7 @@ Requiere Rust estable, target `wasm32-unknown-unknown` y wasm-pack:
 ```bash
 rustup target add wasm32-unknown-unknown
 cargo test --manifest-path dwg-wasm/Cargo.toml
-wasm-pack build dwg-wasm --target web --release --no-default-features --out-dir ../editor/vendor/dwg --out-name otrocad_dwg
+wasm-pack build dwg-wasm --target web --release --out-dir ../editor/vendor/dwg --out-name otrocad_dwg --no-gitignore
 ```
 
 El flujo `Build OtroCAD DWG WebAssembly` ejecuta pruebas de ida y vuelta y publica el runtime compilado en `editor/vendor/dwg/`.
