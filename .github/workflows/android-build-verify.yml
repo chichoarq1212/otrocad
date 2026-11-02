@@ -6,6 +6,12 @@ on:
       - 'android/**'
       - 'editor/**'
       - '.github/workflows/android-build-verify.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'editor/**'
+      - '.github/workflows/android-build-verify.yml'
   workflow_dispatch:
 jobs:
   build:
@@ -47,16 +53,34 @@ jobs:
           ls -lh android/app/build/outputs/apk/debug/app-debug.apk
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk | head -n 8
+      - name: Enable hardware acceleration for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and launch on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -W -n com.otrocad.app/.HybridActivity
+            adb shell pidof com.otrocad.app
       - name: Prepare named test APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.5.4-test.apk
       - name: Publish test APK in GitHub Releases
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-native-0.5.4-test
-          name: OtroCAD Android 0.5.4 · Test build
+          tag_name: android-hybrid-test-${{ github.run_id }}-${{ github.run_attempt }}
+          target_commitish: ${{ github.sha }}
+          name: OtroCAD Android híbrido · Prueba ${{ github.run_id }}
           prerelease: true
           body: |
-            Versión de pruebas. Incluye editor web actualizado empaquetado para uso sin conexión.
+            Versión híbrida de pruebas. Instalada y abierta en un emulador Android; aún no validada en dispositivo físico. Incluye editor web empaquetado para uso sin conexión.
             APK debug: la firma puede diferir de versiones anteriores. Respalda tus dibujos antes de instalar.
           files: OtroCAD-Android-0.5.4-test.apk
       - uses: actions/upload-artifact@v4
