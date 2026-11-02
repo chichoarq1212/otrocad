@@ -68,3 +68,5 @@ assert.equal(ui.objects.length,3);assert.equal(ui.objects[2].type,'arc');
 assert.ok(Math.abs(ui.objects[0].a.x-1)<1e-8);
 assert.ok(Math.abs(ui.objects[1].a.y-1)<1e-8);
 console.log('Comando empalme: selección y creación verificadas');
+
+assert.ok(vm.runInContext('filletGeometry(l1,l2,{x:0,y:0},{x:0,y:0},1)',fillet));
