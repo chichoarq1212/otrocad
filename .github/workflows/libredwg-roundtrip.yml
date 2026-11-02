@@ -35,7 +35,7 @@ jobs:
           node tests/generate-demo-dxf.cjs /tmp/otrocad-input.dxf
           python3 tests/audit-demo-dxf.py /tmp/otrocad-input.dxf
           # Normalize tables before LibreDWG imports the DXF.
-          python3 -c "import ezdxf; d=ezdxf.readfile('/tmp/otrocad-input.dxf'); d.saveas('/tmp/otrocad-normalized.dxf')"
+          python3 -c "import ezdxf; d=ezdxf.readfile('/tmp/otrocad-input.dxf'); d.dxfversion='AC1015'; d.saveas('/tmp/otrocad-normalized.dxf')"
           python3 tests/audit-demo-dxf.py /tmp/otrocad-normalized.dxf
           upstream-libredwg/programs/dwgwrite --as r2000 -I DXF -o /tmp/otrocad-demo.dwg /tmp/otrocad-normalized.dxf
           test "$(head -c 6 /tmp/otrocad-demo.dwg)" = AC1015
