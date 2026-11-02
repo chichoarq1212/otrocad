@@ -437,7 +437,7 @@ function filletGeometry(first,second,pick1,pick2,radius){
  const branch=(line,pick)=>{
   const va={x:line.a.x-p.x,y:line.a.y-p.y},vb={x:line.b.x-p.x,y:line.b.y-p.y},vq={x:pick.x-p.x,y:pick.y-p.y};
   const dot=v=>v.x*vq.x+v.y*vq.y;
-  const keep=dot(va)>=dot(vb)?'a':'b',v=keep==='a'?va:vb,len=Math.hypot(v.x,v.y);
+  const keep=Math.hypot(vq.x,vq.y)<1e-9?(Math.hypot(va.x,va.y)>=Math.hypot(vb.x,vb.y)?'a':'b'):(dot(va)>=dot(vb)?'a':'b'),v=keep==='a'?va:vb,len=Math.hypot(v.x,v.y);
   return len>1e-9?{keep,replace:keep==='a'?'b':'a',unit:{x:v.x/len,y:v.y/len},len}:null;
  };
  const a=branch(first,pick1),b=branch(second,pick2);if(!a||!b)return null;
