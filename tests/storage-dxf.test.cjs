@@ -1,0 +1,142 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync('editor/editor.js', 'utf8');
+const handlers = new Map();
+let stored = new Map(), failure = false, warnings = [], downloaded = null, accept = true;
+const context = {
+  $: selector => { if (!handlers.has(selector)) handlers.set(selector, {}); return handlers.get(selector); },
+  objects: [{type:'line', a:{x:0,y:0}, b:{x:2,y:0},layer:'Muros'}],
+  undo:[], redo:[], clone: x => JSON.parse(JSON.stringify(x)),
+  localStorage: {setItem(k,v){if(failure)throw Error('quota');stored.set(k,v)},getItem:k=>stored.get(k)||null},
+  alert: message=>warnings.push(message), confirm:()=>accept,
+  clearSelection:()=>{}, render:()=>{}, status:{textContent:''},
+  colors:{General:'#ffffff'}, units:'m', zoom:35, distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),
+  download:(name, content)=>{downloaded={name,content}}
+};
+vm.createContext(context);
+vm.runInContext(source.slice(source.indexOf('let storageWarningShown=false;'),source.indexOf('function selectedItems()')),context);
+vm.runInContext(source.slice(source.indexOf('function save(){'),source.indexOf('function world(')),context);
+assert.equal(vm.runInContext('checkpoint()',context),true);
+assert.equal(JSON.parse(stored.get('otrocad-drawing-previous')).shapes[0].b.x,2);
+vm.runInContext('objects[0].b.x=4; save()',context);
+assert.equal(JSON.parse(stored.get('otrocad-drawing'))[0].b.x,4);
+failure=true;
+assert.equal(vm.runInContext('save()',context),false);
+assert.equal(warnings.length,1);
+assert.equal(JSON.parse(stored.get('otrocad-drawing'))[0].b.x,4);
+vm.runInContext(source.slice(source.indexOf("function buildDxf(){"),source.indexOf("\n$('#pdf').onclick")),context);
+context.objects=[{type:'text',a:{x:1,y:2},text:'COCINA',textHeight:14,layer:'Textos'}, {type:'hatch',a:{x:0,y:0},b:{x:2,y:1}}];
+accept=false;handlers.get('#dxf').onclick();assert.equal(downloaded,null, 'No descargar si se rechaza pérdida de datos');
+accept=true;handlers.get('#dxf').onclick();assert.match(downloaded.content,/\r\nTEXT\r\n/);assert.match(downloaded.content,/\r\nCOCINA\r\n/);
+console.log('Storage and DXF checks passed: backup, failed storage warning, export loss warning, text entity');
+
+const demoScope = {window:{}};
+vm.runInNewContext(fs.readFileSync('editor/demo/vivienda.js','utf8'),demoScope);
+const demo = demoScope.window.otroCadDemo.shapes;
+assert.ok(demo.length > 100);
+for (const name of ['SALA','COMEDOR','COCINA','DORMITORIO 1','DORMITORIO 2','BAÑO']) assert.ok(demo.some(x=>x.type==='text' && x.text===name));
+for (const type of ['line','rect','arc','hatch','dim']) assert.ok(demo.some(x=>x.type===type));
+console.log('Demo checks passed: rooms and editable drawing entities');
+const parserCode = source.slice(source.indexOf('function parseDxfEntities(source){'), source.indexOf('\nasync function download('));
+vm.runInContext(parserCode,context);
+const dxf = ['0','SECTION','2','BLOCKS','0','LINE','10','99','20','99','11','100','21','100','0','ENDSEC',
+'0','SECTION','2','ENTITIES','0','LINE','8','Muro','420','5682920','10','0','20','0','11','4','21','0',
+'0','ARC','10','0','20','0','40','2','50','0','51','90','0','HATCH','8','Muros',
+'0','LWPOLYLINE','90','2','70','0','10','0','20','0','42','0.5','10','1','20','0','0','ENDSEC','0','EOF'].join('\n');
+context.dxf=dxf;
+const parsed=vm.runInContext('parseDxfEntities(dxf)',context);
+assert.equal(parsed.length,3, 'No se deben importar las definiciones dentro de BLOCKS como geometría suelta');
+assert.equal(parsed[1].type,'arc');
+assert.ok(Math.abs(parsed[1].pts[2].y-2)<1e-9);
+assert.ok(parsed.importWarnings.some(s=>s.includes('HATCH')));
+assert.ok(parsed.importWarnings.some(s=>s.includes('curvas')));
+assert.equal(parsed[0].color, '#56b6e8');
+console.log('DXF import checks passed: section boundaries, arc, colors and unsupported objects');
+context.objects=[{type:'arc',pts:[{x:1,y:0},{x:0,y:1},{x:-1,y:0}]}, {type:'ellipse',a:{x:3,y:4},b:{x:5,y:5}}];
+downloaded=null;handlers.get('#dxf').onclick();
+assert.match(downloaded.content,/\r\nARC\r\n/);
+assert.match(downloaded.content,/\r\nELLIPSE\r\n/);
+context.roundtrip=downloaded.content;
+const roundtrip=vm.runInContext('parseDxfEntities(roundtrip)',context);
+assert.equal(roundtrip[0].type,'arc');assert.equal(roundtrip[1].type,'ellipse');assert.equal(roundtrip.drawingUnits,'m');
+assert.ok(Math.abs(roundtrip[1].b.x-5)<1e-9);assert.ok(Math.abs(roundtrip[1].b.y-5)<1e-9);
+console.log('DXF round-trip checks passed: native arcs and aligned ellipses');
+const selectionScope = {objects:[],zoom:100,hiddenLayers:new Set(),lockedLayers:new Set(),screen:p=>({x:p.x*100,y:-p.y*100}),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
+vm.createContext(selectionScope);
+vm.runInContext(source.slice(source.indexOf('function arcParams('),source.indexOf('\nconst CAD_THEMES=')),selectionScope);
+vm.runInContext(source.slice(source.indexOf('function selectAt('),source.indexOf('function gripDescriptors(')),selectionScope);
+selectionScope.objects=[{type:'arc',pts:[{x:1,y:0},{x:0,y:1},{x:-1,y:0}]}];
+assert.equal(vm.runInContext('selectAt({x:0,y:1})',selectionScope),0, 'Seleccionar un arco por su curva');
+assert.equal(vm.runInContext('selectAt({x:0,y:-1})',selectionScope),-1, 'No seleccionar el arco por la semicircunferencia opuesta');
+selectionScope.objects=[{type:'ellipse',a:{x:0,y:0},b:{x:2,y:1}}];
+assert.equal(vm.runInContext('selectAt({x:-2,y:0})',selectionScope),0, 'Seleccionar el lado negativo de la elipse');
+assert.equal(vm.runInContext('selectAt({x:0,y:0})',selectionScope),-1, 'No seleccionar toda el área interior');
+console.log('Selection checks passed: arcs and full ellipses');
+selectionScope.world = p=>({x:p.x/100,y:-p.y/100});
+vm.runInContext(source.slice(source.indexOf('function boundsPoints(o){'),source.indexOf("\n$('#fit').onclick")),selectionScope);
+const circleBounds=selectionScope.boundsPoints({type:'circle',a:{x:0,y:0},b:{x:2,y:0}});
+assert.ok(circleBounds.some(p=>p.x===-2&&p.y===-2));
+const ellipseBounds=selectionScope.boundsPoints({type:'ellipse',a:{x:5,y:5},b:{x:7,y:6}});
+assert.ok(ellipseBounds.some(p=>p.x===3&&p.y===4));
+const arcBounds=selectionScope.boundsPoints({type:'arc',pts:[{x:1,y:0},{x:0,y:1},{x:-1,y:0}]});
+assert.ok(arcBounds.some(p=>Math.abs(p.y-1)<1e-9));
+console.log('Fit checks passed: circle, ellipse and arc extents');
+(async()=>{
+ context.objects=[{type:'line',a:{x:0,y:0},b:{x:1,y:1}}];
+ let written='',closed=false;
+ context.window={showSaveFilePicker:async()=>({createWritable:async()=>({write:async value=>{written=value},close:async()=>{closed=true}})})};
+ await handlers.get('#saveAsDxf').onclick();
+ assert.match(written,/\r\nLINE\r\n/);assert.equal(closed,true);assert.match(context.status.textContent,/guardado/i);
+ context.window={};context.prompt=()=> 'Plano/prueba';downloaded=null;
+ await handlers.get('#saveAsDxf').onclick();
+ assert.equal(downloaded.name,'Plano_prueba.dxf');
+ console.log('Save-as checks passed: file picker and download fallback');
+})().catch(error=>{console.error(error);process.exitCode=1});
+vm.runInContext(source.slice(source.indexOf('function entitySegments(s){'),source.indexOf('function lineIntersection(')),selectionScope);
+selectionScope.objects=[{type:'arc',pts:[{x:1,y:0},{x:0,y:1},{x:-1,y:0}]}];
+let segments=selectionScope.entitySegments(selectionScope.objects[0]);
+assert.ok(segments.flat().every(p=>Math.abs(p.x)<=1.001&&p.y>=-0.001&&p.y<=1.001),'Segmentos del arco deben estar en coordenadas del dibujo');
+assert.deepEqual(Array.from(selectionScope.selectByWindow({left:-1.2,right:1.2,bottom:-.2,top:1.2},true)),[0]);
+selectionScope.objects=[{type:'circle',a:{x:0,y:0},b:{x:10,y:0}}];
+assert.deepEqual(Array.from(selectionScope.selectByWindow({left:-.5,right:.5,bottom:-.5,top:.5},false)),[],'Una ventana dentro de un círculo no cruza su contorno');
+console.log('Window selection checks passed: world-space arcs and crossing boundaries');
+context.objects=[{type:'hatch',a:{x:1,y:2},b:{x:3,y:4},hatchPattern:'SOLID',hatchOpacity:1,layer:'Muros',color:'#850e1d'}];
+accept=true;downloaded=null;handlers.get('#dxf').onclick();
+assert.match(downloaded.content,/\r\nHATCH\r\n/);
+context.roundtrip=downloaded.content;
+const wallRoundtrip=vm.runInContext('parseDxfEntities(roundtrip)',context);
+assert.equal(wallRoundtrip.length,1);assert.equal(wallRoundtrip[0].type,'hatch');assert.equal(wallRoundtrip[0].hatchOpacity,1);
+assert.equal(wallRoundtrip[0].a.x,1);assert.equal(wallRoundtrip[0].b.y,4);
+console.log('Solid wall hatch DXF round-trip passed');
+const geometryScope={};vm.createContext(geometryScope);
+vm.runInContext(source.slice(source.indexOf('function transformEntityGeometry('),source.indexOf('function translate(')),geometryScope);
+geometryScope.rectangle={type:'rect',a:{x:0,y:0},b:{x:2,y:1}};
+vm.runInContext('transformEntityGeometry(rectangle,p=>({x:(p.x-p.y)/Math.SQRT2,y:(p.x+p.y)/Math.SQRT2}),false)',geometryScope);
+assert.equal(geometryScope.rectangle.type,'polygon');assert.equal(geometryScope.rectangle.pts.length,4);
+assert.ok(Math.abs(geometryScope.rectangle.pts[2].x-1/Math.SQRT2)<1e-9);
+console.log('Rectangle transformation check passed');
+const groupScope={objects:[{groupId:'a',layer:'General'},{groupId:'a',layer:'General'},{groupId:'b',layer:'General'}],selected:-1,selectedSet:new Set(),hiddenLayers:new Set(),lockedLayers:new Set()};
+vm.createContext(groupScope);
+vm.runInContext(source.slice(source.indexOf('function selectedItems()'),source.indexOf('function clearSelection()')),groupScope);
+vm.runInContext('applySelection([0])',groupScope);
+assert.deepEqual(Array.from(vm.runInContext('selectedItems()',groupScope)),[0,1]);
+const catalogScope={window:{}};vm.runInNewContext(fs.readFileSync('editor/library/furnishings.js','utf8'),catalogScope);
+const sofa=catalogScope.window.otroCadFurnitureCatalog.find(item=>item.id==='sofa');
+assert.ok(Math.abs(sofa.width-2.1336)<1e-6);assert.ok(sofa.shapes.length>1);
+console.log('Furniture checks passed: grouped selection and true-scale CC0 sofa');
+const tapScope={tool:'text',start:null,units:'m',objects:[],status:{textContent:''},lockedLayers:new Set(),snapPoint:p=>p,world:p=>p,constrain:p=>p,prompt:()=> 'SALA',clone:x=>JSON.parse(JSON.stringify(x)),currentStyle:()=>({layer:'Textos'}),checkpoint:()=>{},save:()=>{},applySelection:()=>{},render:()=>{},$:(id)=>({value:id==='#layer'?'General':''}),pointFromInputs:()=>null,document:{activeElement:null},commitEntity:p=>{tapScope.committed=p}};
+vm.createContext(tapScope);vm.runInContext(source.slice(source.indexOf('function handleTap(p){'),source.indexOf('function transformEntityGeometry(')),tapScope);
+vm.runInContext('handleTap({x:2,y:3})',tapScope);assert.equal(tapScope.objects[0].text,'SALA');assert.equal(tapScope.objects[0].a.x,2);
+tapScope.tool='dimaligned';tapScope.start={x:0,y:0};vm.runInContext('handleTap({x:3,y:4})',tapScope);assert.equal(tapScope.committed.x,3);assert.equal(tapScope.committed.y,4);
+console.log('Text and aligned dimension creation checks passed');
+const snapScope={osnapOn:true,osEnd:false,osMid:false,osCenter:false,osQuadrant:true,osIntersection:false,snapRadius:12,zoom:100,objects:[{type:'circle',a:{x:0,y:0},b:{x:2,y:0}}],hiddenLayers:new Set(),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),pointLineDistance:(p,a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)},entitySegments:s=>[[s.a,s.b]]};
+vm.createContext(snapScope);vm.runInContext(source.slice(source.indexOf('function lineIntersection('),source.indexOf('function trimOrExtend(')),snapScope);vm.runInContext(source.slice(source.indexOf('function snapCandidate('),source.indexOf('function snapPoint(')),snapScope);
+let snap=vm.runInContext('snapCandidate({x:0.03,y:2.02})',snapScope);assert.equal(snap.type,'CUADRANTE');assert.equal(snap.point.y,2);
+snapScope.osQuadrant=false;snapScope.osIntersection=true;snapScope.objects=[{type:'line',a:{x:-1,y:0},b:{x:1,y:0}},{type:'line',a:{x:0,y:-1},b:{x:0,y:1}}];
+snap=vm.runInContext('snapCandidate({x:0.02,y:0.02})',snapScope);assert.equal(snap.type,'INTERSECCIÓN');assert.equal(snap.point.x,0);assert.equal(snap.point.y,0);
+console.log('Object snap checks passed: quadrant and line intersection');
+tapScope.tool='measure';tapScope.start=null;tapScope.temp=null;tapScope.updatePrompt=()=>{};tapScope.distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+vm.runInContext('handleTap({x:0,y:0});handleTap({x:3,y:4})',tapScope);
+assert.match(tapScope.status.textContent,/Distancia: 5\.000 m/);assert.equal(tapScope.start,null);
+console.log('Distance measurement check passed');

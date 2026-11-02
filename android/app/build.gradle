@@ -1,5 +1,7 @@
 plugins { id 'com.android.application' }
 
+def nativeOnly = providers.gradleProperty('otrocadNative').orElse('false').get().toBoolean()
+
 android {
     namespace 'com.otrocad.app'
     compileSdk 35
@@ -10,8 +12,21 @@ android {
         versionCode 18
         versionName '0.5.4-test-alpha'
     }
+    if (nativeOnly) {
+        defaultConfig {
+            applicationIdSuffix '.nativealpha'
+            versionNameSuffix '-nativo-experimental'
+        }
+        sourceSets {
+            main {
+                manifest.srcFile 'src/native/AndroidManifest.xml'
+                java.exclude '**/HybridActivity.java'
+            }
+        }
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+

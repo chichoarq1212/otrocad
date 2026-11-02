@@ -14,7 +14,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: otrocad-android-native-v052-${{ github.ref }}
+  group: otrocad-android-hybrid-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
@@ -33,25 +33,14 @@ jobs:
         run: |
           mkdir -p android/app/src/main/assets/editor
           cp editor/index.html editor/editor.js android/app/src/main/assets/editor/
+          cp -R editor/demo editor/library android/app/src/main/assets/editor/
       - name: Compilar APK híbrido con editor offline
         run: gradle -p android assembleDebug --no-daemon
       - name: Preparar APK con nombre de versión
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.5.2.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-hibrido-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: OtroCAD-Android-Nativo-Offline-0.5.2
-          path: OtroCAD-Android-0.5.2.apk
+          name: OtroCAD-Android-hibrido-debug
+          path: OtroCAD-Android-hibrido-debug.apk
           if-no-files-found: error
-      - name: Publicar APK nativo de pruebas
-        if: github.event_name == 'push'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: android-native-0.5.2
-          target_commitish: ${{ github.sha }}
-          name: OtroCAD Android Nativo Offline 0.5.2
-          prerelease: true
-          make_latest: false
-          overwrite_files: true
-          files: OtroCAD-Android-0.5.2.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Esta tarea solo genera un artefacto de pruebas; no modifica releases anteriores.

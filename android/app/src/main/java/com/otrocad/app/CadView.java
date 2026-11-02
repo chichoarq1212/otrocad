@@ -55,6 +55,7 @@ public class CadView extends View {
     public void restoreLocal(){String raw=getContext().getSharedPreferences("otrocad-local",Context.MODE_PRIVATE).getString("drawing","");if(raw!=null&&!raw.isEmpty())try{loadJson(raw);say("Dibujo local recuperado");}catch(Exception ignored){}}
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
+    public int getPolylinePointCount(){return poly.size();}
     public void setTool(String t){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
@@ -428,31 +429,31 @@ public class CadView extends View {
     }
     public void loadDxf(String raw){
         String[] lines=raw.replace("\r","").split("\n");ArrayList<String[]> pairs=new ArrayList<>();for(int i=0;i+1<lines.length;i+=2)pairs.add(new String[]{lines[i].trim(),lines[i+1].trim()});
-        ArrayList<Entity> out=new ArrayList<>();for(int i=0;i<pairs.size();i++){if(!pairs.get(i)[0].equals("0"))continue;String type=pairs.get(i)[1];int j=i+1;HashMap<String,ArrayList<String>> v=new HashMap<>();while(j<pairs.size()&&!pairs.get(j)[0].equals("0")){v.computeIfAbsent(pairs.get(j)[0],k->new ArrayList<>()).add(pairs.get(j)[1]);j++;}
+        ArrayList<Entity> out=new ArrayList<>();boolean inEntities=false;for(int i=0;i<pairs.size();i++){if(!pairs.get(i)[0].equals("0"))continue;String type=pairs.get(i)[1];if(type.equalsIgnoreCase("SECTION")){inEntities=i+1<pairs.size()&&pairs.get(i+1)[0].equals("2")&&pairs.get(i+1)[1].equalsIgnoreCase("ENTITIES");continue;}if(type.equalsIgnoreCase("ENDSEC")){inEntities=false;continue;}if(!inEntities)continue;int j=i+1;HashMap<String,ArrayList<String>> v=new HashMap<>();while(j<pairs.size()&&!pairs.get(j)[0].equals("0")){v.computeIfAbsent(pairs.get(j)[0],k->new ArrayList<>()).add(pairs.get(j)[1]);j++;}
             Entity e=new Entity();e.type=type.equals("LINE")?"LINE":type.equals("CIRCLE")?"CIRCLE":type.equals("LWPOLYLINE")?"POLY":type.equals("ARC")?"ARC":type.equals("TEXT")||type.equals("MTEXT")?"TEXT":"";
             if(e.type.isEmpty())continue;e.layer=first(v,"8","General");float x=num(v,"10",0),y=num(v,"20",0);e.pts.add(new PointF(x,y));
             if(e.type.equals("LINE"))e.pts.add(new PointF(num(v,"11",0),num(v,"21",0)));
             else if(e.type.equals("CIRCLE")){float r=num(v,"40",1);e.pts.add(new PointF(x+r,y));}
-            else if(e.type.equals("POLY")){e.pts.clear();ArrayList<String> xs=v.get("10"),ys=v.get("20");if(xs!=null)for(int k=0;k<xs.size();k++)e.pts.add(new PointF(parse(xs.get(k)),ys!=null&&k<ys.size()?parse(ys.get(k)):0));}
+            else if(e.type.equals("POLY")){e.pts.clear();ArrayList<String> xs=v.get("10"),ys=v.get("20");if(xs!=null)for(int k=0;k<xs.size();k++)e.pts.add(new PointF(parse(xs.get(k)),ys!=null&&k<ys.size()?parse(ys.get(k)):0));if((((int)num(v,"70",0))&1)!=0)e.type="POLYGON";}
             else if(e.type.equals("ARC")){float r=num(v,"40",1),a1=(float)Math.toRadians(num(v,"50",0)),a2=(float)Math.toRadians(num(v,"51",90));e.pts.clear();for(int k=0;k<=24;k++){float t=a1+(a2-a1)*k/24f;e.pts.add(new PointF(x+r*(float)Math.cos(t),y+r*(float)Math.sin(t)));}}
             else if(e.type.equals("TEXT"))e.text=first(v,"1","Texto");
             String col=first(v,"420","");if(!col.isEmpty())try{e.color=Color.rgb((int)(Long.parseLong(col)>>16)&255,(int)(Long.parseLong(col)>>8)&255,(int)Long.parseLong(col)&255);}catch(Exception ignored){}
             e.weight=num(v,"370",25)/100f;e.linetype=first(v,"6","CONTINUOUS");out.add(e);i=j-1;
-        }checkpoint();entities.clear();entities.addAll(out);setSelection(Collections.emptyList());persistLocal();invalidate();say("DXF abierto · "+out.size()+" entidades");
+        }if(out.isEmpty()){say("DXF sin entidades compatibles · se conservó el dibujo actual");return;}checkpoint();entities.clear();entities.addAll(out);setSelection(Collections.emptyList());persistLocal();invalidate();say("DXF abierto · "+out.size()+" entidades");
     }
     private static String first(HashMap<String,ArrayList<String>> m,String k,String d){return m.containsKey(k)&&!m.get(k).isEmpty()?m.get(k).get(0):d;}
     private static float num(HashMap<String,ArrayList<String>> m,String k,float d){return m.containsKey(k)&&!m.get(k).isEmpty()?parse(m.get(k).get(0)):d;}
     private static float parse(String s){try{return Float.parseFloat(s);}catch(Exception e){return 0;}}
     public String toDxf(){
-        StringBuilder b=new StringBuilder("0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n");
-        for(Entity e:entities){String common="8\n"+e.layer+"\n6\n"+e.linetype+"\n370\n"+Math.round(e.weight*100)+"\n420\n"+(e.color&0xffffff)+"\n";
+        StringBuilder b=new StringBuilder("0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1021\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n");
+        for(Entity e:entities){String common="100\nAcDbEntity\n8\n"+e.layer+"\n6\nCONTINUOUS"+"\n370\n"+Math.round(e.weight*100)+"\n420\n"+(e.color&0xffffff)+"\n";
             if(e.pts.size()<1)continue;PointF a=e.pts.get(0);
-            if(e.type.equals("LINE")||e.type.equals("DIM")||e.type.equals("LEADER")){if(e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLINE\n").append(common).append("10\n").append(a.x).append("\n20\n").append(a.y).append("\n30\n0\n11\n").append(q.x).append("\n21\n").append(q.y).append("\n31\n0\n");}}
-            else if(e.type.equals("CIRCLE")&&e.pts.size()>1)b.append("0\nCIRCLE\n").append(common).append("10\n").append(a.x).append("\n20\n").append(a.y).append("\n40\n").append(dist(a,e.pts.get(1))).append("\n");
-            else if(e.type.equals("RECT")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("90\n4\n70\n1\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(q.y).append("\n10\n").append(a.x).append("\n20\n").append(q.y).append("\n");}
-            else if(e.type.equals("TEXT"))b.append("0\nTEXT\n").append(common).append("10\n").append(a.x).append("\n20\n").append(a.y).append("\n40\n").append(e.textHeight).append("\n1\n").append(e.text.replace("\n"," ")).append("\n");
-            else if(e.type.equals("ELLIPSE")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("90\n36\n70\n1\n");for(int k=0;k<36;k++){double t=k*Math.PI*2/36;b.append("10\n").append(a.x+(q.x-a.x)*Math.cos(t)).append("\n20\n").append(a.y+(q.y-a.y)*Math.sin(t)).append("\n");}}
-            else if(e.pts.size()>1){b.append("0\nLWPOLYLINE\n").append(common).append("90\n").append(e.pts.size()).append("\n70\n").append(e.type.equals("POLYGON")?1:0).append("\n");for(PointF p:e.pts)b.append("10\n").append(p.x).append("\n20\n").append(p.y).append("\n");}
+            if(e.type.equals("LINE")||e.type.equals("DIM")||e.type.equals("LEADER")){if(e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLINE\n").append(common).append("100\nAcDbLine\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n30\n0\n11\n").append(q.x).append("\n21\n").append(q.y).append("\n31\n0\n");}}
+            else if(e.type.equals("CIRCLE")&&e.pts.size()>1)b.append("0\nCIRCLE\n").append(common).append("100\nAcDbCircle\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n40\n").append(dist(a,e.pts.get(1))).append("\n");
+            else if(e.type.equals("RECT")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("100\nAcDbPolyline\n90\n4\n70\n1\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(q.y).append("\n10\n").append(a.x).append("\n20\n").append(q.y).append("\n");}
+            else if(e.type.equals("TEXT"))b.append("0\nTEXT\n").append(common).append("100\nAcDbText\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n40\n").append(e.textHeight).append("\n1\n").append(e.text.replace("\n"," ")).append("\n");
+            else if(e.type.equals("ELLIPSE")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("100\nAcDbPolyline\n90\n36\n70\n1\n");for(int k=0;k<36;k++){double t=k*Math.PI*2/36;b.append("10\n").append(a.x+(q.x-a.x)*Math.cos(t)).append("\n20\n").append(a.y+(q.y-a.y)*Math.sin(t)).append("\n");}}
+            else if(e.pts.size()>1){b.append("0\nLWPOLYLINE\n").append(common).append("100\nAcDbPolyline\n90\n").append(e.pts.size()).append("\n70\n").append(e.type.equals("POLYGON")?1:0).append("\n");for(PointF p:e.pts)b.append("10\n").append(p.x).append("\n20\n").append(p.y).append("\n");}
         }return b.append("0\nENDSEC\n0\nEOF\n").toString();
     }
     public void setLayer(String s){layer=s;}
