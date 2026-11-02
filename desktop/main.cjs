@@ -17,7 +17,7 @@ app.whenReady().then(async () => {
     const url = new URL(request.url);
     if (url.hostname !== 'app') return new Response('Not found', { status: 404 });
     let relative;
-    try { relative = decodeURIComponent(url.pathname).replace(/^\\/+/, ''); }
+    try { relative = decodeURIComponent(url.pathname).replace(/^\/+/, ''); }
     catch (_) { return new Response('Bad path', { status: 400 }); }
     const target = path.resolve(root, relative || 'index.html');
     if (target !== root && !target.startsWith(root + path.sep)) return new Response('Forbidden', { status: 403 });
