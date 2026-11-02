@@ -34,6 +34,7 @@ jobs:
           mkdir -p android/app/src/main/assets/editor
           cp editor/index.html editor/editor.js android/app/src/main/assets/editor/
           cp -R editor/demo editor/library android/app/src/main/assets/editor/
+          if [ -d editor/vendor ]; then cp -R editor/vendor android/app/src/main/assets/editor/; fi
       - name: Compilar APK híbrido con editor offline
         run: gradle -p android assembleDebug --no-daemon
       - name: Preparar APK con nombre de versión
