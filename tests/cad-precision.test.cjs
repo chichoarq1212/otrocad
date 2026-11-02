@@ -70,3 +70,13 @@ assert.ok(Math.abs(ui.objects[1].a.y-1)<1e-8);
 console.log('Comando empalme: selección y creación verificadas');
 
 assert.ok(vm.runInContext('filletGeometry(l1,l2,{x:0,y:0},{x:0,y:0},1)',fillet));
+
+const chamferScope = {};
+vm.createContext(chamferScope);
+vm.runInContext(src.slice(src.indexOf('function lineIntersection('),src.indexOf('function trimOrExtend(')),chamferScope);
+const bevel=vm.runInContext('chamferGeometry({type:"line",a:{x:0,y:0},b:{x:5,y:0}},{type:"line",a:{x:0,y:0},b:{x:0,y:5}},{x:4,y:0},{x:0,y:4},1,2)',chamferScope);
+assert.ok(bevel);
+assert.ok(Math.abs(bevel.t1.x-1)<1e-9 && Math.abs(bevel.t1.y)<1e-9);
+assert.ok(Math.abs(bevel.t2.x)<1e-9 && Math.abs(bevel.t2.y-2)<1e-9);
+assert.equal(vm.runInContext('chamferGeometry({type:"line",a:{x:0,y:0},b:{x:1,y:0}},{type:"line",a:{x:0,y:0},b:{x:0,y:1}},{x:1,y:0},{x:0,y:1},2,2)',chamferScope),null);
+console.log('Chaflán: dos distancias independientes y rechazo de distancias excesivas verificados');
