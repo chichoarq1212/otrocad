@@ -43,6 +43,7 @@ jobs:
           mkdir -p android/app/src/main/assets/editor
           cp editor/index.html editor/editor.js android/app/src/main/assets/editor/
           cp -R editor/demo editor/library android/app/src/main/assets/editor/
+          if [ -d editor/vendor ]; then cp -R editor/vendor android/app/src/main/assets/editor/; fi
           test -s android/app/src/main/assets/editor/index.html
           test -s android/app/src/main/assets/editor/editor.js
       - name: Build Android debug APK
