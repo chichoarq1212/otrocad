@@ -439,8 +439,8 @@ function cancelCurrentAction(){
 function performEnterAction(){
  const raw=$('#cmd').value.trim();
  if(raw){$('#cmd').value='';updateCursorCommand();runCommand(raw);return}
- if(poly.length){finishPoly();setTool('select');status.textContent='Polilínea terminada · modo SELECCIÓN';return}
- if(tool==='line'&&start){start=null;temp=null;setTool('select');status.textContent='Línea terminada · modo SELECCIÓN';return}
+ if(poly.length){finishPoly();setTool('select');status.textContent='Polilínea terminada · Enter o espacio para repetir';return}
+ if(tool==='line'&&start){start=null;temp=null;setTool('select');status.textContent='Línea terminada · Enter o espacio para repetir LÍNEA';return}
  if(start){
   let q=pointFromInputs();
   if(q&&distance(start,q)<=1e-9)q=null;
@@ -449,7 +449,7 @@ function performEnterAction(){
   status.textContent='Indica el punto final o introduce longitud y ángulo';return;
  }
  if(arcPoints.length){status.textContent='Arco: marca el siguiente punto o pulsa Escape para cancelar';return}
- if(tool!=='select'&&tool!=='pan'){setTool('select');status.textContent='Comando terminado · modo SELECCIÓN';return}
+ if(tool!=='select'&&tool!=='pan'){setTool('select');status.textContent='Comando terminado · Enter o espacio para repetir';return}
  if(lastCommand){runCommand(lastCommand);return}
  status.textContent='Modo SELECCIÓN';
 }
@@ -466,7 +466,7 @@ function showCadContextMenu(e){
  e.preventDefault();
  contextMenuEl.innerHTML='<div class="cad-menu-title">OTROCAD · MENÚ CONTEXTUAL</div>';
  const raw=$('#cmd').value.trim();
- const enterLabel=raw?'Ejecutar comando':(poly.length?'Enter · Terminar polilínea':(tool==='line'&&start?'Enter · Terminar línea':(start?'Enter · Confirmar punto':'Enter')));
+ const enterLabel=raw?'Ejecutar comando':(poly.length?'Enter · Terminar polilínea':(tool==='line'&&start?'Enter · Terminar línea':(start?'Enter · Confirmar punto':'Enter · Repetir comando')));
  addCadMenuItem(enterLabel,'↵',performEnterAction,!raw&&!poly.length&&!start&&!lastCommand,true);
  addCadMenuItem('Repetir último comando',lastCommand||'—',repeatLastCommand,!lastCommand);
  addCadMenuDivider();
@@ -487,7 +487,7 @@ function showCadContextMenu(e){
 }
 $('#cmd').addEventListener('input',updateCursorCommand);
 $('#cmd').addEventListener('keydown',e=>{
- if(e.key==='Enter'){e.preventDefault();submitCommand()}
+ if(e.key==='Enter'||e.key===' '&&$('#cmd').value.trim()===''){e.preventDefault();e.stopPropagation();submitCommand()}
  else if(e.key==='Escape'){e.preventDefault();cancelCurrentAction();$('#cmd').blur();stage.focus({preventScroll:true})}
 });
 document.addEventListener('pointerdown',e=>{if(contextMenuEl&&!contextMenuEl.contains(e.target))hideCadContextMenu()});
@@ -543,6 +543,7 @@ canvas.addEventListener('contextmenu',e=>{
  if(e.ctrlKey){showDraftSettings();return}
  if(e.shiftKey){showCadContextMenu(e);return}
  if(hasActiveCommand&&rightClickDuringCommand==='enter'){hideCadContextMenu();performEnterAction();return}
+ if(!hasActiveCommand&&rightClickDuringCommand==='enter'&&rightClickMode==='repeat'){hideCadContextMenu();repeatLastCommand();return}
  if(!hasActiveCommand&&rightClickMode==='repeat'){hideCadContextMenu();repeatLastCommand();return}
  showCadContextMenu(e);
 });
@@ -570,7 +571,7 @@ document.addEventListener('keydown',e=>{
  if(e.key==='F10'){e.preventDefault();toggle('polarToggle');return}
  if(e.key==='F3'){e.preventDefault();toggle('osnapToggle');return}
  if(e.key==='Enter'){e.preventDefault();performEnterAction();return}
- if(e.key===' '&&poly.length){e.preventDefault();finishPoly();return}
+ if(e.key===' '&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();performEnterAction();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){$('#undo').click();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){$('#redo').click();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'&&(active===stage||active===canvas||active===document.body)){e.preventDefault();applySelection(objects.map((_,i)=>i));showProperties();render();return}
@@ -612,7 +613,7 @@ function runCommand(raw){
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
-$('#cmd').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submitCommand()}});
+$('#cmd').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '&&$('#cmd').value.trim()===''){e.preventDefault();e.stopPropagation();submitCommand()}});
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!==b.dataset.tab)});
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
 $('#finish-poly').onclick=finishPoly;
