@@ -93,7 +93,7 @@ public class HybridActivity extends Activity {
         loadOffline();
     }
 
-    private final class AndroidFileBridge {
+    public final class AndroidFileBridge {
         @JavascriptInterface public void saveFile(String name,String mime,String base64){
             try{
                 pendingSaveBytes=Base64.decode(base64,Base64.DEFAULT);
