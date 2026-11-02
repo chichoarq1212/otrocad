@@ -30,6 +30,7 @@ public class CadView extends View {
     private int drawColor=Color.rgb(220,232,245), selected=-1;
     private final LinkedHashSet<Integer> selectedItems=new LinkedHashSet<>();
     private final ArrayList<Integer> moveTargets=new ArrayList<>();
+    private int modifyTarget=-1;
     private PointF selectionStartScreen=null,selectionEndScreen=null;
     private boolean selectionDragging=false,selectionAdditive=false,multiSelectMode=false;
     private GripRef activeGrip=null;
@@ -57,7 +58,7 @@ public class CadView extends View {
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
     public int getPolylinePointCount(){return poly.size();}
-    public void setTool(String t){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
+    public void setTool(String t){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();modifyTarget=-1;selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
     public void setTransformValue(double value){transformValue=value;}
     public void setPolygonSides(int sides){if(sides>=3&&sides<=64)polygonSides=sides;}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
@@ -360,6 +361,33 @@ public class CadView extends View {
         PointF q=constrain(snap(raw));
         if(tool.equals("SELECT")){int h=hit(q);setSelection(h>=0?Arrays.asList(h):Collections.emptyList());say(h<0?"Sin selección":"Objeto seleccionado");invalidate();return;}
         if(tool.equals("ERASE")){if(selectedIndices().isEmpty()){int h=hit(q);if(h>=0)setSelection(Arrays.asList(h));}deleteSelected();return;}
+        if(tool.equals("TRIM")||tool.equals("EXTEND")){
+            if(modifyTarget<0){
+                int h=hit(q);
+                if(h<0||!entities.get(h).type.equals("LINE")){say(tool+" nativo requiere seleccionar una línea");return;}
+                modifyTarget=h;setSelection(Arrays.asList(h));say(tool+" · toca el extremo que deseas modificar");invalidate();return;
+            }
+            if(modifyTarget>=entities.size()){modifyTarget=-1;return;}
+            Entity target=entities.get(modifyTarget);
+            if(!target.type.equals("LINE")||target.pts.size()<2){modifyTarget=-1;say("La entidad ya no es una línea válida");return;}
+            int endpoint=dist(q,target.pts.get(0))<=dist(q,target.pts.get(1))?0:1;
+            PointF a=target.pts.get(0),b=target.pts.get(1),origin=target.pts.get(endpoint);
+            double best=Double.POSITIVE_INFINITY;PointF bestPoint=null;
+            for(int i=0;i<entities.size();i++){
+                if(i==modifyTarget)continue;Entity boundary=entities.get(i);
+                if(!boundary.type.equals("LINE")||boundary.pts.size()<2)continue;
+                PointF c=boundary.pts.get(0),d=boundary.pts.get(1);
+                double[] hit=NativeTransform.lineIntersection(a.x,a.y,b.x,b.y,c.x,c.y,d.x,d.y);
+                if(hit==null)continue;double t=hit[2],u=hit[3];
+                if(u< -1e-8||u>1+1e-8)continue;
+                if(tool.equals("TRIM")&&(t<=1e-8||t>=1-1e-8))continue;
+                if(tool.equals("EXTEND")&&(endpoint==0?t>=-1e-8:t<=1+1e-8))continue;
+                double distance=Math.hypot(hit[0]-origin.x,hit[1]-origin.y);
+                if(distance<best){best=distance;bestPoint=new PointF((float)hit[0],(float)hit[1]);}
+            }
+            if(bestPoint==null){say("No se encontró una intersección compatible para "+tool);modifyTarget=-1;return;}
+            checkpoint();target.pts.set(endpoint,bestPoint);modifyTarget=-1;setSelection(Arrays.asList(selected));persistLocal();invalidate();say(tool+" aplicado a línea");return;
+        }
         if(tool.equals("MIRROR")){
             if(moveTargets.isEmpty()){
                 moveTargets.addAll(selectedIndices());
@@ -575,8 +603,8 @@ public class CadView extends View {
             if(parts.length<2){say("Indica el valor: RO grados o SC factor");return;}
             try{double value=Double.parseDouble(parts[1]);if(!Double.isFinite(value)||((cmd.equals("SC")||cmd.equals("SCALE"))&&value<=0))throw new NumberFormatException();setTransformValue(value);setTool(cmd.equals("RO")||cmd.equals("ROTATE")?"ROTATE":"SCALE");}catch(NumberFormatException ex){say("Valor de transformación no válido");}return;
         }
-        String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("POL","POLYGON");m.put("L","LINE");m.put("PL","POLY");m.put("MI","MIRROR");m.put("MIR","MIRROR");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
-        String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","MIRROR","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE","POLYGON").contains(t)){setTool(t);return;}
+        String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("POL","POLYGON");m.put("L","LINE");m.put("PL","POLY");m.put("MI","MIRROR");m.put("MIR","MIRROR");m.put("TR","TRIM");m.put("EX","EXTEND");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
+        String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","MIRROR","TRIM","EXTEND","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE","POLYGON").contains(t)){setTool(t);return;}
         if(c.equals("UNDO")||c.equals("U")){undo();return;}if(c.equals("REDO")){redo();return;}if(c.equals("DELETE")){deleteSelected();return;}
         try{String z=s.replace("@","");if(z.contains("<")){String[] p=z.split("<");float len=Float.parseFloat(p[0]),ang=(float)Math.toRadians(Float.parseFloat(p[1]));PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):(tool.equals("ARC")&&!arcPoints.isEmpty()?arcPoints.get(arcPoints.size()-1):(anchor==null?new PointF(0,0):anchor));handle(new PointF(base.x+len*(float)Math.cos(ang),base.y+len*(float)Math.sin(ang)));return;}if(z.contains(",")){String[] p=z.split(",");float x=Float.parseFloat(p[0]),y=Float.parseFloat(p[1]);PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):(tool.equals("ARC")&&!arcPoints.isEmpty()?arcPoints.get(arcPoints.size()-1):(anchor==null?new PointF(0,0):anchor));if(s.startsWith("@")){x+=base.x;y+=base.y;}handle(new PointF(x,y));return;}}catch(Exception ignored){}
         say("Comando no reconocido: "+c);
