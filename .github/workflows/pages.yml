@@ -1,7 +1,5 @@
 name: Publish OtroCAD
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
@@ -17,11 +15,6 @@ jobs:
         run: node scripts/build-pages.cjs
       - name: Verify all local navigation and assets
         run: node scripts/verify-pages.cjs
-      - name: Screenshot of the REAL CAD editor
-        run: |
-          BROWSER="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
-          "$BROWSER" --headless --no-sandbox --disable-gpu --hide-scrollbars --disable-dev-shm-usage --virtual-time-budget=2200 --window-size=1440,900 --screenshot="$PWD/dist/editor-preview.png" "file://$PWD/dist/editor/index.html"
-          test -s dist/editor-preview.png
       - name: Disable Jekyll processing
         run: touch dist/.nojekyll
       - name: Publish files to gh-pages branch
