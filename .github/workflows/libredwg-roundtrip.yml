@@ -40,7 +40,9 @@ jobs:
           upstream-libredwg/programs/dwgwrite --as r2000 -I DXF -o /tmp/otrocad-demo.dwg /tmp/otrocad-normalized.dxf
           test "$(head -c 6 /tmp/otrocad-demo.dwg)" = AC1015
           upstream-libredwg/programs/dwgread -O DXF -o /tmp/otrocad-return.dxf /tmp/otrocad-demo.dwg
+          upstream-libredwg/programs/dwg2dxf -m -o /tmp/otrocad-minimal.dxf /tmp/otrocad-demo.dwg
           python3 tests/audit-demo-dxf.py /tmp/otrocad-return.dxf
+          python3 tests/audit-demo-dxf.py /tmp/otrocad-minimal.dxf
       - name: Conservar archivos para inspección
         if: always()
         uses: actions/upload-artifact@v4
@@ -51,4 +53,5 @@ jobs:
             /tmp/otrocad-normalized.dxf
             /tmp/otrocad-demo.dwg
             /tmp/otrocad-return.dxf
+            /tmp/otrocad-minimal.dxf
           if-no-files-found: warn
