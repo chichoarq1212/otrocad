@@ -433,13 +433,14 @@ function addCadMenuItem(label,hint,action,disabled=false,primary=false){
 }
 function cancelCurrentAction(){
  $('#cmd').value='';updateCursorCommand();
- start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];selectionStart=null;selectionBox=null;
- render();updatePrompt();status.textContent='Comando cancelado · listo para continuar';
+ hideCadContextMenu();setTool('select');selectionStart=null;selectionBox=null;activeSnap=null;
+ render();updatePrompt();status.textContent='Comando cancelado · modo SELECCIÓN (ventana y cruce)';
 }
 function performEnterAction(){
  const raw=$('#cmd').value.trim();
  if(raw){$('#cmd').value='';updateCursorCommand();runCommand(raw);return}
- if(poly.length){finishPoly();return}
+ if(poly.length){finishPoly();setTool('select');status.textContent='Polilínea terminada · modo SELECCIÓN';return}
+ if(tool==='line'&&start){start=null;temp=null;setTool('select');status.textContent='Línea terminada · modo SELECCIÓN';return}
  if(start){
   let q=pointFromInputs();
   if(q&&distance(start,q)<=1e-9)q=null;
@@ -448,8 +449,9 @@ function performEnterAction(){
   status.textContent='Indica el punto final o introduce longitud y ángulo';return;
  }
  if(arcPoints.length){status.textContent='Arco: marca el siguiente punto o pulsa Escape para cancelar';return}
+ if(tool!=='select'&&tool!=='pan'){setTool('select');status.textContent='Comando terminado · modo SELECCIÓN';return}
  if(lastCommand){runCommand(lastCommand);return}
- status.textContent='No hay un comando activo para confirmar';
+ status.textContent='Modo SELECCIÓN';
 }
 function submitCommand(){
  const raw=$('#cmd').value.trim();
@@ -464,11 +466,12 @@ function showCadContextMenu(e){
  e.preventDefault();
  contextMenuEl.innerHTML='<div class="cad-menu-title">OTROCAD · MENÚ CONTEXTUAL</div>';
  const raw=$('#cmd').value.trim();
- const enterLabel=raw?'Ejecutar comando':(poly.length?'Enter · Terminar polilínea':(start?'Enter · Confirmar punto':'Enter'));
+ const enterLabel=raw?'Ejecutar comando':(poly.length?'Enter · Terminar polilínea':(tool==='line'&&start?'Enter · Terminar línea':(start?'Enter · Confirmar punto':'Enter')));
  addCadMenuItem(enterLabel,'↵',performEnterAction,!raw&&!poly.length&&!start&&!lastCommand,true);
  addCadMenuItem('Repetir último comando',lastCommand||'—',repeatLastCommand,!lastCommand);
  addCadMenuDivider();
- addCadMenuItem('Cancelar operación','Esc',cancelCurrentAction,false);
+ addCadMenuItem('Salir del comando · Seleccionar','Esc',cancelCurrentAction,false);
+ addCadMenuItem('Configurar clic derecho','⚙',showDraftSettings);
  addCadMenuItem('Deshacer','Ctrl + Z',()=>$('#undo').click(),!undo.length);
  addCadMenuItem('Rehacer','Ctrl + Y',()=>$('#redo').click(),!redo.length);
  addCadMenuDivider();
@@ -536,7 +539,8 @@ canvas.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('contextmenu',e=>{
  e.preventDefault();
- const hasActiveCommand=!!($('#cmd').value.trim()||poly.length||start||arcPoints.length);
+ const hasActiveCommand=!!($('#cmd').value.trim()||poly.length||start||arcPoints.length||(tool!=='select'&&tool!=='pan'));
+ if(e.ctrlKey){showDraftSettings();return}
  if(e.shiftKey){showCadContextMenu(e);return}
  if(hasActiveCommand&&rightClickDuringCommand==='enter'){hideCadContextMenu();performEnterAction();return}
  if(!hasActiveCommand&&rightClickMode==='repeat'){hideCadContextMenu();repeatLastCommand();return}
