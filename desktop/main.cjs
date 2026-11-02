@@ -1,7 +1,7 @@
 'use strict';
-const { app, BrowserWindow, session, protocol, net } = require('electron');
+const { app, BrowserWindow, session, protocol } = require('electron');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
+const fs = require('node:fs/promises');
 const smoke = process.argv.includes('--smoke-test');
 
 protocol.registerSchemesAsPrivileged([{
@@ -21,8 +21,18 @@ app.whenReady().then(async () => {
     catch (_) { return new Response('Bad path', { status: 400 }); }
     const target = path.resolve(root, relative || 'index.html');
     if (target !== root && !target.startsWith(root + path.sep)) return new Response('Forbidden', { status: 403 });
-    try { return await net.fetch(pathToFileURL(target).toString()); }
-    catch (_) { return new Response('Not found', { status: 404 }); }
+    try {
+      const bytes = await fs.readFile(target);
+      const ext = path.extname(target).toLowerCase();
+      const mime = ({
+        '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',
+        '.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
+        '.wasm':'application/wasm','.svg':'image/svg+xml','.png':'image/png',
+        '.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp',
+        '.json':'application/json','.webmanifest':'application/manifest+json'
+      })[ext] || 'application/octet-stream';
+      return new Response(bytes, { headers: { 'Content-Type': mime, 'Cache-Control': 'no-store' } });
+    } catch (_) { return new Response('Not found', { status: 404 }); }
   });
 
   // Only the bundled application origin is permitted; the packaged editor works without network access.
