@@ -11,8 +11,10 @@ const requiredFiles = [
   'sw.js',
   'icon.svg',
   'editor-preview.svg',
+  'editor-preview-real.jpg',
   'editor/index.html',
   'editor/editor.js',
+  'editor/demo/vivienda.js',
   'tutorial/index.html',
   'descargas/index.html',
   'herramientas/index.html'
@@ -28,7 +30,7 @@ for (const relativePath of requiredFiles) {
 fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
 
-for (const relativePath of ['index.html', 'manifest.webmanifest', 'sw.js', 'icon.svg', 'editor-preview.svg']) {
+for (const relativePath of ['index.html', 'manifest.webmanifest', 'sw.js', 'icon.svg', 'editor-preview.svg', 'editor-preview-real.jpg']) {
   fs.copyFileSync(path.join(root, relativePath), path.join(output, relativePath));
 }
 
@@ -39,3 +41,4 @@ fs.cpSync(path.join(root, 'herramientas'), path.join(output, 'herramientas'), { 
 
 console.log('OtroCAD listo para Cloudflare Workers: solo se publican los archivos web en /dist.');
 console.log('Se excluyen android/, .github/, tests/ y el resto del código de desarrollo.');
+

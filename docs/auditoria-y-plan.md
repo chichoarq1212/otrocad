@@ -12,7 +12,7 @@ Base auditada: main a2d7624dab63f9ab8e35609e6ffce759186eabb9 (0.5.4 alfa). Las f
 - El repositorio no incluye un archivo de licencia; antes de integrar código de terceros hay que acordar la licencia y comprobar las obligaciones de distribución.
 
 ## Primera mejora en esta rama
-Copia local previa a una edición, recuperación manual y aviso si falla el almacenamiento. DXF ahora incluye texto y advierte de entidades omitidas o simplificadas; aún no es una conversión sin pérdida. Los datos del navegador siguen siendo una copia local: eliminarlos también elimina las copias. El respaldo descargable existente sigue disponible para conservar entidades que DXF aún no soporta.
+Copia local previa a una edición, recuperación manual y aviso si falla el almacenamiento. DXF ahora incluye texto y advierte de entidades omitidas o simplificadas; aún no es una conversión sin pérdida. Existe una vivienda de demostración editable con 163 entidades, una captura real de la interfaz y una portada preparada para mostrarla. La muestra es conceptual y no constituye un proyecto constructivo verificado. Los datos del navegador siguen siendo una copia local: eliminarlos también elimina las copias. El respaldo descargable existente sigue disponible para conservar entidades que DXF aún no soporta.
 
 ## DWG: alternativas para evaluar
 - GNU LibreDWG lee y escribe DWG, con licencia GPL-3.0 o posterior. La integración requiere evaluar compatibilidad de licencia, versiones, cobertura, compilación web/Android/Windows y pruebas con AutoCAD y otros lectores. https://www.gnu.org/software/libredwg/

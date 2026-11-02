@@ -1,5 +1,5 @@
-const CACHE='otrocad-pc-offline-47';
-const ASSETS=['./','./index.html','./editor/','./editor/index.html','./editor/editor.js','./tutorial/','./tutorial/index.html','./descargas/','./descargas/index.html','./herramientas/','./herramientas/index.html','./manifest.webmanifest','./icon.svg','./editor-preview.svg'];
+const CACHE='otrocad-pc-offline-48';
+const ASSETS=['./','./index.html','./editor/','./editor/index.html','./editor/editor.js','./editor/demo/vivienda.js','./tutorial/','./tutorial/index.html','./descargas/','./descargas/index.html','./herramientas/','./herramientas/index.html','./manifest.webmanifest','./icon.svg','./editor-preview.svg','./editor-preview-real.jpg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('otrocad-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
@@ -17,3 +17,4 @@ self.addEventListener('fetch',event=>{
   return Response.error();
  })());
 });
+

@@ -30,3 +30,11 @@ context.objects=[{type:'text',a:{x:1,y:2},text:'COCINA',textHeight:14,layer:'Tex
 accept=false;handlers.get('#dxf').onclick();assert.equal(downloaded,null, 'No descargar si se rechaza pérdida de datos');
 accept=true;handlers.get('#dxf').onclick();assert.match(downloaded.content,/\r\nTEXT\r\n/);assert.match(downloaded.content,/\r\nCOCINA\r\n/);
 console.log('Storage and DXF checks passed: backup, failed storage warning, export loss warning, text entity');
+
+const demoScope = {window:{}};
+vm.runInNewContext(fs.readFileSync('editor/demo/vivienda.js','utf8'),demoScope);
+const demo = demoScope.window.otroCadDemo.shapes;
+assert.ok(demo.length > 100);
+for (const name of ['SALA','COMEDOR','COCINA','DORMITORIO 1','DORMITORIO 2','BANO']) assert.ok(demo.some(x=>x.type==='text' && x.text===name));
+for (const type of ['line','rect','arc','hatch','dim']) assert.ok(demo.some(x=>x.type===type));
+console.log('Demo checks passed: rooms and editable drawing entities');

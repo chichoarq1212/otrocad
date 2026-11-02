@@ -36,6 +36,7 @@ jobs:
         run: |
           mkdir -p android/app/src/main/assets/editor
           cp editor/index.html editor/editor.js android/app/src/main/assets/editor/
+          cp -R editor/demo android/app/src/main/assets/editor/
           test -s android/app/src/main/assets/editor/index.html
           test -s android/app/src/main/assets/editor/editor.js
       - name: Build Android debug APK
@@ -63,3 +64,4 @@ jobs:
           name: OtroCAD-Android-debug-verified
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
