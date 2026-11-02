@@ -61,9 +61,6 @@ public class HybridActivity extends Activity {
                 if(url.startsWith(OFFLINE)){offline=true;notice("OtroCAD · EDITOR LOCAL · sin internet");}
                 else if(url.startsWith(ONLINE)){offline=false;notice("OtroCAD · WEB EN LÍNEA");}
             }
-            @Override public void onReceivedError(WebView view,WebResourceRequest request,android.webkit.WebResourceError error){
-                if(request.isForMainFrame()&&!offline)loadOffline();
-            }
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
                 Uri u=request.getUrl();String host=u.getHost();
                 if("otrocad.cristhian-torres-arq.workers.dev".equals(host)||"appassets.androidplatform.net".equals(host))return false;
