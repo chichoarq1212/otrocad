@@ -1,0 +1,73 @@
+name: Build OtroCAD DWG WebAssembly
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dwg-wasm/**'
+      - 'editor/editor.js'
+      - 'editor/index.html'
+      - '.github/workflows/dwg-wasm.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dwg-wasm/**'
+      - 'editor/editor.js'
+      - 'editor/index.html'
+      - '.github/workflows/dwg-wasm.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dwg-wasm-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust and WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: dwg-wasm
+      - name: Run native DWG round-trip tests
+        run: cargo test --manifest-path dwg-wasm/Cargo.toml --locked
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+      - name: Build browser WebAssembly module
+        run: wasm-pack build dwg-wasm --target web --release --no-default-features --out-dir ../editor/vendor/dwg --out-name otrocad_dwg
+      - name: Verify generated module
+        run: |
+          test -s editor/vendor/dwg/otrocad_dwg.js
+          test -s editor/vendor/dwg/otrocad_dwg_bg.wasm
+          grep -q 'dxf_to_dwg' editor/vendor/dwg/otrocad_dwg.js
+          grep -q 'dwg_to_dxf' editor/vendor/dwg/otrocad_dwg.js
+      - name: Commit generated WebAssembly runtime to main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add editor/vendor/dwg
+          if git diff --cached --quiet; then
+            echo "WASM runtime is already current"
+            exit 0
+          fi
+          git commit -m "Build local DWG WebAssembly runtime"
+          git push
+      - name: Upload WebAssembly artifact for pull requests
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: OtroCAD-DWG-WebAssembly
+          path: editor/vendor/dwg/
+          if-no-files-found: error
