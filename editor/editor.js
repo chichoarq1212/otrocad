@@ -264,7 +264,7 @@ function commitEntity(endPoint){
  else if(tool==='dim'||tool==='dimaligned')objects.push({type:tool,a:clone(start),b:clone(endPoint),...style,layer:'Cotas'});
  else if(tool==='rect'||tool==='hatch'||tool==='ellipse')objects.push({type:tool,a:clone(start),b:clone(endPoint),...(tool==='hatch'?{hatchPattern:$('#hatchPattern')?.value||'ANSI31',hatchSpacing:Number($('#hatchSpacing')?.value||10)}:{}),...style});
  else if(tool==='circle')objects.push({type:'circle',a:clone(start),b:clone(endPoint),...style});
- else if(tool==='polygon'){const n=Math.max(3,Math.min(64,polySides));const r=distance(start,endPoint);const pts=[];for(let i=0;i<n;i++){const a=2*Math.PI*i/n;pts.push({x:start.x+r*Math.cos(a),y:start.y+r*Math.sin(a)})}objects.push({type:'polygon',pts,...style})}
+ else if(tool==='polygon'){const n=Math.max(3,Math.min(64,polySides));const r=distance(start,endPoint);const pts=[];for(let i=0;i<n;i++){const a=Math.atan2(endPoint.y-start.y,endPoint.x-start.x)+2*Math.PI*i/n;pts.push({x:start.x+r*Math.cos(a),y:start.y+r*Math.sin(a)})}objects.push({type:'polygon',pts,...style})}
  save();applySelection([objects.length-1]);start=null;temp=null;render();updatePrompt();
 }
 function finishPoly(){if(poly.length<2){status.textContent='La polilínea necesita al menos dos puntos';return false}if(lockedLayers.has($('#layer').value)){status.textContent='La capa actual está bloqueada';return false}checkpoint();objects.push({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)});save();poly=[];start=null;temp=null;render();updatePrompt();status.textContent='Polilínea terminada';return true}
@@ -285,8 +285,8 @@ function doOffset(q){
   const r=distance(s.a,s.b),newR=r+(distance(q,s.a)>r?d:-d);
   if(newR<=0){status.textContent='El desfase dejaría un radio no válido';return}objects.push({type:'circle',a:clone(s.a),b:{x:s.a.x+newR,y:s.a.y},...style});
  }else if(s.type==='rect'){
-  const minX=Math.min(s.a.x,s.b.x),maxX=Math.max(s.a.x,s.b.x),minY=Math.min(s.a.y,s.b.y),maxY=Math.max(s.a.y,s.b.y),cx=(minX+maxX)/2,cy=(minY+maxY)/2,expand=distance(q,{x:cx,y:cy})>Math.hypot(maxX-minX,maxY-minY)/2?d:-d;
-  if(maxX-minX<=2*Math.abs(expand)||maxY-minY<=2*Math.abs(expand)){status.textContent='El desfase dejaría un rectángulo no válido';return}objects.push({type:'rect',a:{x:minX-expand,y:minY-expand},b:{x:maxX+expand,y:maxY+expand},...style});
+  const minX=Math.min(s.a.x,s.b.x),maxX=Math.max(s.a.x,s.b.x),minY=Math.min(s.a.y,s.b.y),maxY=Math.max(s.a.y,s.b.y),inside=q.x>=minX&&q.x<=maxX&&q.y>=minY&&q.y<=maxY,expand=inside?-d:d;
+  if(inside&&(maxX-minX<=2*d||maxY-minY<=2*d)){status.textContent='El desfase dejaría un rectángulo no válido';return}objects.push({type:'rect',a:{x:minX-expand,y:minY-expand},b:{x:maxX+expand,y:maxY+expand},...style});
  }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
  if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([objects.length-1]);render();status.textContent='OFFSET creado';
 }
