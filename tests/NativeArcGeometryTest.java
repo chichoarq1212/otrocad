@@ -14,6 +14,17 @@ public class NativeArcGeometryTest {
         verify(new double[]{1000001,1000000},new double[]{1000000,1000001},new double[]{999999,1000000},1000000,1000000,1);
         check(ArcGeometry.through(0,0,1,1,2,2)==null);
         check(ArcGeometry.through(0,0,0,0,1,1)==null);
+        double[][] wrap=ArcGeometry.fromDxf(3,4,2,350,10);
+        check(wrap!=null);
+        check(wrap[32][0]>4.999 && Math.abs(wrap[32][1]-4)<1e-8);
+        double[] dxf=ArcGeometry.toDxf(wrap);
+        check(dxf!=null && Math.abs(dxf[0]-3)<1e-8 && Math.abs(dxf[1]-4)<1e-8);
+        check(Math.abs(dxf[2]-2)<1e-8 && Math.abs(dxf[3]-350)<1e-7 && Math.abs(dxf[4]-10)<1e-7);
+        double[][] clockwise=ArcGeometry.through(1,0,0,-1,-1,0);
+        dxf=ArcGeometry.toDxf(clockwise);
+        check(dxf!=null && Math.abs(dxf[3]-180)<1e-7 && Math.abs(dxf[4])<1e-7);
+        check(ArcGeometry.toDxf(new double[][]{{0,0},{1,2},{2,1},{3,0}})==null);
+        check(ArcGeometry.fromDxf(0,0,0,0,90)==null);
         System.out.println("Arco nativo: sentido, punto intermedio, radio y casos inválidos correctos");
     }
 }

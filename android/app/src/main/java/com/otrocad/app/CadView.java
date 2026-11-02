@@ -509,7 +509,7 @@ public class CadView extends View {
             if(e.type.equals("LINE"))e.pts.add(new PointF(num(v,"11",0),num(v,"21",0)));
             else if(e.type.equals("CIRCLE")){float r=num(v,"40",1);e.pts.add(new PointF(x+r,y));}
             else if(e.type.equals("POLY")){e.pts.clear();ArrayList<String> xs=v.get("10"),ys=v.get("20");if(xs!=null)for(int k=0;k<xs.size();k++)e.pts.add(new PointF(parse(xs.get(k)),ys!=null&&k<ys.size()?parse(ys.get(k)):0));if((((int)num(v,"70",0))&1)!=0)e.type="POLYGON";}
-            else if(e.type.equals("ARC")){float r=num(v,"40",1),a1=(float)Math.toRadians(num(v,"50",0)),a2=(float)Math.toRadians(num(v,"51",90));e.pts.clear();for(int k=0;k<=24;k++){float t=a1+(a2-a1)*k/24f;e.pts.add(new PointF(x+r*(float)Math.cos(t),y+r*(float)Math.sin(t)));}}
+            else if(e.type.equals("ARC")){double[][] samples=ArcGeometry.fromDxf(x,y,num(v,"40",0),num(v,"50",0),num(v,"51",0));if(samples==null){i=j-1;continue;}e.pts.clear();for(double[] p:samples)e.pts.add(new PointF((float)p[0],(float)p[1]));}
             else if(e.type.equals("TEXT"))e.text=first(v,"1","Texto");
             String col=first(v,"420","");if(!col.isEmpty())try{e.color=Color.rgb((int)(Long.parseLong(col)>>16)&255,(int)(Long.parseLong(col)>>8)&255,(int)Long.parseLong(col)&255);}catch(Exception ignored){}
             e.weight=num(v,"370",25)/100f;e.linetype=first(v,"6","CONTINUOUS");out.add(e);i=j-1;
@@ -527,8 +527,14 @@ public class CadView extends View {
             else if(e.type.equals("RECT")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("100\nAcDbPolyline\n90\n4\n70\n1\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(q.y).append("\n10\n").append(a.x).append("\n20\n").append(q.y).append("\n");}
             else if(e.type.equals("TEXT"))b.append("0\nTEXT\n").append(common).append("100\nAcDbText\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n40\n").append(e.textHeight).append("\n1\n").append(e.text.replace("\n"," ")).append("\n");
             else if(e.type.equals("ELLIPSE")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("100\nAcDbPolyline\n90\n36\n70\n1\n");for(int k=0;k<36;k++){double t=k*Math.PI*2/36;b.append("10\n").append(a.x+(q.x-a.x)*Math.cos(t)).append("\n20\n").append(a.y+(q.y-a.y)*Math.sin(t)).append("\n");}}
+            else if(e.type.equals("ARC")&&appendDxfArc(b,e,common)){}
             else if(e.pts.size()>1){b.append("0\nLWPOLYLINE\n").append(common).append("100\nAcDbPolyline\n90\n").append(e.pts.size()).append("\n70\n").append(e.type.equals("POLYGON")?1:0).append("\n");for(PointF p:e.pts)b.append("10\n").append(p.x).append("\n20\n").append(p.y).append("\n");}
         }return b.append("0\nENDSEC\n0\nEOF\n").toString();
+    }
+    private static boolean appendDxfArc(StringBuilder out,Entity e,String common){
+        double[][] points=new double[e.pts.size()][2];for(int i=0;i<points.length;i++){points[i][0]=e.pts.get(i).x;points[i][1]=e.pts.get(i).y;}
+        double[] g=ArcGeometry.toDxf(points);if(g==null)return false;
+        out.append("0\nARC\n").append(common).append("100\nAcDbCircle\n10\n").append(g[0]).append("\n20\n").append(g[1]).append("\n30\n0\n40\n").append(g[2]).append("\n100\nAcDbArc\n50\n").append(g[3]).append("\n51\n").append(g[4]).append("\n");return true;
     }
     public void setLayer(String s){layer=s;}
     public void setOffsetDistance(float d){if(Float.isFinite(d)&&d>0&&d<1000000)offsetDistance=d;}
