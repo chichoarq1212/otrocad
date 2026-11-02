@@ -39,7 +39,7 @@ public class CadView extends View {
     private String units="m";
     private boolean grid=true, gridSnap=false, ortho=false, polar=false, snap=true, crosshair=true;
     private boolean osEnd=true,osMid=true,osCenter=true,osQuadrant=true,osPerpendicular=false,osTangent=false,osNearest=false,osParallel=false;
-    private int decimalPrecision=3;
+    private int decimalPrecision=3, polygonSides=6;
     private PointF anchor=null,cursor=new PointF(0,0),panLast=null,moveBase=null;
     private boolean panning=false,pinching=false;
     private float pinchStart=0,pinchZoom=36f;
@@ -57,6 +57,7 @@ public class CadView extends View {
     public String getTool(){return tool;}
     public int getPolylinePointCount(){return poly.size();}
     public void setTool(String t){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
+    public void setPolygonSides(int sides){if(sides>=3&&sides<=64)polygonSides=sides;}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
     public void toggleOrtho(){ortho=!ortho;say("ORTHO "+(ortho?"activado · líneas horizontales y verticales":"desactivado · dirección libre"));invalidate();}
@@ -377,6 +378,14 @@ public class CadView extends View {
             }else say("Marca el siguiente punto del arco");
             invalidate();return;
         }
+        if(tool.equals("POLYGON")){
+            if(anchor==null){anchor=new PointF(q.x,q.y);say("Polígono: indica el primer vértice");invalidate();return;}
+            double[][] vertices=PolygonGeometry.regular(anchor.x,anchor.y,q.x,q.y,polygonSides);
+            if(vertices==null){say("Polígono: indica un radio mayor que cero");return;}
+            checkpoint();Entity e=new Entity();e.type="POLYGON";e.layer=layer;e.color=drawColor;e.weight=weight;
+            for(double[] v:vertices)e.pts.add(new PointF((float)v[0],(float)v[1]));
+            entities.add(e);setSelection(Arrays.asList(entities.size()-1));anchor=null;persistLocal();invalidate();say("Polígono creado · "+polygonSides+" lados");return;
+        }
         if(tool.equals("TEXT")){Entity e=new Entity();e.type="TEXT";e.layer=layer;e.color=drawColor;e.text=textValue;e.pts.add(q);checkpoint();entities.add(e);setSelection(Arrays.asList(entities.size()-1));persistLocal();invalidate();say("Texto colocado");return;}
         if(tool.equals("LINE")||tool.equals("RECT")||tool.equals("CIRCLE")||tool.equals("DIM")||tool.equals("HATCH")||tool.equals("LEADER")||tool.equals("ELLIPSE")){
             if(anchor==null){anchor=q;cursor=q;invalidate();say("Marca el punto final");}else{addEntity(tool,anchor,q);}return;
@@ -481,8 +490,8 @@ public class CadView extends View {
     public void runCommand(String raw){
         String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);if(u.equals("MULTI")){toggleMultiSelect();return;}if(u.equals("ESC")||u.equals("CANCEL")){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;setSelection(Collections.emptyList());anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;say("Comando cancelado · selección limpia");invalidate();return;}String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
         if(u.equals("F7")||u.equals("GRID")){toggleGrid();return;}if(u.equals("F8")||u.equals("ORTHO")){toggleOrtho();return;}if(u.equals("F9")||u.equals("SNAP")){toggleGridSnap();return;}if(u.equals("F3")||u.equals("OSNAP")){toggleSnap();return;}if(u.equals("F10")||u.equals("POLAR")){togglePolar();return;}
-        String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
-        String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE").contains(t)){setTool(t);return;}
+        String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("POL","POLYGON");m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
+        String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE","POLYGON").contains(t)){setTool(t);return;}
         if(c.equals("UNDO")||c.equals("U")){undo();return;}if(c.equals("REDO")){redo();return;}if(c.equals("DELETE")){deleteSelected();return;}
         try{String z=s.replace("@","");if(z.contains("<")){String[] p=z.split("<");float len=Float.parseFloat(p[0]),ang=(float)Math.toRadians(Float.parseFloat(p[1]));PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):(tool.equals("ARC")&&!arcPoints.isEmpty()?arcPoints.get(arcPoints.size()-1):(anchor==null?new PointF(0,0):anchor));handle(new PointF(base.x+len*(float)Math.cos(ang),base.y+len*(float)Math.sin(ang)));return;}if(z.contains(",")){String[] p=z.split(",");float x=Float.parseFloat(p[0]),y=Float.parseFloat(p[1]);PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):(tool.equals("ARC")&&!arcPoints.isEmpty()?arcPoints.get(arcPoints.size()-1):(anchor==null?new PointF(0,0):anchor));if(s.startsWith("@")){x+=base.x;y+=base.y;}handle(new PointF(x,y));return;}}catch(Exception ignored){}
         say("Comando no reconocido: "+c);
