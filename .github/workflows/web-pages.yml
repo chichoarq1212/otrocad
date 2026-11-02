@@ -5,6 +5,9 @@ on:
     branches: ["main"]
     paths:
       - "editor/**"
+      - "descargas/**"
+      - "tutorial/**"
+      - "herramientas/**"
       - "index.html"
       - "manifest.webmanifest"
       - "sw.js"
@@ -16,6 +19,9 @@ on:
     branches: ["main"]
     paths:
       - "editor/**"
+      - "descargas/**"
+      - "tutorial/**"
+      - "herramientas/**"
       - "index.html"
       - "manifest.webmanifest"
       - "sw.js"

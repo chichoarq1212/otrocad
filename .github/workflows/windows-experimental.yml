@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - 'desktop/**'
+      - 'editor/**'
+      - 'scripts/build-pages.cjs'
       - '.github/workflows/windows-experimental.yml'
   pull_request:
     paths:
