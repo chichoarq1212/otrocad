@@ -8,12 +8,19 @@ on:
       - 'tests/NativeArcGeometryTest.java'
       - 'tests/NativePolygonGeometryTest.java'
       - 'tests/NativeTransformTest.java'
+      - 'tests/NativeDxfArcFixture.java'
+      - 'tests/audit-native-dxf-arcs.py'
       - '.github/workflows/android-native-smoke.yml'
   pull_request:
     branches: [main]
     paths:
       - 'android/**'
       - 'tests/android-native-smoke.py'
+      - 'tests/NativeArcGeometryTest.java'
+      - 'tests/NativePolygonGeometryTest.java'
+      - 'tests/NativeTransformTest.java'
+      - 'tests/NativeDxfArcFixture.java'
+      - 'tests/audit-native-dxf-arcs.py'
       - '.github/workflows/android-native-smoke.yml'
   workflow_dispatch:
 concurrency:
