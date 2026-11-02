@@ -326,6 +326,19 @@ function handleTap(p){
  if(tool==='offset'){doOffset(q);return}
  if(tool==='poly'){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Polilínea: marca otro vértice o pulsa Enter';return}
  if(tool==='explode'){explodeAt(q);return}
+ if(tool==='fillet'){
+  const hit=selectAt(q);
+  if(hit<0||objects[hit]?.type!=='line'){status.textContent='Empalme: selecciona una línea';return}
+  if(modifyTarget<0){modifyTarget=hit;moveBase=clone(q);applySelection([hit]);status.textContent='Empalme: selecciona la segunda línea';return}
+  if(hit===modifyTarget){status.textContent='Selecciona otra línea';return}
+  const raw=prompt('Radio del empalme (0 para esquina)', '0');if(raw===null)return;
+  const radius=Number(String(raw).trim().replace(',','.'));if(String(raw).trim()===''||!Number.isFinite(radius)||radius<0){status.textContent='Introduce un radio válido';return}
+  const first=objects[modifyTarget],second=objects[hit],g=filletGeometry(first,second,moveBase,q,radius);
+  if(!g){status.textContent='No se puede empalmar: comprueba las líneas y el radio';return}
+  checkpoint();first[g.a.replace]=clone(g.t1);second[g.b.replace]=clone(g.t2);
+  if(g.arc)objects.push({type:'arc',pts:g.arc.map(clone),layer:first.layer,color:first.color,lineweight:first.lineweight,linetype:first.linetype});
+  save();applySelection([modifyTarget,hit]);modifyTarget=-1;moveBase=null;render();status.textContent='Empalme aplicado';return;
+ }
  if(tool==='trim'||tool==='extend'){
   if(modifyTarget<0){modifyTarget=selectAt(q);applySelection(modifyTarget>=0?[modifyTarget]:[]);if(modifyTarget<0){status.textContent='Selecciona la línea que deseas modificar';return}status.textContent='Marca el extremo que deseas '+(tool==='trim'?'recortar':'alargar');return}
   const idx=modifyTarget;trimOrExtend(idx,q,tool);return;
@@ -416,6 +429,28 @@ function lineIntersection(a,b,c,d,segments=true){
  const qx=c.x-a.x,qy=c.y-a.y,t=(qx*sy-qy*sx)/den,u=(qx*ry-qy*rx)/den;
  if(segments&&(t< -1e-8||t>1+1e-8||u< -1e-8||u>1+1e-8))return null;
  return {x:a.x+t*rx,y:a.y+t*ry,t,u};
+}
+function filletGeometry(first,second,pick1,pick2,radius){
+ if(!first||!second||first.type!=='line'||second.type!=='line'||!Number.isFinite(radius)||radius<0)return null;
+ const intersection=lineIntersection(first.a,first.b,second.a,second.b,false);if(!intersection)return null;
+ const p={x:intersection.x,y:intersection.y};
+ const branch=(line,pick)=>{
+  const va={x:line.a.x-p.x,y:line.a.y-p.y},vb={x:line.b.x-p.x,y:line.b.y-p.y},vq={x:pick.x-p.x,y:pick.y-p.y};
+  const dot=v=>v.x*vq.x+v.y*vq.y;
+  const keep=dot(va)>=dot(vb)?'a':'b',v=keep==='a'?va:vb,len=Math.hypot(v.x,v.y);
+  return len>1e-9?{keep,replace:keep==='a'?'b':'a',unit:{x:v.x/len,y:v.y/len},len}:null;
+ };
+ const a=branch(first,pick1),b=branch(second,pick2);if(!a||!b)return null;
+ const dot=Math.max(-1,Math.min(1,a.unit.x*b.unit.x+a.unit.y*b.unit.y)),theta=Math.acos(dot);
+ if(theta<1e-6||Math.PI-theta<1e-6)return null;
+ if(radius===0)return {a,b,t1:p,t2:p,arc:null};
+ const t=radius/Math.tan(theta/2);if(!Number.isFinite(t)||t>=a.len-1e-9||t>=b.len-1e-9)return null;
+ const t1={x:p.x+a.unit.x*t,y:p.y+a.unit.y*t},t2={x:p.x+b.unit.x*t,y:p.y+b.unit.y*t};
+ const bis={x:a.unit.x+b.unit.x,y:a.unit.y+b.unit.y},bl=Math.hypot(bis.x,bis.y),cl=radius/Math.sin(theta/2);
+ const center={x:p.x+bis.x/bl*cl,y:p.y+bis.y/bl*cl};
+ const mx=t1.x+t2.x-2*center.x,my=t1.y+t2.y-2*center.y,ml=Math.hypot(mx,my);if(ml<1e-9)return null;
+ const mid={x:center.x+radius*mx/ml,y:center.y+radius*my/ml};
+ return {a,b,t1,t2,arc:[t1,mid,t2]};
 }
 function trimOrExtend(index,q,mode){
  const s=objects[index];if(!s||s.type!=='line'){status.textContent=mode.toUpperCase()+' en esta alfa requiere una línea';return}
@@ -634,7 +669,7 @@ document.addEventListener('keydown',e=>{
   e.preventDefault();$('#cmd').value += e.key;updateCursorCommand();return;
  }
 },true);
-const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',BH:'hatch',BHATCH:'hatch',D:'dim',DIM:'dim',DLI:'dim',DIMLINEAR:'dim',DAL:'dimaligned',DIMALIGNED:'dimaligned',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
+const aliases={F:'fillet',FILLET:'fillet',DI:'measure',DIST:'measure',DISTANCE:'measure',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',BH:'hatch',BHATCH:'hatch',D:'dim',DIM:'dim',DLI:'dim',DIMLINEAR:'dim',DAL:'dimaligned',DIMALIGNED:'dimaligned',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
 function parseCoordinate(raw,base){
  const s=raw.trim().replace(/\s+/g,'');let m;
  if((m=s.match(/^@?(-?\d+(?:[.,]\d+)?),(-?\d+(?:[.,]\d+)?)$/))){const x=Number(m[1].replace(',','.')),y=Number(m[2].replace(',','.'));return s.startsWith('@')?{x:base.x+x,y:base.y+y}:{x,y}}
@@ -666,7 +701,7 @@ function runCommand(raw){
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
- if(c==='F'||c==='FILLET'||c==='CHA'||c==='CHAMFER'){status.textContent=c+' · empalme/chaflán aún no implementado';return}
+ if(c==='CHA'||c==='CHAMFER'){status.textContent=c+' · chaflán aún no implementado';return}
  const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
