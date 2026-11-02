@@ -45,6 +45,7 @@ jobs:
           node tests/grips.test.cjs
           node tests/storage-dxf.test.cjs
           node tests/build-version.test.cjs
+          node tests/offline-worker.test.cjs
           python scripts/generate-furniture.py
           python scripts/generate-demo.py
           git diff --exit-code -- editor/library/furnishings.js editor/demo/vivienda.js
