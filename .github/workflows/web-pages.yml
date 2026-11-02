@@ -42,6 +42,7 @@ jobs:
           node --check sw.js
           node --check tests/grips.test.cjs
           node tests/grips.test.cjs
+          node tests/storage-dxf.test.cjs
           node -e "JSON.parse(require('fs').readFileSync('manifest.webmanifest', 'utf8'))"
       - name: Generar salida web limpia
         run: |
@@ -55,3 +56,4 @@ jobs:
           test ! -e dist/android
           test ! -e dist/.github
           test ! -e dist/tests
+
