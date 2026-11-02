@@ -8,6 +8,8 @@ public class NativeTransformTest {
         p=NativeTransform.mirror(3,2,0,0,4,0);near(p[0],3);near(p[1],-2);
         p=NativeTransform.mirror(2,3,1,0,1,4);near(p[0],0);near(p[1],3);
         if(NativeTransform.mirror(2,3,1,1,1,1)!=null)throw new AssertionError("El eje degenerado debe rechazarse");
-        System.out.println("Rotación, escala y simetría nativas verificadas");
+        double[] hit=NativeTransform.lineIntersection(0,0,4,0,2,-2,2,2);near(hit[0],2);near(hit[1],0);near(hit[2],.5);near(hit[3],.5);
+        if(NativeTransform.lineIntersection(0,0,1,0,0,1,1,1)!=null)throw new AssertionError("Las paralelas no deben intersectar");
+        System.out.println("Rotación, escala, simetría e intersección nativas verificadas");
     }
 }
