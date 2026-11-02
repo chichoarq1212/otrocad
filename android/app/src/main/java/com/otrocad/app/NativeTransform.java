@@ -9,4 +9,10 @@ public final class NativeTransform {
     public static double[] scale(double x,double y,double bx,double by,double factor) {
         return new double[]{bx+(x-bx)*factor,by+(y-by)*factor};
     }
+    public static double[] mirror(double x,double y,double ax,double ay,double bx,double by) {
+        double dx=bx-ax,dy=by-ay,len2=dx*dx+dy*dy;
+        if(!Double.isFinite(len2)||len2<1e-18)return null;
+        double t=((x-ax)*dx+(y-ay)*dy)/len2,px=ax+t*dx,py=ay+t*dy;
+        return new double[]{2*px-x,2*py-y};
+    }
 }
