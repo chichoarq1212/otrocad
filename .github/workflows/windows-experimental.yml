@@ -1,0 +1,47 @@
+name: Windows offline experimental
+on:
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'editor/**'
+      - 'scripts/build-pages.cjs'
+      - '.github/workflows/windows-experimental.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-install:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar editor y dependencias
+        shell: pwsh
+        run: |
+          node scripts/build-pages.cjs
+          Copy-Item -Recurse dist desktop/dist
+          npm install --prefix desktop --no-audit --no-fund
+      - name: Crear instalador
+        working-directory: desktop
+        run: npm run dist
+      - name: Instalar y abrir sin red
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem desktop/release/*-Setup.exe | Select-Object -First 1
+          if (-not $installer) { throw 'No se creó el instalador' }
+          $target = Join-Path $env:RUNNER_TEMP 'OtroCAD-test'
+          $setup = Start-Process $installer.FullName -ArgumentList '/S', "/D=$target" -PassThru -Wait
+          if ($setup.ExitCode -ne 0) { throw "Instalador terminó con $($setup.ExitCode)" }
+          $exe = Join-Path $target 'OtroCAD.exe'
+          if (-not (Test-Path $exe)) { throw 'No se encontró la aplicación instalada' }
+          $smoke = Start-Process $exe -ArgumentList '--smoke-test' -PassThru -Wait
+          if ($smoke.ExitCode -ne 0) { throw "Prueba de apertura terminó con $($smoke.ExitCode)" }
+          Get-FileHash $installer.FullName -Algorithm SHA256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OtroCAD-Windows-experimental
+          path: desktop/release/*-Setup.exe
+          if-no-files-found: error
