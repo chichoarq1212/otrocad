@@ -5,6 +5,7 @@ on:
     paths:
       - 'android/**'
       - 'tests/android-native-smoke.py'
+      - 'tests/NativeArcGeometryTest.java'
       - '.github/workflows/android-native-smoke.yml'
   pull_request:
     branches: [main]
@@ -25,6 +26,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Validar geometría circular nativa
+        run: |
+          mkdir -p /tmp/otrocad-geometry-test
+          javac -d /tmp/otrocad-geometry-test android/app/src/main/java/com/otrocad/app/ArcGeometry.java tests/NativeArcGeometryTest.java
+          java -cp /tmp/otrocad-geometry-test NativeArcGeometryTest
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
