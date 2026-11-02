@@ -68,7 +68,10 @@ jobs:
           script: |
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -W -n com.otrocad.app/.HybridActivity
-            adb shell pidof com.otrocad.app
+            if ! adb shell pidof com.otrocad.app; then
+              adb logcat -d -s AndroidRuntime:E ActivityManager:W WebViewFactory:E
+              exit 1
+            fi
       - name: Prepare named test APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.5.4-test.apk
       - name: Publish test APK in GitHub Releases
