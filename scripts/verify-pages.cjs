@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
 const root=path.join(process.cwd(),'dist');
-const required=['index.html','editor/index.html','editor/editor.js','descargas/index.html','tutorial/index.html','herramientas/index.html','sw.js','manifest.webmanifest','icon.svg'];
+const required=['index.html','editor/index.html','editor/editor.js','descargas/index.html','tutorial/index.html','herramientas/index.html','sw.js','manifest.webmanifest','icon.svg','editor-preview.svg'];
 for(const file of required){if(!fs.existsSync(path.join(root,file)))throw Error('Missing '+file);}
 const pages=['index.html','descargas/index.html','tutorial/index.html','herramientas/index.html','editor/index.html'];
 for(const page of pages){
