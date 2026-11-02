@@ -47,12 +47,13 @@ public class MainActivity extends Activity {
         LinearLayout tabStrip=new LinearLayout(this);tabStrip.setOrientation(LinearLayout.HORIZONTAL);tabStrip.setPadding(dp(4),dp(2),dp(4),dp(2));tabsScroll.addView(tabStrip);
         root.addView(tabsScroll,new LinearLayout.LayoutParams(-1,dp(46)));
         android.widget.FrameLayout ribbonPanels=new android.widget.FrameLayout(this);
-        final String[] tabNames={"Dibujo","Modificar","Anotar","Capas","Vista","Configuración","Archivo"};
+        final String[] tabNames={"Dibujo","Modificar","Anotar","Capas","Vista","Configuración","Archivo","Dibujo +"};
         final View[] panels=new View[tabNames.length];
         final Button[] tabs=new Button[tabNames.length];
         panels[0]=toolbar(new String[][]{{"Selección","SELECT"},{"Línea","LINE"},{"Polilínea","POLY"},{"Finalizar","FINISH_POLY"},{"Rectángulo","RECT"},{"Círculo","CIRCLE"},{"Arco","ARC"},{"Elipse","ELLIPSE"}});
         panels[1]=toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"OFFSET","OFFSET"},{"BORRAR","ERASE"},{"DESHACER","UNDO"},{"REHACER","REDO"}});
         panels[2]=toolbar(new String[][]{{"COTA","DIM"},{"HATCH","HATCH"},{"TEXTO","TEXT"},{"DIRECTRIZ","LEADER"}});
+        panels[7]=toolbar(new String[][]{{"Polígono","POLYGON"}});
         panels[6]=toolbar(new String[][]{{"Abrir","OPEN"},{"Guardar DXF","DXF"},{"Respaldo","SAVE"},{"PDF","PDF"}});
         GridLayout settings=new GridLayout(this);settings.setColumnCount(4);settings.setRowCount(2);settings.setPadding(5,4,5,4);
         addToggle(settings,"GRID",()->cad.toggleGrid());addOrthoToggle(settings);addToggle(settings,"POLAR",()->cad.togglePolar());addToggle(settings,"SNAP",()->cad.toggleGridSnap());addToggle(settings,"OSNAP",()->cad.toggleSnap());addToggle(settings,"CRUZ",()->cad.toggleCrosshair());Button multi=smallButton(cad.isMultiSelectEnabled()?"Sumar sí":"Sumar no");multi.setOnClickListener(v->{cad.toggleMultiSelect();multi.setText(cad.isMultiSelectEnabled()?"Sumar sí":"Sumar no");multi.setBackgroundTintList(android.content.res.ColorStateList.valueOf(cad.isMultiSelectEnabled()?0xffffcf23:0xffe7efff));});GridLayout.LayoutParams mlp=new GridLayout.LayoutParams();mlp.width=0;mlp.height=dp(38);mlp.columnSpec=GridLayout.spec(settings.getChildCount()%4,1f);mlp.rowSpec=GridLayout.spec(settings.getChildCount()/4);mlp.setMargins(2,2,2,2);settings.addView(multi,mlp);Button hp=smallButton("HP");hp.setOnClickListener(v->showSettings());GridLayout.LayoutParams hlp=new GridLayout.LayoutParams();hlp.width=0;hlp.height=dp(38);hlp.columnSpec=GridLayout.spec(settings.getChildCount()%4,1f);hlp.rowSpec=GridLayout.spec(settings.getChildCount()/4);hlp.setMargins(2,2,2,2);settings.addView(hp,hlp);
@@ -122,6 +123,12 @@ public class MainActivity extends Activity {
     private void toolAction(String tool){
         if(tool.equals("FINISH_POLY")){cad.finish();return;}if(tool.equals("OPEN")){openPicker();return;}if(tool.equals("SAVE")){savePicker(SAVE_JSON,"application/json","otrocad.json");return;}if(tool.equals("DXF")){new AlertDialog.Builder(this).setTitle("DXF experimental").setMessage("Esta versión nativa aún puede simplificar o perder cotas, arcos, elipses, hachurados, tipos de línea y bloques al exportar. Conserva un respaldo editable antes de continuar.").setNegativeButton("Cancelar",null).setPositiveButton("Continuar",(d,w)->savePicker(SAVE_DXF,"application/dxf","otrocad.dxf")).show();return;}if(tool.equals("PDF")){savePicker(SAVE_PDF,"application/pdf","otrocad.pdf");return;}
         if(tool.equals("UNDO")){cad.undo();return;}if(tool.equals("REDO")){cad.redo();return;}
+        if(tool.equals("POLYGON")){
+            EditText input=new EditText(this);input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);input.setText("6");input.setSelectAllOnFocus(true);
+            AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Número de lados (3 a 64)").setView(input).setNegativeButton("Cancelar",null).setPositiveButton("Aceptar",null).create();
+            dialog.setOnShowListener(unused->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{int sides=Integer.parseInt(input.getText().toString());if(sides<3||sides>64)throw new NumberFormatException();cad.setPolygonSides(sides);cad.setTool("POLYGON");dialog.dismiss();}catch(NumberFormatException e){input.setError("Elige un número entre 3 y 64");}}));
+            dialog.show();return;
+        }
         if(tool.equals("TEXT")){EditText input=new EditText(this);input.setSingleLine(true);input.setText("Texto");new AlertDialog.Builder(this).setTitle("Contenido del texto").setView(input).setNegativeButton("Cancelar",null).setPositiveButton("Aceptar",(d,w)->{cad.setTextValue(input.getText().toString());cad.setTool("TEXT");}).show();return;}
         if(tool.equals("OFFSET")){EditText input=new EditText(this);input.setInputType(8194);input.setText("1");new AlertDialog.Builder(this).setTitle("Distancia OFFSET").setView(input).setNegativeButton("Cancelar",null).setPositiveButton("Aceptar",(d,w)->{try{cad.setOffsetDistance(Float.parseFloat(input.getText().toString()));cad.setTool("OFFSET");}catch(Exception e){status.setText("Distancia no válida");}}).show();return;}
         cad.setTool(tool);
