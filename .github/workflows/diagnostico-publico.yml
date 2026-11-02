@@ -1,0 +1,28 @@
+name: Diagnóstico de archivos públicos
+on:
+  pull_request:
+    paths: ['.github/workflows/diagnostico-publico.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comparar archivos publicados
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/build-pages.cjs
+          curl -fsSL -H 'Cache-Control: no-cache, no-store' "https://otrocad.cristhian-torres-arq.workers.dev/editor/editor.js?diagnostico=${GITHUB_SHA}" -o /tmp/public-editor.js
+          wc -c dist/editor/editor.js /tmp/public-editor.js
+          sha256sum dist/editor/editor.js /tmp/public-editor.js
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("dist/editor/editor.js").read_bytes()
+          b=Path("/tmp/public-editor.js").read_bytes()
+          i=next((i for i,(x,y) in enumerate(zip(a,b)) if x != y), min(len(a),len(b)))
+          print("Primera diferencia:", i)
+          print("Repositorio:",repr(a[max(0,i-100):i+200]))
+          print("Publicado:",repr(b[max(0,i-100):i+200]))
+          PY
