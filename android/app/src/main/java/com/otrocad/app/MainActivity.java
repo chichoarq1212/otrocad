@@ -51,7 +51,7 @@ public class MainActivity extends Activity {
         final View[] panels=new View[tabNames.length];
         final Button[] tabs=new Button[tabNames.length];
         panels[0]=toolbar(new String[][]{{"Selección","SELECT"},{"Línea","LINE"},{"Polilínea","POLY"},{"Finalizar","FINISH_POLY"},{"Rectángulo","RECT"},{"Círculo","CIRCLE"},{"Arco","ARC"},{"Elipse","ELLIPSE"}});
-        panels[1]=toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"SIMETRÍA","MIRROR"},{"OFFSET","OFFSET"},{"Girar","ROTATE"},{"Escala","SCALE"},{"BORRAR","ERASE"},{"DESHACER","UNDO"},{"REHACER","REDO"}});
+        panels[1]=toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"SIMETRÍA","MIRROR"},{"OFFSET","OFFSET"},{"Recortar","TRIM"},{"Alargar","EXTEND"},{"Girar","ROTATE"},{"Escala","SCALE"},{"BORRAR","ERASE"},{"DESHACER","UNDO"},{"REHACER","REDO"}});
         panels[2]=toolbar(new String[][]{{"COTA","DIM"},{"HATCH","HATCH"},{"TEXTO","TEXT"},{"DIRECTRIZ","LEADER"}});
         panels[7]=toolbar(new String[][]{{"Polígono","POLYGON"}});
         panels[6]=toolbar(new String[][]{{"Abrir","OPEN"},{"Guardar DXF","DXF"},{"Respaldo","SAVE"},{"PDF","PDF"}});
