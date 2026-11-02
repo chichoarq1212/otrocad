@@ -7,6 +7,7 @@ on:
       - 'tests/android-native-smoke.py'
       - 'tests/NativeArcGeometryTest.java'
       - 'tests/NativePolygonGeometryTest.java'
+      - 'tests/NativeTransformTest.java'
       - '.github/workflows/android-native-smoke.yml'
   pull_request:
     branches: [main]
@@ -30,9 +31,10 @@ jobs:
       - name: Validar geometría circular nativa
         run: |
           mkdir -p /tmp/otrocad-geometry-test
-          javac -d /tmp/otrocad-geometry-test android/app/src/main/java/com/otrocad/app/ArcGeometry.java android/app/src/main/java/com/otrocad/app/PolygonGeometry.java tests/NativeArcGeometryTest.java tests/NativePolygonGeometryTest.java
+          javac -d /tmp/otrocad-geometry-test android/app/src/main/java/com/otrocad/app/ArcGeometry.java android/app/src/main/java/com/otrocad/app/PolygonGeometry.java android/app/src/main/java/com/otrocad/app/NativeTransform.java tests/NativeArcGeometryTest.java tests/NativePolygonGeometryTest.java tests/NativeTransformTest.java
           java -cp /tmp/otrocad-geometry-test NativeArcGeometryTest
           java -cp /tmp/otrocad-geometry-test NativePolygonGeometryTest
+          java -cp /tmp/otrocad-geometry-test NativeTransformTest
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'

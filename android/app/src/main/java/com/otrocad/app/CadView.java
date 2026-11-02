@@ -40,6 +40,7 @@ public class CadView extends View {
     private boolean grid=true, gridSnap=false, ortho=false, polar=false, snap=true, crosshair=true;
     private boolean osEnd=true,osMid=true,osCenter=true,osQuadrant=true,osPerpendicular=false,osTangent=false,osNearest=false,osParallel=false;
     private int decimalPrecision=3, polygonSides=6;
+    private double transformValue=0;
     private PointF anchor=null,cursor=new PointF(0,0),panLast=null,moveBase=null;
     private boolean panning=false,pinching=false;
     private float pinchStart=0,pinchZoom=36f;
@@ -57,6 +58,7 @@ public class CadView extends View {
     public String getTool(){return tool;}
     public int getPolylinePointCount(){return poly.size();}
     public void setTool(String t){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
+    public void setTransformValue(double value){transformValue=value;}
     public void setPolygonSides(int sides){if(sides>=3&&sides<=64)polygonSides=sides;}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
@@ -358,6 +360,40 @@ public class CadView extends View {
         PointF q=constrain(snap(raw));
         if(tool.equals("SELECT")){int h=hit(q);setSelection(h>=0?Arrays.asList(h):Collections.emptyList());say(h<0?"Sin selección":"Objeto seleccionado");invalidate();return;}
         if(tool.equals("ERASE")){if(selectedIndices().isEmpty()){int h=hit(q);if(h>=0)setSelection(Arrays.asList(h));}deleteSelected();return;}
+        if(tool.equals("ROTATE")||tool.equals("SCALE")){
+            if(moveTargets.isEmpty()){
+                moveTargets.addAll(selectedIndices());
+                if(moveTargets.isEmpty()){
+                    int h=hit(q);if(h<0){say("Selecciona uno o varios objetos");return;}
+                    setSelection(Arrays.asList(h));moveTargets.add(h);
+                    say("Seleccionado · indica el punto base");invalidate();return;
+                }
+            }
+            if(!Double.isFinite(transformValue)||(tool.equals("SCALE")&&transformValue<=0)){say("Valor de transformación no válido");return;}
+            for(int idx:moveTargets){
+                if(idx<0||idx>=entities.size())return;
+                String type=entities.get(idx).type;
+                if(!Arrays.asList("LINE","POLY","POLYGON","RECT","CIRCLE","ARC").contains(type)){
+                    say("Transformación no disponible para "+type+"; no se modificó el dibujo");return;
+                }
+            }
+            checkpoint();
+            for(int idx:moveTargets){
+                Entity e=entities.get(idx);
+                if(e.type.equals("RECT")&&e.pts.size()>=2){
+                    PointF a=e.pts.get(0),b=e.pts.get(1);
+                    ArrayList<PointF> corners=new ArrayList<>();
+                    corners.add(new PointF(a.x,a.y));corners.add(new PointF(b.x,a.y));
+                    corners.add(new PointF(b.x,b.y));corners.add(new PointF(a.x,b.y));
+                    e.pts=corners;e.type="POLYGON";
+                }
+                for(PointF p:e.pts){
+                    double[] v=tool.equals("ROTATE")?NativeTransform.rotate(p.x,p.y,q.x,q.y,transformValue):NativeTransform.scale(p.x,p.y,q.x,q.y,transformValue);
+                    p.x=(float)v[0];p.y=(float)v[1];
+                }
+            }
+            int count=moveTargets.size();moveTargets.clear();persistLocal();invalidate();say(tool+" aplicado · "+count+" objeto(s)");return;
+        }
         if(tool.equals("MOVE")||tool.equals("COPY")){
             if(moveTargets.isEmpty()){moveTargets.addAll(selectedIndices());if(moveTargets.isEmpty()){int h=hit(q);if(h>=0){setSelection(Arrays.asList(h));moveTargets.add(h);}else{say("Selecciona uno o varios objetos");return;}say("Objeto seleccionado · indica punto base");invalidate();return;}}
             if(moveBase==null){moveBase=q;say("Indica punto destino");return;}
@@ -490,6 +526,10 @@ public class CadView extends View {
     public void runCommand(String raw){
         String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);if(u.equals("MULTI")){toggleMultiSelect();return;}if(u.equals("ESC")||u.equals("CANCEL")){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;setSelection(Collections.emptyList());anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;say("Comando cancelado · selección limpia");invalidate();return;}String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
         if(u.equals("F7")||u.equals("GRID")){toggleGrid();return;}if(u.equals("F8")||u.equals("ORTHO")){toggleOrtho();return;}if(u.equals("F9")||u.equals("SNAP")){toggleGridSnap();return;}if(u.equals("F3")||u.equals("OSNAP")){toggleSnap();return;}if(u.equals("F10")||u.equals("POLAR")){togglePolar();return;}
+        if(cmd.equals("RO")||cmd.equals("ROTATE")||cmd.equals("SC")||cmd.equals("SCALE")){
+            if(parts.length<2){say("Indica el valor: RO grados o SC factor");return;}
+            try{double value=Double.parseDouble(parts[1]);if(!Double.isFinite(value)||((cmd.equals("SC")||cmd.equals("SCALE"))&&value<=0))throw new NumberFormatException();setTransformValue(value);setTool(cmd.equals("RO")||cmd.equals("ROTATE")?"ROTATE":"SCALE");}catch(NumberFormatException ex){say("Valor de transformación no válido");}return;
+        }
         String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("POL","POLYGON");m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
         String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE","POLYGON").contains(t)){setTool(t);return;}
         if(c.equals("UNDO")||c.equals("U")){undo();return;}if(c.equals("REDO")){redo();return;}if(c.equals("DELETE")){deleteSelected();return;}

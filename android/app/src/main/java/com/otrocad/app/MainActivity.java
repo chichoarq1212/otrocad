@@ -51,7 +51,7 @@ public class MainActivity extends Activity {
         final View[] panels=new View[tabNames.length];
         final Button[] tabs=new Button[tabNames.length];
         panels[0]=toolbar(new String[][]{{"Selección","SELECT"},{"Línea","LINE"},{"Polilínea","POLY"},{"Finalizar","FINISH_POLY"},{"Rectángulo","RECT"},{"Círculo","CIRCLE"},{"Arco","ARC"},{"Elipse","ELLIPSE"}});
-        panels[1]=toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"OFFSET","OFFSET"},{"BORRAR","ERASE"},{"DESHACER","UNDO"},{"REHACER","REDO"}});
+        panels[1]=toolbar(new String[][]{{"MOVER","MOVE"},{"COPIAR","COPY"},{"OFFSET","OFFSET"},{"Girar","ROTATE"},{"Escala","SCALE"},{"BORRAR","ERASE"},{"DESHACER","UNDO"},{"REHACER","REDO"}});
         panels[2]=toolbar(new String[][]{{"COTA","DIM"},{"HATCH","HATCH"},{"TEXTO","TEXT"},{"DIRECTRIZ","LEADER"}});
         panels[7]=toolbar(new String[][]{{"Polígono","POLYGON"}});
         panels[6]=toolbar(new String[][]{{"Abrir","OPEN"},{"Guardar DXF","DXF"},{"Respaldo","SAVE"},{"PDF","PDF"}});
@@ -123,6 +123,11 @@ public class MainActivity extends Activity {
     private void toolAction(String tool){
         if(tool.equals("FINISH_POLY")){cad.finish();return;}if(tool.equals("OPEN")){openPicker();return;}if(tool.equals("SAVE")){savePicker(SAVE_JSON,"application/json","otrocad.json");return;}if(tool.equals("DXF")){new AlertDialog.Builder(this).setTitle("DXF experimental").setMessage("Esta versión nativa aún puede simplificar o perder cotas, arcos, elipses, hachurados, tipos de línea y bloques al exportar. Conserva un respaldo editable antes de continuar.").setNegativeButton("Cancelar",null).setPositiveButton("Continuar",(d,w)->savePicker(SAVE_DXF,"application/dxf","otrocad.dxf")).show();return;}if(tool.equals("PDF")){savePicker(SAVE_PDF,"application/pdf","otrocad.pdf");return;}
         if(tool.equals("UNDO")){cad.undo();return;}if(tool.equals("REDO")){cad.redo();return;}
+        if(tool.equals("ROTATE")||tool.equals("SCALE")){
+            boolean rotate=tool.equals("ROTATE");EditText input=new EditText(this);input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);input.setText(rotate?"90":"2");input.setSelectAllOnFocus(true);
+            AlertDialog dialog=new AlertDialog.Builder(this).setTitle(rotate?"Ángulo de giro en grados":"Factor de escala").setView(input).setNegativeButton("Cancelar",null).setPositiveButton("Aceptar",null).create();
+            dialog.setOnShowListener(unused->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{double value=Double.parseDouble(input.getText().toString().replace(',','.'));if(!Double.isFinite(value)||(!rotate&&value<=0))throw new NumberFormatException();cad.setTransformValue(value);cad.setTool(tool);dialog.dismiss();}catch(NumberFormatException e){input.setError("Introduce un valor válido");}}));dialog.show();return;
+        }
         if(tool.equals("POLYGON")){
             EditText input=new EditText(this);input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);input.setText("6");input.setSelectAllOnFocus(true);
             AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Número de lados (3 a 64)").setView(input).setNegativeButton("Cancelar",null).setPositiveButton("Aceptar",null).create();
