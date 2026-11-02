@@ -533,8 +533,7 @@ public class CadView extends View {
     }
     private static boolean appendDxfArc(StringBuilder out,Entity e,String common){
         double[][] points=new double[e.pts.size()][2];for(int i=0;i<points.length;i++){points[i][0]=e.pts.get(i).x;points[i][1]=e.pts.get(i).y;}
-        double[] g=ArcGeometry.toDxf(points);if(g==null)return false;
-        out.append("0\nARC\n").append(common).append("100\nAcDbCircle\n10\n").append(g[0]).append("\n20\n").append(g[1]).append("\n30\n0\n40\n").append(g[2]).append("\n100\nAcDbArc\n50\n").append(g[3]).append("\n51\n").append(g[4]).append("\n");return true;
+        return DxfArcWriter.append(out,points,common);
     }
     public void setLayer(String s){layer=s;}
     public void setOffsetDistance(float d){if(Float.isFinite(d)&&d>0&&d<1000000)offsetDistance=d;}
