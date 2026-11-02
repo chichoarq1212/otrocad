@@ -31,26 +31,24 @@ jobs:
           BASE="https://otrocad.cristhian-torres-arq.workers.dev"
           matched=0
           for i in $(seq 1 18); do
-            echo "Checking public build (attempt $i)"
-            if curl --fail --location --silent --show-error --max-time 15 \
-              -H 'Cache-Control: no-cache, no-store' \
-              "$BASE/build-info.json?verify=${GITHUB_SHA}-$i" -o /tmp/otrocad-build-info.json && \
-              cmp -s dist/build-info.json /tmp/otrocad-build-info.json; then
-              matched=1
-              break
-            fi
-            sleep 20
+            echo "Checking public build and assets (attempt $i)"
+            matched=1
+            for file in build-info.json index.html editor/index.html editor/editor.js editor/demo/vivienda.js editor/library/furnishings.js sw.js descargas/index.html; do
+              if ! curl --fail --location --silent --show-error --max-time 20 \
+                -H 'Cache-Control: no-cache, no-store' \
+                "$BASE/$file?verify=${GITHUB_SHA}-$i" -o /tmp/otrocad-live-file || ! cmp -s "dist/$file" /tmp/otrocad-live-file; then
+                echo "Not yet current: $file"
+                matched=0
+                break
+              fi
+            done
+            if [ "$matched" = 1 ]; then break; fi
+            if [ "$i" -lt 18 ]; then sleep 20; fi
           done
           if [ "$matched" != 1 ]; then
-            echo "::error::Cloudflare does not yet serve the build generated from this commit."
+            echo "::error::Cloudflare does not yet serve all assets from this build."
             exit 1
           fi
-          for file in index.html editor/index.html editor/editor.js editor/demo/vivienda.js sw.js descargas/index.html; do
-            curl --fail --location --silent --show-error --max-time 20 \
-              -H 'Cache-Control: no-cache, no-store' \
-              "$BASE/$file?verify=${GITHUB_SHA}" -o /tmp/otrocad-live-file
-            cmp "dist/$file" /tmp/otrocad-live-file || { echo "::error::Public file differs: $file"; exit 1; }
-          done
           APK="https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.5.4-test/OtroCAD-Android-0.5.4-test.apk"
           curl --fail --location --silent --show-error --max-time 90 "$APK" -o /tmp/otrocad-download.apk
           unzip -tq /tmp/otrocad-download.apk
