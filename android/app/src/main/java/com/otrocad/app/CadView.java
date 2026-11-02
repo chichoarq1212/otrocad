@@ -358,7 +358,18 @@ public class CadView extends View {
             if(tool.equals("COPY"))setSelection(created);moveTargets.clear();moveBase=null;persistLocal();invalidate();say("Edición aplicada a "+(tool.equals("COPY")?created.size():selectedIndices().size())+" objeto(s)");return;
         }
         if(tool.equals("POLY")){poly.add(q);cursor=new PointF(q.x,q.y);invalidate();say("Vértice añadido · pulsa Terminar PL");return;}
-        if(tool.equals("ARC")){arcPoints.add(q);if(arcPoints.size()==3){ArrayList<PointF> a=arcPoints;checkpoint();Entity e=new Entity();e.type="ARC";e.layer=layer;e.color=drawColor;e.weight=weight;for(int i=0;i<=24;i++){float t=i/24f;PointF p=new PointF(a.get(0).x*(1-t)*(1-t)+a.get(1).x*2*(1-t)*t+a.get(2).x*t*t,a.get(0).y*(1-t)*(1-t)+a.get(1).y*2*(1-t)*t+a.get(2).y*t*t);e.pts.add(p);}entities.add(e);setSelection(Arrays.asList(entities.size()-1));arcPoints.clear();persistLocal();say("Arco creado");}else say("Marca el siguiente punto del arco");invalidate();return;}
+        if(tool.equals("ARC")){
+            arcPoints.add(q);
+            if(arcPoints.size()==3){
+                PointF a=arcPoints.get(0),b=arcPoints.get(1),c=arcPoints.get(2);
+                double[][] samples=ArcGeometry.through(a.x,a.y,b.x,b.y,c.x,c.y);
+                if(samples==null){arcPoints.clear();say("No se puede crear el arco: los puntos coinciden o están alineados");invalidate();return;}
+                checkpoint();Entity e=new Entity();e.type="ARC";e.layer=layer;e.color=drawColor;e.weight=weight;
+                for(double[] p:samples)e.pts.add(new PointF((float)p[0],(float)p[1]));
+                entities.add(e);setSelection(Arrays.asList(entities.size()-1));arcPoints.clear();persistLocal();say("Arco circular creado");
+            }else say("Marca el siguiente punto del arco");
+            invalidate();return;
+        }
         if(tool.equals("TEXT")){Entity e=new Entity();e.type="TEXT";e.layer=layer;e.color=drawColor;e.text=textValue;e.pts.add(q);checkpoint();entities.add(e);setSelection(Arrays.asList(entities.size()-1));persistLocal();invalidate();say("Texto colocado");return;}
         if(tool.equals("LINE")||tool.equals("RECT")||tool.equals("CIRCLE")||tool.equals("DIM")||tool.equals("HATCH")||tool.equals("LEADER")||tool.equals("ELLIPSE")){
             if(anchor==null){anchor=q;cursor=q;invalidate();say("Marca el punto final");}else{addEntity(tool,anchor,q);}return;
