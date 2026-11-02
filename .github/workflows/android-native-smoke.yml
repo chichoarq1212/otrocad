@@ -16,6 +16,9 @@ on:
       - 'tests/android-native-smoke.py'
       - '.github/workflows/android-native-smoke.yml'
   workflow_dispatch:
+concurrency:
+  group: native-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -50,6 +53,24 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging OtroCAD-Nativo-experimental-debug.apk | head -n 8
           if "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions OtroCAD-Nativo-experimental-debug.apk | grep -q 'android.permission.INTERNET'; then
             echo '::error::La versión nativa experimental no debe solicitar Internet.'
+            exit 1
+          fi
+      - name: Preparar imagen del emulador con reintentos
+        shell: bash
+        run: |
+          set -uo pipefail
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          installed=0
+          for attempt in 1 2 3; do
+            echo "Descarga de imagen Android: intento $attempt"
+            if "$sdkmanager" --install "system-images;android-29;google_apis;x86_64"; then
+              installed=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep 10; fi
+          done
+          if [ "$installed" -ne 1 ]; then
+            echo "::error::No se pudo descargar íntegramente la imagen del emulador Android."
             exit 1
           fi
       - name: Enable KVM
