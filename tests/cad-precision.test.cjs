@@ -58,3 +58,13 @@ assert.ok(Math.abs(rounded.arc[1].y-(1-Math.SQRT1_2))<1e-8);
 assert.equal(vm.runInContext('filletGeometry(l1,l2,{x:4,y:0},{x:0,y:4},10)',fillet),null);
 assert.equal(vm.runInContext('filletGeometry(l1,l2,{x:4,y:0},{x:0,y:4},0).arc',fillet),null);
 console.log('Empalme: tangencia, radio cero y radio excesivo verificados');
+
+const ui={objects:[{type:'line',a:{x:0,y:0},b:{x:5,y:0},layer:'General'},{type:'line',a:{x:0,y:0},b:{x:0,y:5},layer:'General'}], tool:'fillet',modifyTarget:-1,moveBase:null,status:{textContent:''}, lockedLayers:new Set(),snapPoint:p=>p,world:p=>p,constrain:p=>p,clone:x=>JSON.parse(JSON.stringify(x)),selectAt:p=>p.x>p.y?0:1,applySelection:()=>{},checkpoint:()=>{},save:()=>{},render:()=>{},prompt:()=> '1',$:()=>({value:'General'}),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
+vm.createContext(ui);
+vm.runInContext(src.slice(src.indexOf('function lineIntersection('),src.indexOf('function trimOrExtend(')),ui);
+vm.runInContext(src.slice(src.indexOf('function handleTap(p){'),src.indexOf('function transformEntityGeometry(')),ui);
+vm.runInContext('handleTap({x:4,y:0});handleTap({x:0,y:4})',ui);
+assert.equal(ui.objects.length,3);assert.equal(ui.objects[2].type,'arc');
+assert.ok(Math.abs(ui.objects[0].a.x-1)<1e-8);
+assert.ok(Math.abs(ui.objects[1].a.y-1)<1e-8);
+console.log('Comando empalme: selección y creación verificadas');
