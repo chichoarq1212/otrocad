@@ -121,8 +121,26 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 #groups #finish-poly:disabled{opacity:.5;cursor:not-allowed}
 #groups #finish-poly:not(:disabled):hover{background:#eef6ff;border-color:#7db4e9}
 @media(max-width:760px){#groups #finish-poly{min-width:82px;min-height:76px;scroll-snap-align:start}}
+
+/* Modo de dibujo compacto para teléfonos en horizontal. */
+#ribbonToggle{display:none}
+@media (orientation:landscape) and (max-height:500px){
+ header{height:40px!important;min-height:40px!important;padding:3px 8px!important;gap:6px!important}
+ #brand{font-size:16px!important} #brand .brandmark{width:27px!important;height:27px!important}
+ #filebar button{min-height:30px!important;padding:4px 7px!important;font-size:11px!important}
+ #ribbonToggle{display:block;flex:0 0 auto;min-height:32px;padding:4px 10px;background:#fff;color:#164b9e;border:1px solid #fff;border-radius:6px;font-size:12px;font-weight:700}
+ #ribbon{height:126px!important}
+ #tabs{height:38px!important;min-height:38px;overflow-x:auto;white-space:nowrap;align-items:center}
+ #tabs button{min-height:32px!important;padding:5px 10px!important;font-size:11px!important;flex:0 0 auto}
+ #groups{height:88px!important;min-height:88px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x}
+ #workspace{height:calc(100dvh - 40px - 126px - 80px)!important;min-height:0!important}
+ #commandbar{height:42px!important;padding:4px 6px!important} #cmd{height:33px!important;font-size:13px!important}
+ #statusbar{height:38px!important;overflow-x:auto} #statusbar button{min-height:30px!important}
+ body.cad-ribbon-collapsed #ribbon{display:none!important}
+ body.cad-ribbon-collapsed #workspace{height:calc(100dvh - 40px - 80px)!important}
+}
 </style></head><body>
-<header><span id="brand"><svg class="brandmark" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="104" fill="#185BE8"/><circle cx="256" cy="256" r="158" fill="none" stroke="#FFFFFF" stroke-width="42" stroke-dasharray="720 275" stroke-linecap="round" transform="rotate(48 256 256)"/><path d="M256 98a158 158 0 0 1 158 158" fill="none" stroke="#FFCF23" stroke-width="42" stroke-linecap="round"/><path d="M256 177v158M177 256h158" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/><circle cx="256" cy="256" r="22" fill="#FFCF23"/></svg><span><span class="o">O</span><span class="cad">troCAD</span></span></span><div id="filebar"><button onclick="location.href='../index.html'">Inicio</button><button onclick="location.href='../tutorial/'">Tutorial</button><button id="undo" title="Deshacer · Ctrl+Z">↶ Deshacer</button><button id="redo" title="Rehacer · Ctrl+Y">↷ Rehacer</button></div></header>
+<header><span id="brand"><svg class="brandmark" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="104" fill="#185BE8"/><circle cx="256" cy="256" r="158" fill="none" stroke="#FFFFFF" stroke-width="42" stroke-dasharray="720 275" stroke-linecap="round" transform="rotate(48 256 256)"/><path d="M256 98a158 158 0 0 1 158 158" fill="none" stroke="#FFCF23" stroke-width="42" stroke-linecap="round"/><path d="M256 177v158M177 256h158" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/><circle cx="256" cy="256" r="22" fill="#FFCF23"/></svg><span><span class="o">O</span><span class="cad">troCAD</span></span></span><div id="filebar"><button onclick="location.href='../index.html'">Inicio</button><button onclick="location.href='../tutorial/'">Tutorial</button><button id="undo" title="Deshacer · Ctrl+Z">↶ Deshacer</button><button id="redo" title="Rehacer · Ctrl+Y">↷ Rehacer</button></div><button id="ribbonToggle" type="button" aria-controls="ribbon" aria-expanded="true">⌃ Ocultar</button></header>
 <section id="ribbon"><nav id="tabs" aria-label="Herramientas CAD"><button data-tab="file">ARCHIVO</button><button class="active" data-tab="draw" aria-selected="true">DIBUJO</button><button data-tab="modify">MODIFICAR</button><button data-tab="annotate">ANOTAR</button><button data-tab="blocks">BLOQUES</button><button data-tab="layers">CAPAS</button><button data-tab="view">VISTA</button><button data-tab="settings">CONFIGURACIÓN</button></nav><div id="groups">
 <div class="toolgroup" data-panel="file" hidden><span class="group-title">PROYECTO</span>
 <button id="newDrawing" title="Crear un dibujo nuevo"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M13 3v5h5M16 3v6m-3-3h6"/></svg></span>Nuevo</button>
@@ -155,4 +173,22 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 </div></section>
 <main id="workspace"><div id="stage"><canvas id="cad"></canvas><div id="crossinfo">X 0.000 · Y 0.000 · Z 0.000</div><div id="dynamic"><label>LONGITUD</label><input id="dynLen" inputmode="decimal" placeholder="0.00"><label>ÁNGULO</label><input id="dynAngle" inputmode="decimal" placeholder="0°"><button id="acceptPoint">✓</button></div></div><aside id="properties"><h3>PROPIEDADES DEL OBJETO</h3><div id="propContent">Selecciona una entidad para editar sus propiedades.</div></aside></main>
 <div id="commandbar"><strong>CMD</strong><input id="cmd" enterkeyhint="go" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe un comando (LINE, PLINE, OFFSET, MOVE...) y pulsa Enter"><button id="cmdRun" type="button" title="Ejecutar comando · Enter / Espacio">↵ RUN</button><span id="prompt">Comando listo</span></div>
-<footer id="statusbar"><button id="gridToggle">GRID F7</button><button id="orthoToggle">ORTHO F8</button><button id="snapToggle">SNAP F9</button><button id="polarToggle">POLAR F10</button><button id="osnapToggle">OSNAP F3</button><button id="draftQuick" title="Configurar ORTHO, OSNAP, POLAR y SNAP">⚙ DRAFTING</button><button id="crossToggle">CRUZ</button><span id="status">OtroCAD · Motor geométrico alfa</span><span id="offlineState" role="status" style="font-size:11px;margin-left:auto;opacity:.8">Preparando modo sin conexión…</span></footer><input id="file" type="file" accept=".json,.dxf,.dwg" hidden><script src="demo/vivienda.js"></script><script src="library/furnishings.js"></script><script src="editor.js"></script><script>if("serviceWorker" in navigator){let hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController){const el=document.getElementById("offlineState");if(el)el.textContent="Actualización disponible · guarda tu dibujo y recarga"}hadController=true});navigator.serviceWorker.register("../sw.js",{updateViaCache:"none"}).then(async r=>{await navigator.serviceWorker.ready;const el=document.getElementById("offlineState");if(el&&!el.textContent.includes("Actualización"))el.textContent="Recursos sin conexión preparados"}).catch(()=>{const el=document.getElementById("offlineState");if(el)el.textContent="Modo sin conexión no disponible"})}</script></body></html>
+<footer id="statusbar"><button id="gridToggle">GRID F7</button><button id="orthoToggle">ORTHO F8</button><button id="snapToggle">SNAP F9</button><button id="polarToggle">POLAR F10</button><button id="osnapToggle">OSNAP F3</button><button id="draftQuick" title="Configurar ORTHO, OSNAP, POLAR y SNAP">⚙ DRAFTING</button><button id="crossToggle">CRUZ</button><span id="status">OtroCAD · Motor geométrico alfa</span><span id="offlineState" role="status" style="font-size:11px;margin-left:auto;opacity:.8">Preparando modo sin conexión…</span></footer><input id="file" type="file" accept=".json,.dxf,.dwg" hidden><script src="demo/vivienda.js"></script><script src="library/furnishings.js"></script><script src="editor.js"></script><script>
+(()=>{
+ const media=window.matchMedia('(orientation: landscape) and (max-height: 500px)');
+ const button=document.getElementById('ribbonToggle');
+ const groups=document.getElementById('groups');
+ function setCollapsed(value){
+  const collapsed=media.matches && value;
+  document.body.classList.toggle('cad-ribbon-collapsed',collapsed);
+  button.setAttribute('aria-expanded',String(!collapsed));
+  button.textContent=collapsed?'☰ Herramientas':'⌃ Ocultar';
+  button.setAttribute('aria-label',collapsed?'Mostrar herramientas CAD':'Ocultar herramientas CAD');
+ }
+ button.addEventListener('click',()=>setCollapsed(!document.body.classList.contains('cad-ribbon-collapsed')));
+ groups.addEventListener('click',event=>{if(media.matches && event.target.closest('button[data-tool]')) setCollapsed(true)});
+ function onModeChange(){setCollapsed(media.matches)}
+ if(media.addEventListener) media.addEventListener('change',onModeChange); else media.addListener(onModeChange);
+ onModeChange();
+})();
+</script><script>if("serviceWorker" in navigator){let hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController){const el=document.getElementById("offlineState");if(el)el.textContent="Actualización disponible · guarda tu dibujo y recarga"}hadController=true});navigator.serviceWorker.register("../sw.js",{updateViaCache:"none"}).then(async r=>{await navigator.serviceWorker.ready;const el=document.getElementById("offlineState");if(el&&!el.textContent.includes("Actualización"))el.textContent="Recursos sin conexión preparados"}).catch(()=>{const el=document.getElementById("offlineState");if(el)el.textContent="Modo sin conexión no disponible"})}</script></body></html>
