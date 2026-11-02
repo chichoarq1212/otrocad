@@ -145,7 +145,14 @@ public class CadView extends View {
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         for(Entity e:entities){
             ArrayList<PointF> ps=e.pts;if(ps.isEmpty())continue;
-            if(osEnd)for(PointF v:ps){float d=dist(q,v);if(d<limit){limit=d;best=v;}}
+            if(osEnd){
+                // Sampled curves have many internal points: only arc ends are endpoints.
+                if(e.type.equals("ARC")){
+                    for(int index:new int[]{0,ps.size()-1}){PointF v=ps.get(index);float d=dist(q,v);if(d<limit){limit=d;best=v;}}
+                }else if(!e.type.equals("CIRCLE")&&!e.type.equals("ELLIPSE")){
+                    for(PointF v:ps){float d=dist(q,v);if(d<limit){limit=d;best=v;}}
+                }
+            }
             if(ps.size()>=2&&(e.type.equals("LINE")||e.type.equals("DIM")||e.type.equals("LEADER")||e.type.equals("POLY"))){
                 int segments=e.type.equals("POLY")?ps.size()-1:1;
                 for(int j=0;j<segments;j++){
