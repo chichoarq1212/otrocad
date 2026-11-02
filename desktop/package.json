@@ -1,0 +1,37 @@
+{
+  "name": "otrocad-desktop",
+  "version": "0.5.4",
+  "private": true,
+  "description": "OtroCAD para Windows sin conexión, versión experimental",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "35.7.5",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "com.otrocad.desktop",
+    "productName": "OtroCAD",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "dist/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "OtroCAD-Windows-0.5.4-experimental-Setup.${ext}"
+    }
+  }
+}
