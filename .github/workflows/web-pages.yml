@@ -45,7 +45,15 @@ jobs:
           node tests/grips.test.cjs
           node tests/storage-dxf.test.cjs
           node tests/build-version.test.cjs
+          python scripts/generate-furniture.py
+          python scripts/generate-demo.py
+          git diff --exit-code -- editor/library/furnishings.js editor/demo/vivienda.js
           node -e "JSON.parse(require('fs').readFileSync('manifest.webmanifest', 'utf8'))"
+      - name: Validar DXF con un lector independiente
+        run: |
+          python -m pip install --disable-pip-version-check ezdxf==1.4.4
+          node tests/generate-demo-dxf.cjs /tmp/otrocad-demo-ci.dxf
+          python tests/audit-demo-dxf.py /tmp/otrocad-demo-ci.dxf
       - name: Generar salida web limpia
         run: |
           node scripts/build-pages.cjs

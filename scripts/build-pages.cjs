@@ -16,6 +16,7 @@ const requiredFiles = [
   'editor/index.html',
   'editor/editor.js',
   'editor/demo/vivienda.js',
+  'editor/library/furnishings.js',
   'tutorial/index.html',
   'descargas/index.html',
   'herramientas/index.html'

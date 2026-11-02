@@ -12,7 +12,7 @@ Base auditada: main a2d7624dab63f9ab8e35609e6ffce759186eabb9 (0.5.4 alfa). Las f
 - El repositorio no incluye un archivo de licencia; antes de integrar código de terceros hay que acordar la licencia y comprobar las obligaciones de distribución.
 
 ## Primera mejora en esta rama
-Copia local previa a una edición, recuperación manual y aviso si falla el almacenamiento. DXF ahora incluye texto, arcos y elipses alineadas; advierte de entidades omitidas o simplificadas tanto al abrir como al exportar. Aún no es una conversión sin pérdida. Existe una vivienda de demostración editable con 163 entidades, una captura real de la interfaz y una portada preparada para mostrarla. La muestra es conceptual y no constituye un proyecto constructivo verificado. Los datos del navegador siguen siendo una copia local: eliminarlos también elimina las copias. El respaldo descargable existente sigue disponible para conservar entidades que DXF aún no soporta.
+Copia local previa a una edición, recuperación manual y aviso si falla el almacenamiento. DXF ahora incluye texto, arcos, elipses alineadas y hachurados sólidos rectangulares; advierte de entidades omitidas o simplificadas tanto al abrir como al exportar. Aún no es una conversión sin pérdida. Existe una vivienda conceptual articulada de demostración editable con 251 entidades y mobiliario CC0, con comprobaciones básicas de despeje de puertas, una captura real de la interfaz y una portada preparada para mostrarla. La muestra es conceptual y no constituye un proyecto constructivo verificado. Los datos del navegador siguen siendo una copia local: eliminarlos también elimina las copias. El respaldo descargable existente sigue disponible para conservar entidades que DXF aún no soporta.
 
 ## DWG: alternativas para evaluar
 - GNU LibreDWG lee y escribe DWG, con licencia GPL-3.0 o posterior. La integración requiere evaluar compatibilidad de licencia, versiones, cobertura, compilación web/Android/Windows y pruebas con AutoCAD y otros lectores. https://www.gnu.org/software/libredwg/
@@ -25,3 +25,6 @@ Ninguna alternativa está integrada ni validada aquí.
 3. Crear vivienda editable con dimensiones y entidades compatibles. Abrirla en el editor real, comprobarla y capturar la interfaz para la portada.
 4. Verificar y completar herramientas, precisión, selección, interfaz táctil y controles. Migrar funcionalidad al motor nativo de Android y crear instalador Windows offline.
 5. Automatizar pruebas de instalación, firma y versionado sin sobrescribir una release existente; validar los bytes descargados y la versión realmente servida, incluida actualización de service worker y escenarios offline.
+
+## Android nativo experimental
+Se añadió una variante aislada con identificador propio, actividad Canvas nativa y sin permiso de Internet. Su compilación e inicio deben comprobarse en el emulador y posteriormente en equipos físicos. Es una alfa independiente: no tiene paridad con el editor web, ni DWG auténtico, ni biblioteca de bloques web. La versión híbrida permanece separada.

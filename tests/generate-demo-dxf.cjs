@@ -1,0 +1,9 @@
+const fs=require('node:fs'),vm=require('node:vm');
+const target=process.argv[2];if(!target)throw Error('Indica el archivo de salida');
+const source=fs.readFileSync('editor/editor.js','utf8');
+const context={window:{},colors:{General:'#ffffff'},zoom:35,units:'m',confirm:()=>true,distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),$:()=>({})};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync('editor/demo/vivienda.js','utf8'),context);
+context.objects=context.window.otroCadDemo.shapes;
+vm.runInContext(source.slice(source.indexOf('function buildDxf(){'),source.indexOf("\n$('#dxf').onclick")),context);
+fs.writeFileSync(target,vm.runInContext('buildDxf()',context));
