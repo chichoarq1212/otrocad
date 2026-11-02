@@ -98,7 +98,7 @@ public class HybridActivity extends Activity {
             try{
                 pendingSaveBytes=Base64.decode(base64,Base64.DEFAULT);
                 pendingSaveMime=(mime==null||mime.isEmpty())?"application/octet-stream":mime;
-                pendingSaveName=(name==null||name.isEmpty())?"otrocad.bin":name.replace(/[^a-zA-Z0-9._-]/g,"_");
+                pendingSaveName=(name==null||name.isEmpty())?"otrocad.bin":name.replaceAll("[^a-zA-Z0-9._-]","_");
                 runOnUiThread(()->{
                     Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);
                     intent.setType(pendingSaveMime);intent.putExtra(Intent.EXTRA_TITLE,pendingSaveName);
