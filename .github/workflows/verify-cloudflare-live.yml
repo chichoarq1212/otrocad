@@ -1,0 +1,48 @@
+name: Verify Cloudflare live OtroCAD
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'editor/**'
+      - 'descargas/**'
+      - 'sw.js'
+      - 'manifest.webmanifest'
+      - 'icon.svg'
+      - 'scripts/**'
+      - '.github/workflows/verify-cloudflare-live.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate site before deployment
+        run: |
+          node scripts/build-pages.cjs
+          node scripts/verify-pages.cjs
+          grep -q '0.5.4' dist/descargas/index.html
+      - name: Wait for Cloudflare deployment and verify actual public response
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://otrocad.cristhian-torres-arq.workers.dev/descargas/"
+          for i in $(seq 1 18); do
+            echo "Attempt $i: $URL"
+            if curl --fail --location --silent --show-error --max-time 15 \
+              -H 'Cache-Control: no-cache, no-store' \
+              "$URL?verify=${GITHUB_SHA}-$i" -o /tmp/otrocad-live.html; then
+              if grep -q 'Descargar APK Android 0.5.4' /tmp/otrocad-live.html && \
+                 grep -q 'OtroCAD-Android-0.5.4-test.apk' /tmp/otrocad-live.html; then
+                echo "PASS: Cloudflare publicly serves OtroCAD 0.5.4"
+                exit 0
+              fi
+              echo "Still stale: response does not include 0.5.4 APK"
+              grep -oE '0\\.5\\.[0-9]+' /tmp/otrocad-live.html | sort -u | head || true
+            fi
+            sleep 20
+          done
+          echo "::error::Cloudflare is still serving outdated content. Check Workers deployment source, build command, and output directory."
+          exit 1
