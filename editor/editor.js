@@ -339,6 +339,20 @@ function handleTap(p){
   if(g.arc)objects.push({type:'arc',pts:g.arc.map(clone),layer:first.layer,color:first.color,lineweight:first.lineweight,linetype:first.linetype});
   save();applySelection([modifyTarget,hit]);modifyTarget=-1;moveBase=null;render();status.textContent='Empalme aplicado';return;
  }
+ if(tool==='chamfer'){
+  const hit=selectAt(q);
+  if(hit<0||objects[hit]?.type!=='line'){status.textContent='Chaflán: selecciona una línea';return}
+  if(modifyTarget<0){modifyTarget=hit;moveBase=clone(q);applySelection([hit]);status.textContent='Chaflán: selecciona la segunda línea';return}
+  if(hit===modifyTarget){status.textContent='Selecciona otra línea';return}
+  const raw=prompt('Distancia del chaflán (una distancia o dos separadas por coma)','0.25');if(raw===null)return;
+  const values=String(raw).trim().replace(/\s/g,'').replace(';',',').split(',').map(Number);
+  if(!values.length||values.length>2||values.some(v=>!Number.isFinite(v)||v<=0)){status.textContent='Introduce una o dos distancias positivas';return}
+  const d1=values[0],d2=values[1]??d1,first=objects[modifyTarget],second=objects[hit],g=chamferGeometry(first,second,moveBase,q,d1,d2);
+  if(!g){status.textContent='No se puede aplicar el chaflán: revisa las líneas y las distancias';return}
+  checkpoint();first[g.a.replace]=clone(g.t1);second[g.b.replace]=clone(g.t2);
+  objects.push({type:'line',a:clone(g.t1),b:clone(g.t2),layer:first.layer,color:first.color,lineweight:first.lineweight,linetype:first.linetype});
+  save();applySelection([modifyTarget,hit,objects.length-1]);modifyTarget=-1;moveBase=null;render();status.textContent='CHAFLÁN aplicado';return;
+ }
  if(tool==='trim'||tool==='extend'){
   if(modifyTarget<0){modifyTarget=selectAt(q);applySelection(modifyTarget>=0?[modifyTarget]:[]);if(modifyTarget<0){status.textContent='Selecciona la línea que deseas modificar';return}status.textContent='Marca el extremo que deseas '+(tool==='trim'?'recortar':'alargar');return}
   const idx=modifyTarget;trimOrExtend(idx,q,tool);return;
@@ -451,6 +465,21 @@ function filletGeometry(first,second,pick1,pick2,radius){
  const mx=t1.x+t2.x-2*center.x,my=t1.y+t2.y-2*center.y,ml=Math.hypot(mx,my);if(ml<1e-9)return null;
  const mid={x:center.x+radius*mx/ml,y:center.y+radius*my/ml};
  return {a,b,t1,t2,arc:[t1,mid,t2]};
+}
+function chamferGeometry(first,second,pick1,pick2,distance1,distance2){
+ if(!first||!second||first.type!=='line'||second.type!=='line'||!Number.isFinite(distance1)||!Number.isFinite(distance2)||distance1<=0||distance2<=0)return null;
+ const intersection=lineIntersection(first.a,first.b,second.a,second.b,false);if(!intersection)return null;
+ const p={x:intersection.x,y:intersection.y};
+ const branch=(line,pick)=>{
+  const va={x:line.a.x-p.x,y:line.a.y-p.y},vb={x:line.b.x-p.x,y:line.b.y-p.y},vq={x:pick.x-p.x,y:pick.y-p.y};
+  const dot=v=>v.x*vq.x+v.y*vq.y;
+  const keep=Math.hypot(vq.x,vq.y)<1e-9?(Math.hypot(va.x,va.y)>=Math.hypot(vb.x,vb.y)?'a':'b'):(dot(va)>=dot(vb)?'a':'b');
+  const v=keep==='a'?va:vb,len=Math.hypot(v.x,v.y);
+  return len>1e-9?{keep,replace:keep==='a'?'b':'a',unit:{x:v.x/len,y:v.y/len},len}:null;
+ };
+ const a=branch(first,pick1),b=branch(second,pick2);
+ if(!a||!b||distance1>=a.len-1e-9||distance2>=b.len-1e-9)return null;
+ return {a,b,t1:{x:p.x+a.unit.x*distance1,y:p.y+a.unit.y*distance1},t2:{x:p.x+b.unit.x*distance2,y:p.y+b.unit.y*distance2}};
 }
 function trimOrExtend(index,q,mode){
  const s=objects[index];if(!s||s.type!=='line'){status.textContent=mode.toUpperCase()+' en esta alfa requiere una línea';return}
@@ -721,7 +750,18 @@ $('#save').onclick=()=>{if(save())status.textContent='Copia local guardada en es
 $('#recover').onclick=()=>{let previous;try{previous=JSON.parse(localStorage.getItem('otrocad-drawing-previous')||'null')}catch(e){alert('No se puede leer la copia anterior.');return}const shapes=Array.isArray(previous)?previous:previous?.shapes;if(!Array.isArray(shapes)){alert('No hay una copia anterior disponible en este navegador.');return}if(!confirm('¿Recuperar la copia anterior? El dibujo actual pasará a ser la copia anterior.'))return;if(!checkpoint()&&objects.length){alert('No se recuperó la copia porque no se pudo conservar el dibujo actual.');return}objects=shapes;if(['m','cm','mm'].includes(previous?.units))units=previous.units;clearSelection();if(save())status.textContent='Copia anterior recuperada';render()};
 $('#demoHouse').onclick=async()=>{if(objects.length&&!confirm('¿Abrir la vivienda de demostración? Se conservará una copia anterior en este navegador.'))return;try{const demo=clone(window.otroCadDemo);if(!Array.isArray(demo.shapes)||!demo.shapes.length)throw Error('La demostración está vacía.');if(!checkpoint()&&objects.length)throw Error('No se abrió el ejemplo porque no se pudo conservar el dibujo anterior.');objects=demo.shapes;units='m';clearSelection();save();$('#fit').click();status.textContent='Vivienda de demostración · '+objects.length+' entidades editables'}catch(e){alert('No se pudo abrir la demostración: '+e.message)}};
 $('#open').onclick=()=>$('#file').click();
-$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const lib=await import('https://cdn.jsdelivr.net/npm/@cadview/dwg@0.2.0/+esm');const dxf=await lib.convertDwgToDxf(await f.arrayBuffer());arr=parseDxfEntities(dxf)}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
+let dwgRuntimePromise=null;
+async function getDwgRuntime(){
+ if(!dwgRuntimePromise){
+  dwgRuntimePromise=(async()=>{
+   const engine=await import('./vendor/dwg/otrocad_dwg.js');
+   await engine.default();
+   return engine;
+  })().catch(error=>{dwgRuntimePromise=null;throw error});
+ }
+ return dwgRuntimePromise;
+}
+$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const dxfBytes=engine.dwg_to_dxf(new Uint8Array(await f.arrayBuffer()));const dxf=new TextDecoder('utf-8').decode(dxfBytes);arr=parseDxfEntities(dxf)}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
 function parseDxfEntities(source){
  const lines=source.replace(/\r/g,'').split('\n'),pairs=[];
  for(let i=0;i+1<lines.length;i+=2){const code=Number(lines[i].trim());if(Number.isFinite(code))pairs.push([code,lines[i+1].trim()])}
@@ -810,6 +850,25 @@ function buildDxf(){
  add(0,'ENDSEC',0,'EOF');return rows.join('\r\n')+'\r\n';
 }
 $('#dxf').onclick=()=>{const data=buildDxf();if(data!==null)download('otrocad.dxf',data,'application/dxf')};
+$('#saveAsDwg').onclick=async()=>{
+ const data=buildDxf();if(data===null)return;
+ const button=$('#saveAsDwg');button.disabled=true;const original=button.textContent;button.textContent='Preparando DWG…';
+ try{
+  const engine=await getDwgRuntime();
+  const bytes=engine.dxf_to_dwg(new TextEncoder().encode(data));
+  if(!(bytes instanceof Uint8Array)||bytes.length<6||new TextDecoder().decode(bytes.subarray(0,6))!=='AC1032')throw Error('El motor no produjo un DWG binario AC1032 válido.');
+  const checkBytes=engine.dwg_to_dxf(bytes);
+  const check=parseDxfEntities(new TextDecoder('utf-8').decode(checkBytes));
+  const expected=parseDxfEntities(data);
+  if(!check.length||check.length!==expected.length)throw Error('La validación DWG detectó diferencias de entidades ('+expected.length+' originales, '+check.length+' al reabrir). No se descargó el archivo.');
+  const blob=new Blob([bytes],{type:'application/acad'});
+  if(typeof window.showSaveFilePicker==='function'&&!window.OtroCadAndroid){
+   try{const handle=await window.showSaveFilePicker({suggestedName:'otrocad.dwg',types:[{description:'Dibujo AutoCAD DWG',accept:{'application/acad':['.dwg']}}]});const stream=await handle.createWritable();await stream.write(blob);await stream.close();status.textContent='DWG AC1032 guardado y reabierto para validación';return}catch(error){if(error.name==='AbortError')return;throw error}
+  }
+  await download('otrocad.dwg',blob,'application/acad');
+  status.textContent='DWG AC1032 generado y reabierto para validación';
+ }catch(error){console.error(error);alert('No se pudo guardar el DWG: '+(error.message||error))}finally{button.disabled=false;button.textContent=original}
+};
 $('#saveAsDxf').onclick=async()=>{
  const data=buildDxf();if(data===null)return;
  if(typeof window.showSaveFilePicker==='function'&&!window.OtroCadAndroid){

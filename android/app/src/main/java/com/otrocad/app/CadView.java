@@ -30,6 +30,7 @@ public class CadView extends View {
     private int drawColor=Color.rgb(220,232,245), selected=-1;
     private final LinkedHashSet<Integer> selectedItems=new LinkedHashSet<>();
     private final ArrayList<Integer> moveTargets=new ArrayList<>();
+    private int modifyTarget=-1;
     private PointF selectionStartScreen=null,selectionEndScreen=null;
     private boolean selectionDragging=false,selectionAdditive=false,multiSelectMode=false;
     private GripRef activeGrip=null;
@@ -39,7 +40,8 @@ public class CadView extends View {
     private String units="m";
     private boolean grid=true, gridSnap=false, ortho=false, polar=false, snap=true, crosshair=true;
     private boolean osEnd=true,osMid=true,osCenter=true,osQuadrant=true,osPerpendicular=false,osTangent=false,osNearest=false,osParallel=false;
-    private int decimalPrecision=3;
+    private int decimalPrecision=3, polygonSides=6;
+    private double transformValue=0;
     private PointF anchor=null,cursor=new PointF(0,0),panLast=null,moveBase=null;
     private boolean panning=false,pinching=false;
     private float pinchStart=0,pinchZoom=36f;
@@ -56,7 +58,9 @@ public class CadView extends View {
     private void say(String s){if(listener!=null)listener.onStatus(s);}
     public String getTool(){return tool;}
     public int getPolylinePointCount(){return poly.size();}
-    public void setTool(String t){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
+    public void setTool(String t){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;tool=t.toUpperCase(Locale.ROOT);anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();modifyTarget=-1;selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;panning=false;say(tool.equals("SELECT")?"Selección CAD · VENTANA / CRUCE · arrastra grips cuadrados para editar · MULTI acumula":"Herramienta: "+tool);invalidate();}
+    public void setTransformValue(double value){transformValue=value;}
+    public void setPolygonSides(int sides){if(sides>=3&&sides<=64)polygonSides=sides;}
     public void setTextValue(String s){textValue=s==null?"Texto":s;}
     public void toggleGrid(){grid=!grid;invalidate();}
     public void toggleOrtho(){ortho=!ortho;say("ORTHO "+(ortho?"activado · líneas horizontales y verticales":"desactivado · dirección libre"));invalidate();}
@@ -145,7 +149,14 @@ public class CadView extends View {
         PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):anchor;
         for(Entity e:entities){
             ArrayList<PointF> ps=e.pts;if(ps.isEmpty())continue;
-            if(osEnd)for(PointF v:ps){float d=dist(q,v);if(d<limit){limit=d;best=v;}}
+            if(osEnd){
+                // Sampled curves have many internal points: only arc ends are endpoints.
+                if(e.type.equals("ARC")){
+                    for(int index:new int[]{0,ps.size()-1}){PointF v=ps.get(index);float d=dist(q,v);if(d<limit){limit=d;best=v;}}
+                }else if(!e.type.equals("CIRCLE")&&!e.type.equals("ELLIPSE")){
+                    for(PointF v:ps){float d=dist(q,v);if(d<limit){limit=d;best=v;}}
+                }
+            }
             if(ps.size()>=2&&(e.type.equals("LINE")||e.type.equals("DIM")||e.type.equals("LEADER")||e.type.equals("POLY"))){
                 int segments=e.type.equals("POLY")?ps.size()-1:1;
                 for(int j=0;j<segments;j++){
@@ -350,6 +361,107 @@ public class CadView extends View {
         PointF q=constrain(snap(raw));
         if(tool.equals("SELECT")){int h=hit(q);setSelection(h>=0?Arrays.asList(h):Collections.emptyList());say(h<0?"Sin selección":"Objeto seleccionado");invalidate();return;}
         if(tool.equals("ERASE")){if(selectedIndices().isEmpty()){int h=hit(q);if(h>=0)setSelection(Arrays.asList(h));}deleteSelected();return;}
+        if(tool.equals("TRIM")||tool.equals("EXTEND")){
+            if(modifyTarget<0){
+                int h=hit(q);
+                if(h<0||!entities.get(h).type.equals("LINE")){say(tool+" nativo requiere seleccionar una línea");return;}
+                modifyTarget=h;setSelection(Arrays.asList(h));say(tool+" · toca el extremo que deseas modificar");invalidate();return;
+            }
+            if(modifyTarget>=entities.size()){modifyTarget=-1;return;}
+            Entity target=entities.get(modifyTarget);
+            if(!target.type.equals("LINE")||target.pts.size()<2){modifyTarget=-1;say("La entidad ya no es una línea válida");return;}
+            int endpoint=dist(q,target.pts.get(0))<=dist(q,target.pts.get(1))?0:1;
+            PointF a=target.pts.get(0),b=target.pts.get(1),origin=target.pts.get(endpoint);
+            double best=Double.POSITIVE_INFINITY;PointF bestPoint=null;
+            for(int i=0;i<entities.size();i++){
+                if(i==modifyTarget)continue;Entity boundary=entities.get(i);
+                if(!boundary.type.equals("LINE")||boundary.pts.size()<2)continue;
+                PointF c=boundary.pts.get(0),d=boundary.pts.get(1);
+                double[] hit=NativeTransform.lineIntersection(a.x,a.y,b.x,b.y,c.x,c.y,d.x,d.y);
+                if(hit==null)continue;double t=hit[2],u=hit[3];
+                if(u< -1e-8||u>1+1e-8)continue;
+                if(tool.equals("TRIM")&&(t<=1e-8||t>=1-1e-8))continue;
+                if(tool.equals("EXTEND")&&(endpoint==0?t>=-1e-8:t<=1+1e-8))continue;
+                double distance=Math.hypot(hit[0]-origin.x,hit[1]-origin.y);
+                if(distance<best){best=distance;bestPoint=new PointF((float)hit[0],(float)hit[1]);}
+            }
+            if(bestPoint==null){say("No se encontró una intersección compatible para "+tool);modifyTarget=-1;return;}
+            checkpoint();target.pts.set(endpoint,bestPoint);modifyTarget=-1;setSelection(Arrays.asList(selected));persistLocal();invalidate();say(tool+" aplicado a línea");return;
+        }
+        if(tool.equals("MIRROR")){
+            if(moveTargets.isEmpty()){
+                moveTargets.addAll(selectedIndices());
+                if(moveTargets.isEmpty()){
+                    int h=hit(q);if(h<0){say("Selecciona uno o varios objetos");return;}
+                    setSelection(Arrays.asList(h));moveTargets.add(h);say("Objeto seleccionado · indica el primer punto del eje");invalidate();return;
+                }
+            }
+            if(moveBase==null){moveBase=new PointF(q.x,q.y);say("Indica el segundo punto del eje de simetría");invalidate();return;}
+            if(Math.hypot(q.x-moveBase.x,q.y-moveBase.y)<1e-6){say("El eje de simetría debe tener longitud");return;}
+            for(int idx:moveTargets){
+                if(idx<0||idx>=entities.size())return;
+                String type=entities.get(idx).type;
+                if(!Arrays.asList("LINE","POLY","POLYGON","RECT","CIRCLE","ARC").contains(type)){
+                    say("SIMETRÍA no disponible para "+type+"; no se modificó el dibujo");return;
+                }
+            }
+            checkpoint();
+            for(int idx:moveTargets){
+                Entity e=entities.get(idx);
+                if(e.type.equals("RECT")&&e.pts.size()>=2){
+                    PointF a=e.pts.get(0),b=e.pts.get(1);ArrayList<PointF> corners=new ArrayList<>();
+                    corners.add(new PointF(a.x,a.y));corners.add(new PointF(b.x,a.y));corners.add(new PointF(b.x,b.y));corners.add(new PointF(a.x,b.y));
+                    e.pts=corners;e.type="POLYGON";
+                }
+                for(PointF p:e.pts){double[] v=NativeTransform.mirror(p.x,p.y,moveBase.x,moveBase.y,q.x,q.y);if(v==null){say("Eje de simetría inválido");return;}p.x=(float)v[0];p.y=(float)v[1];}
+            }
+            int count=moveTargets.size();moveTargets.clear();moveBase=null;persistLocal();invalidate();say("SIMETRÍA aplicada · "+count+" objeto(s)");return;
+        }
+        if(tool.equals("ROTATE")||tool.equals("SCALE")){
+            if(moveTargets.isEmpty()){
+                moveTargets.addAll(selectedIndices());
+                if(moveTargets.isEmpty()){
+                    int h=hit(q);if(h<0){say("Selecciona uno o varios objetos");return;}
+                    setSelection(Arrays.asList(h));moveTargets.add(h);
+                    say("Seleccionado · indica el punto base");invalidate();return;
+                }
+            }
+            if(!Double.isFinite(transformValue)||(tool.equals("SCALE")&&transformValue<=0)){say("Valor de transformación no válido");return;}
+            for(int idx:moveTargets){
+                if(idx<0||idx>=entities.size())return;
+                String type=entities.get(idx).type;
+                if(!Arrays.asList("LINE","POLY","POLYGON","RECT","CIRCLE","ARC").contains(type)){
+                    say("Transformación no disponible para "+type+"; no se modificó el dibujo");return;
+                }
+                Entity candidate=entities.get(idx);
+                ArrayList<PointF> points=new ArrayList<>(candidate.pts);
+                if(type.equals("RECT")&&points.size()>=2){
+                    PointF p=points.get(0),r=points.get(1);points.add(new PointF(p.x,r.y));points.add(new PointF(r.x,p.y));
+                }
+                for(PointF point:points){
+                    double[] result=tool.equals("ROTATE")?NativeTransform.rotate(point.x,point.y,q.x,q.y,transformValue):NativeTransform.scale(point.x,point.y,q.x,q.y,transformValue);
+                    if(!Double.isFinite(result[0])||!Double.isFinite(result[1])||Math.abs(result[0])>Float.MAX_VALUE||Math.abs(result[1])>Float.MAX_VALUE){
+                        say("La transformación excede el rango permitido; no se modificó el dibujo");return;
+                    }
+                }
+            }
+            checkpoint();
+            for(int idx:moveTargets){
+                Entity e=entities.get(idx);
+                if(e.type.equals("RECT")&&e.pts.size()>=2){
+                    PointF a=e.pts.get(0),b=e.pts.get(1);
+                    ArrayList<PointF> corners=new ArrayList<>();
+                    corners.add(new PointF(a.x,a.y));corners.add(new PointF(b.x,a.y));
+                    corners.add(new PointF(b.x,b.y));corners.add(new PointF(a.x,b.y));
+                    e.pts=corners;e.type="POLYGON";
+                }
+                for(PointF p:e.pts){
+                    double[] v=tool.equals("ROTATE")?NativeTransform.rotate(p.x,p.y,q.x,q.y,transformValue):NativeTransform.scale(p.x,p.y,q.x,q.y,transformValue);
+                    p.x=(float)v[0];p.y=(float)v[1];
+                }
+            }
+            int count=moveTargets.size();moveTargets.clear();persistLocal();invalidate();say(tool+" aplicado · "+count+" objeto(s)");return;
+        }
         if(tool.equals("MOVE")||tool.equals("COPY")){
             if(moveTargets.isEmpty()){moveTargets.addAll(selectedIndices());if(moveTargets.isEmpty()){int h=hit(q);if(h>=0){setSelection(Arrays.asList(h));moveTargets.add(h);}else{say("Selecciona uno o varios objetos");return;}say("Objeto seleccionado · indica punto base");invalidate();return;}}
             if(moveBase==null){moveBase=q;say("Indica punto destino");return;}
@@ -358,7 +470,26 @@ public class CadView extends View {
             if(tool.equals("COPY"))setSelection(created);moveTargets.clear();moveBase=null;persistLocal();invalidate();say("Edición aplicada a "+(tool.equals("COPY")?created.size():selectedIndices().size())+" objeto(s)");return;
         }
         if(tool.equals("POLY")){poly.add(q);cursor=new PointF(q.x,q.y);invalidate();say("Vértice añadido · pulsa Terminar PL");return;}
-        if(tool.equals("ARC")){arcPoints.add(q);if(arcPoints.size()==3){ArrayList<PointF> a=arcPoints;checkpoint();Entity e=new Entity();e.type="ARC";e.layer=layer;e.color=drawColor;e.weight=weight;for(int i=0;i<=24;i++){float t=i/24f;PointF p=new PointF(a.get(0).x*(1-t)*(1-t)+a.get(1).x*2*(1-t)*t+a.get(2).x*t*t,a.get(0).y*(1-t)*(1-t)+a.get(1).y*2*(1-t)*t+a.get(2).y*t*t);e.pts.add(p);}entities.add(e);setSelection(Arrays.asList(entities.size()-1));arcPoints.clear();persistLocal();say("Arco creado");}else say("Marca el siguiente punto del arco");invalidate();return;}
+        if(tool.equals("ARC")){
+            arcPoints.add(q);
+            if(arcPoints.size()==3){
+                PointF a=arcPoints.get(0),b=arcPoints.get(1),c=arcPoints.get(2);
+                double[][] samples=ArcGeometry.through(a.x,a.y,b.x,b.y,c.x,c.y);
+                if(samples==null){arcPoints.clear();say("No se puede crear el arco: los puntos coinciden o están alineados");invalidate();return;}
+                checkpoint();Entity e=new Entity();e.type="ARC";e.layer=layer;e.color=drawColor;e.weight=weight;
+                for(double[] p:samples)e.pts.add(new PointF((float)p[0],(float)p[1]));
+                entities.add(e);setSelection(Arrays.asList(entities.size()-1));arcPoints.clear();persistLocal();say("Arco circular creado");
+            }else say("Marca el siguiente punto del arco");
+            invalidate();return;
+        }
+        if(tool.equals("POLYGON")){
+            if(anchor==null){anchor=new PointF(q.x,q.y);say("Polígono: indica el primer vértice");invalidate();return;}
+            double[][] vertices=PolygonGeometry.regular(anchor.x,anchor.y,q.x,q.y,polygonSides);
+            if(vertices==null){say("Polígono: indica un radio mayor que cero");return;}
+            checkpoint();Entity e=new Entity();e.type="POLYGON";e.layer=layer;e.color=drawColor;e.weight=weight;
+            for(double[] v:vertices)e.pts.add(new PointF((float)v[0],(float)v[1]));
+            entities.add(e);setSelection(Arrays.asList(entities.size()-1));anchor=null;persistLocal();invalidate();say("Polígono creado · "+polygonSides+" lados");return;
+        }
         if(tool.equals("TEXT")){Entity e=new Entity();e.type="TEXT";e.layer=layer;e.color=drawColor;e.text=textValue;e.pts.add(q);checkpoint();entities.add(e);setSelection(Arrays.asList(entities.size()-1));persistLocal();invalidate();say("Texto colocado");return;}
         if(tool.equals("LINE")||tool.equals("RECT")||tool.equals("CIRCLE")||tool.equals("DIM")||tool.equals("HATCH")||tool.equals("LEADER")||tool.equals("ELLIPSE")){
             if(anchor==null){anchor=q;cursor=q;invalidate();say("Marca el punto final");}else{addEntity(tool,anchor,q);}return;
@@ -435,7 +566,7 @@ public class CadView extends View {
             if(e.type.equals("LINE"))e.pts.add(new PointF(num(v,"11",0),num(v,"21",0)));
             else if(e.type.equals("CIRCLE")){float r=num(v,"40",1);e.pts.add(new PointF(x+r,y));}
             else if(e.type.equals("POLY")){e.pts.clear();ArrayList<String> xs=v.get("10"),ys=v.get("20");if(xs!=null)for(int k=0;k<xs.size();k++)e.pts.add(new PointF(parse(xs.get(k)),ys!=null&&k<ys.size()?parse(ys.get(k)):0));if((((int)num(v,"70",0))&1)!=0)e.type="POLYGON";}
-            else if(e.type.equals("ARC")){float r=num(v,"40",1),a1=(float)Math.toRadians(num(v,"50",0)),a2=(float)Math.toRadians(num(v,"51",90));e.pts.clear();for(int k=0;k<=24;k++){float t=a1+(a2-a1)*k/24f;e.pts.add(new PointF(x+r*(float)Math.cos(t),y+r*(float)Math.sin(t)));}}
+            else if(e.type.equals("ARC")){double[][] samples=ArcGeometry.fromDxf(x,y,num(v,"40",0),num(v,"50",0),num(v,"51",0));if(samples==null){i=j-1;continue;}e.pts.clear();for(double[] p:samples)e.pts.add(new PointF((float)p[0],(float)p[1]));}
             else if(e.type.equals("TEXT"))e.text=first(v,"1","Texto");
             String col=first(v,"420","");if(!col.isEmpty())try{e.color=Color.rgb((int)(Long.parseLong(col)>>16)&255,(int)(Long.parseLong(col)>>8)&255,(int)Long.parseLong(col)&255);}catch(Exception ignored){}
             e.weight=num(v,"370",25)/100f;e.linetype=first(v,"6","CONTINUOUS");out.add(e);i=j-1;
@@ -453,8 +584,13 @@ public class CadView extends View {
             else if(e.type.equals("RECT")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("100\nAcDbPolyline\n90\n4\n70\n1\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(a.y).append("\n10\n").append(q.x).append("\n20\n").append(q.y).append("\n10\n").append(a.x).append("\n20\n").append(q.y).append("\n");}
             else if(e.type.equals("TEXT"))b.append("0\nTEXT\n").append(common).append("100\nAcDbText\n10\n").append(a.x).append("\n20\n").append(a.y).append("\n40\n").append(e.textHeight).append("\n1\n").append(e.text.replace("\n"," ")).append("\n");
             else if(e.type.equals("ELLIPSE")&&e.pts.size()>1){PointF q=e.pts.get(1);b.append("0\nLWPOLYLINE\n").append(common).append("100\nAcDbPolyline\n90\n36\n70\n1\n");for(int k=0;k<36;k++){double t=k*Math.PI*2/36;b.append("10\n").append(a.x+(q.x-a.x)*Math.cos(t)).append("\n20\n").append(a.y+(q.y-a.y)*Math.sin(t)).append("\n");}}
+            else if(e.type.equals("ARC")&&appendDxfArc(b,e,common)){}
             else if(e.pts.size()>1){b.append("0\nLWPOLYLINE\n").append(common).append("100\nAcDbPolyline\n90\n").append(e.pts.size()).append("\n70\n").append(e.type.equals("POLYGON")?1:0).append("\n");for(PointF p:e.pts)b.append("10\n").append(p.x).append("\n20\n").append(p.y).append("\n");}
         }return b.append("0\nENDSEC\n0\nEOF\n").toString();
+    }
+    private static boolean appendDxfArc(StringBuilder out,Entity e,String common){
+        double[][] points=new double[e.pts.size()][2];for(int i=0;i<points.length;i++){points[i][0]=e.pts.get(i).x;points[i][1]=e.pts.get(i).y;}
+        return DxfArcWriter.append(out,points,common);
     }
     public void setLayer(String s){layer=s;}
     public void setOffsetDistance(float d){if(Float.isFinite(d)&&d>0&&d<1000000)offsetDistance=d;}
@@ -463,8 +599,12 @@ public class CadView extends View {
     public void runCommand(String raw){
         String s=raw.trim();if(s.isEmpty())return;String u=s.toUpperCase(Locale.ROOT);if(u.equals("MULTI")){toggleMultiSelect();return;}if(u.equals("ESC")||u.equals("CANCEL")){if(activeGrip!=null)cancelGripDrag();pendingLength=false;pendingDirection=null;setSelection(Collections.emptyList());anchor=null;poly.clear();arcPoints.clear();moveBase=null;moveTargets.clear();selectionStartScreen=null;selectionEndScreen=null;selectionDragging=false;say("Comando cancelado · selección limpia");invalidate();return;}String[] parts=u.split("\\s+");String cmd=parts[0];if(cmd.equals("O")||cmd.equals("OFFSET")){if(parts.length>1){float d=parse(parts[1]);if(d>0)setOffsetDistance(d);}setTool("OFFSET");return;}
         if(u.equals("F7")||u.equals("GRID")){toggleGrid();return;}if(u.equals("F8")||u.equals("ORTHO")){toggleOrtho();return;}if(u.equals("F9")||u.equals("SNAP")){toggleGridSnap();return;}if(u.equals("F3")||u.equals("OSNAP")){toggleSnap();return;}if(u.equals("F10")||u.equals("POLAR")){togglePolar();return;}
-        String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
-        String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE").contains(t)){setTool(t);return;}
+        if(cmd.equals("RO")||cmd.equals("ROTATE")||cmd.equals("SC")||cmd.equals("SCALE")){
+            if(parts.length<2){say("Indica el valor: RO grados o SC factor");return;}
+            try{double value=Double.parseDouble(parts[1]);if(!Double.isFinite(value)||((cmd.equals("SC")||cmd.equals("SCALE"))&&value<=0))throw new NumberFormatException();setTransformValue(value);setTool(cmd.equals("RO")||cmd.equals("ROTATE")?"ROTATE":"SCALE");}catch(NumberFormatException ex){say("Valor de transformación no válido");}return;
+        }
+        String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("POL","POLYGON");m.put("L","LINE");m.put("PL","POLY");m.put("MI","MIRROR");m.put("MIR","MIRROR");m.put("TR","TRIM");m.put("EX","EXTEND");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
+        String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","MIRROR","TRIM","EXTEND","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE","POLYGON").contains(t)){setTool(t);return;}
         if(c.equals("UNDO")||c.equals("U")){undo();return;}if(c.equals("REDO")){redo();return;}if(c.equals("DELETE")){deleteSelected();return;}
         try{String z=s.replace("@","");if(z.contains("<")){String[] p=z.split("<");float len=Float.parseFloat(p[0]),ang=(float)Math.toRadians(Float.parseFloat(p[1]));PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):(tool.equals("ARC")&&!arcPoints.isEmpty()?arcPoints.get(arcPoints.size()-1):(anchor==null?new PointF(0,0):anchor));handle(new PointF(base.x+len*(float)Math.cos(ang),base.y+len*(float)Math.sin(ang)));return;}if(z.contains(",")){String[] p=z.split(",");float x=Float.parseFloat(p[0]),y=Float.parseFloat(p[1]);PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):(tool.equals("ARC")&&!arcPoints.isEmpty()?arcPoints.get(arcPoints.size()-1):(anchor==null?new PointF(0,0):anchor));if(s.startsWith("@")){x+=base.x;y+=base.y;}handle(new PointF(x,y));return;}}catch(Exception ignored){}
         say("Comando no reconocido: "+c);

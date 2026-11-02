@@ -14,6 +14,8 @@ on:
       - "icon.svg"
       - "scripts/**"
       - "tests/**"
+      - "dwg-wasm/**"
+      - "dwg-wasm/**"
       - ".github/workflows/web-pages.yml"
   pull_request:
     branches: ["main"]
@@ -28,6 +30,7 @@ on:
       - "icon.svg"
       - "scripts/**"
       - "tests/**"
+      - "dwg-wasm/**"
       - ".github/workflows/web-pages.yml"
   workflow_dispatch:
 
@@ -51,6 +54,7 @@ jobs:
           node tests/grips.test.cjs
           node tests/cad-precision.test.cjs
           node tests/storage-dxf.test.cjs
+          node tests/dwg-integration.test.cjs
           node tests/build-version.test.cjs
           node tests/offline-worker.test.cjs
           python scripts/generate-furniture.py

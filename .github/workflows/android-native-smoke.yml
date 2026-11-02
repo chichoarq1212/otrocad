@@ -5,14 +5,27 @@ on:
     paths:
       - 'android/**'
       - 'tests/android-native-smoke.py'
+      - 'tests/NativeArcGeometryTest.java'
+      - 'tests/NativePolygonGeometryTest.java'
+      - 'tests/NativeTransformTest.java'
+      - 'tests/NativeDxfArcFixture.java'
+      - 'tests/audit-native-dxf-arcs.py'
       - '.github/workflows/android-native-smoke.yml'
   pull_request:
     branches: [main]
     paths:
       - 'android/**'
       - 'tests/android-native-smoke.py'
+      - 'tests/NativeArcGeometryTest.java'
+      - 'tests/NativePolygonGeometryTest.java'
+      - 'tests/NativeTransformTest.java'
+      - 'tests/NativeDxfArcFixture.java'
+      - 'tests/audit-native-dxf-arcs.py'
       - '.github/workflows/android-native-smoke.yml'
   workflow_dispatch:
+concurrency:
+  group: native-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -25,6 +38,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Validar geometría circular nativa
+        run: |
+          mkdir -p /tmp/otrocad-geometry-test
+          javac -d /tmp/otrocad-geometry-test android/app/src/main/java/com/otrocad/app/ArcGeometry.java android/app/src/main/java/com/otrocad/app/DxfArcWriter.java android/app/src/main/java/com/otrocad/app/PolygonGeometry.java android/app/src/main/java/com/otrocad/app/NativeTransform.java tests/NativeArcGeometryTest.java tests/NativePolygonGeometryTest.java tests/NativeTransformTest.java tests/NativeDxfArcFixture.java
+          java -cp /tmp/otrocad-geometry-test NativeArcGeometryTest
+          java -cp /tmp/otrocad-geometry-test NativePolygonGeometryTest
+          java -cp /tmp/otrocad-geometry-test NativeTransformTest
+          java -cp /tmp/otrocad-geometry-test NativeDxfArcFixture /tmp/otrocad-native-arcs.dxf
+          python3 -m pip install --disable-pip-version-check ezdxf==1.4.4
+          python3 tests/audit-native-dxf-arcs.py /tmp/otrocad-native-arcs.dxf
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -40,6 +63,24 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging OtroCAD-Nativo-experimental-debug.apk | head -n 8
           if "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions OtroCAD-Nativo-experimental-debug.apk | grep -q 'android.permission.INTERNET'; then
             echo '::error::La versión nativa experimental no debe solicitar Internet.'
+            exit 1
+          fi
+      - name: Preparar imagen del emulador con reintentos
+        shell: bash
+        run: |
+          set -uo pipefail
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          installed=0
+          for attempt in 1 2 3; do
+            echo "Descarga de imagen Android: intento $attempt"
+            if "$sdkmanager" --install "system-images;android-29;google_apis;x86_64"; then
+              installed=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep 10; fi
+          done
+          if [ "$installed" -ne 1 ]; then
+            echo "::error::No se pudo descargar íntegramente la imagen del emulador Android."
             exit 1
           fi
       - name: Enable KVM

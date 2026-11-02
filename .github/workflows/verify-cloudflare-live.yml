@@ -52,6 +52,14 @@ jobs:
             echo "::error::Cloudflare does not yet serve all assets from this build."
             exit 1
           fi
+          if [ -f dist/editor/vendor/dwg/otrocad_dwg.js ] && [ -f dist/editor/vendor/dwg/otrocad_dwg_bg.wasm ]; then
+            for file in editor/vendor/dwg/otrocad_dwg.js editor/vendor/dwg/otrocad_dwg_bg.wasm; do
+              if ! curl --fail --location --silent --show-error --max-time 30 -H 'Cache-Control: no-cache, no-store' "$BASE/$file?verify=${GITHUB_SHA}-wasm" -o /tmp/otrocad-live-wasm || ! cmp -s "dist/$file" /tmp/otrocad-live-wasm; then
+                echo "::error::Cloudflare no sirve el runtime DWG exacto: $file"
+                exit 1
+              fi
+            done
+          fi
           APK="https://github.com/chichoarq1212/otrocad/releases/download/android-hybrid-test-41458967083-1/OtroCAD-Android-0.5.4-test.apk"
           curl --fail --location --silent --show-error --max-time 90 "$APK" -o /tmp/otrocad-download.apk
           unzip -tq /tmp/otrocad-download.apk
