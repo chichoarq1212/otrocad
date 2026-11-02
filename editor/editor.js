@@ -276,17 +276,16 @@ function doOffset(q){
   offsetDistancePreset=false;status.textContent='Indica el lado del desfase';return;
  }
  const s=objects[selected],d=offsetDistance,style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype},before=objects.length;
- checkpoint();
  if(s.type==='line'){
   const dx=s.b.x-s.a.x,dy=s.b.y-s.a.y,L=Math.hypot(dx,dy)||1;
   const side=((q.x-s.a.x)*(-dy/L)+(q.y-s.a.y)*(dx/L))>=0?1:-1,ox=-dy/L*d*side,oy=dx/L*d*side;
-  objects.push({type:'line',a:{x:s.a.x+ox,y:s.a.y+oy},b:{x:s.b.x+ox,y:s.b.y+oy},...style});
+  checkpoint();objects.push({type:'line',a:{x:s.a.x+ox,y:s.a.y+oy},b:{x:s.b.x+ox,y:s.b.y+oy},...style});
  }else if(s.type==='circle'){
   const r=distance(s.a,s.b),newR=r+(distance(q,s.a)>r?d:-d);
-  if(newR<=0){status.textContent='El desfase dejaría un radio no válido';return}objects.push({type:'circle',a:clone(s.a),b:{x:s.a.x+newR,y:s.a.y},...style});
+  if(newR<=0){status.textContent='El desfase dejaría un radio no válido';return}checkpoint();objects.push({type:'circle',a:clone(s.a),b:{x:s.a.x+newR,y:s.a.y},...style});
  }else if(s.type==='rect'){
   const minX=Math.min(s.a.x,s.b.x),maxX=Math.max(s.a.x,s.b.x),minY=Math.min(s.a.y,s.b.y),maxY=Math.max(s.a.y,s.b.y),inside=q.x>=minX&&q.x<=maxX&&q.y>=minY&&q.y<=maxY,expand=inside?-d:d;
-  if(inside&&(maxX-minX<=2*d||maxY-minY<=2*d)){status.textContent='El desfase dejaría un rectángulo no válido';return}objects.push({type:'rect',a:{x:minX-expand,y:minY-expand},b:{x:maxX+expand,y:maxY+expand},...style});
+  if(inside&&(maxX-minX<=2*d||maxY-minY<=2*d)){status.textContent='El desfase dejaría un rectángulo no válido';return}checkpoint();objects.push({type:'rect',a:{x:minX-expand,y:minY-expand},b:{x:maxX+expand,y:maxY+expand},...style});
  }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
  if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([objects.length-1]);render();status.textContent='OFFSET creado';
 }
