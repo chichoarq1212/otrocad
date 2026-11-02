@@ -1,60 +1,73 @@
 # OtroCAD
 
-CAD 2D libre en desarrollo para arquitectura, dibujo técnico, topografía y vialidad.
+CAD 2D gratuito en desarrollo para arquitectura, dibujo técnico, ingeniería, topografía y vialidad. Proyecto existente: no es un repositorio nuevo.
 
-Proyecto hermano de [ESQUECHAT 3D](https://esquechat.com/). Identidad visual azul marino, amarillo y blanco.
-
-## Accesos
-- Sitio: https://otrocad.ficti-ia3ec.chatgpt.site
-- Editor web: https://otrocad.ficti-ia3ec.chatgpt.site/editor/
+## Accesos oficiales
+- Sitio: https://otrocad.cristhian-torres-arq.workers.dev/
+- Editor: https://otrocad.cristhian-torres-arq.workers.dev/editor/
+- Descargas: https://otrocad.cristhian-torres-arq.workers.dev/descargas/
 - Código fuente: https://github.com/chichoarq1212/otrocad
-- APK y compilaciones: https://github.com/chichoarq1212/otrocad/releases
+- Compilaciones: https://github.com/chichoarq1212/otrocad/actions
+- Versiones: https://github.com/chichoarq1212/otrocad/releases
 
-## Estado actual
-### Web / PWA
-- Dibujo 2D: línea, polilínea, rectángulo, círculo, arco, elipse, polígono, cotas, hatch, texto y directrices.
-- Precisión: entrada dinámica, coordenadas absolutas/relativas, ORTHO, POLAR, GRID, SNAP, OSNAP y cruceta.
-- Selección CAD: ventana izquierda→derecha (solo entidades totalmente contenidas), cruce derecha→izquierda (entidades tocadas o atravesadas), selección múltiple, Shift/Ctrl o botón MULTI para acumular/quitar, ESC para limpiar; mover/copiar/borrar conjuntos.
-- Edición: mover, copiar, OFFSET, rotar, espejo, escalar, TRIM, EXTEND y EXPLODE para entidades compatibles.
-- Grips CAD: arrastra extremos, vértices, esquinas y puntos de control para editar geometría directamente; incluye líneas, polilíneas, polígonos, rectángulos, círculos, elipses, arcos, cotas, directrices y textos.
-- Grips con historial de edición: guardar, deshacer y cancelar cambios.
-- Capas básicas con visibilidad y bloqueo, color, tipo y grosor de línea.
-- Ventana de configuración HP: unidades, rejilla, incremento POLAR, radio OSNAP, ORTHO, SNAP y cruceta.
-- Abrir/guardar JSON; importar/exportar DXF; exportar SVG e imprimir/guardar PDF.
-- PWA con recursos locales cacheados para volver a abrir el editor sin conexión después de la primera carga.
+## Capacidades del editor web
 
-### Android nativo
-La versión Android 0.4.4 alfa reemplaza la envoltura WebView por una vista Android Canvas. No usa permiso de Internet y el dibujo funciona localmente. Incluye dibujo táctil, selección, edición geométrica mediante grips arrastrables, mover/copiar/borrar, undo/redo, entrada de longitud exacta por tramo, polilíneas con FIN PL, ORTHO ON/OFF, configuración HP, POLAR, SNAP F9, OSNAP F3, unidades, capas básicas, autoguardado local, JSON, DXF y PDF. Usa el isotipo original en el icono adaptativo y aceleración gráfica.
+### Dibujo y precisión
+- Línea, polilínea, rectángulo, círculo, arco circular de tres puntos, elipse, polígono regular, cotas, hachurados, texto, directrices y mobiliario a escala.
+- Entrada dinámica de longitud y ángulo, coordenadas, ORTHO, POLAR, GRID, SNAP, OSNAP y cruceta.
+- Selección individual, múltiple, ventana y cruce; grips editables e historial deshacer/rehacer.
+- Capas, visibilidad/bloqueo, colores, tipos y grosores de línea.
+- Navegación por ratón, teclado y controles táctiles.
 
-### Entrada de longitud en Android 0.4.4
-- En LÍNEA: marca el inicio, toca hacia la dirección deseada e introduce la longitud exacta en las unidades activas.
-- En POLILÍNEA: marca el primer vértice y repite dirección + longitud para cada tramo; usa FIN PL para cerrar el trazado.
-- ORTHO ON restringe la dirección a horizontal/vertical; ORTHO OFF permite dibujar libremente. El estado se muestra en el botón de la barra superior.
-- El isotipo geométrico amarillo y blanco se usa en el icono adaptativo de Android y en la cabecera de la aplicación.
+### Modificación
+- Mover, copiar, OFFSET, girar, simetría, escalar, TRIM, EXTEND, FILLET/empalme, CHAMFER/chaflán y EXPLODE para entidades compatibles.
+- Los comandos que no pueden procesar una geometría muestran una advertencia en vez de modificar silenciosamente el dibujo.
 
-## Limitaciones importantes
-- No es todavía un reemplazo completo de AutoCAD ni de Civil 3D.
-- DWG directo no está implementado en el motor Android nativo. La conversión DWG del editor web carga un módulo externo y necesita Internet.
-- La compatibilidad DXF cubre entidades frecuentes, no todos los objetos, bloques, referencias externas, estilos ni objetos proxy.
-- En Android nativo faltan operaciones avanzadas como TRIM, EXTEND, FILLET, CHAMFER, bloques dinámicos, layouts y plot styles.
-- Los archivos PDF y las medidas deben revisarse antes de usarse como documentación de obra.
-- Los APK de CI son compilaciones debug para pruebas, no paquetes firmados para Google Play.
-- El APK nativo 0.4.4 se compila y publica como versión alfa de pruebas; no está firmado para distribución comercial ni para Google Play.
+### Archivos y recuperación
+- Guardado automático local tras las operaciones de edición, copia previa, recuperación manual y copia de respaldo descargable.
+- Importar DXF y exportar DXF con advertencias para entidades no admitidas o simplificadas.
+- Exportar SVG y PDF.
+- La integración DWG local se está incorporando con un módulo WebAssembly basado en acadrust 0.6.8 (MPL-2.0): lectura DWG→DXF y escritura DXF→DWG AC1032, con lectura de retorno. La compatibilidad final depende de las entidades que el editor pueda representar; no equivale a certificar todos los objetos de AutoCAD, bloques dinámicos, referencias externas o extensiones verticales.
+- El archivo de proyecto interno y la copia de respaldo siguen siendo formatos de recuperación; DXF/DWG son formatos de intercambio CAD.
+
+### Proyecto arquitectónico
+- Vivienda de demostración editable con distribución articulada, mobiliario y anotaciones. Es una muestra conceptual para enseñar las capacidades del editor, no un plano constructivo aprobado.
+
+## Plataformas
+
+- **Web/PWA:** editor en navegador; el service worker cachea recursos publicados para uso offline después de cargarlos.
+- **Android híbrido:** incluye el editor web local para trabajar offline. La integración DWG se empaqueta en esta variante cuando el runtime WebAssembly se compila.
+- **Android nativo Canvas:** variante independiente sin permiso de Internet. Tiene herramientas táctiles propias, pero no toda la paridad del editor web ni DWG.
+- **Windows:** aplicación Electron con editor empaquetado; la validación offline debe incluir el módulo DWG y realizarse también en un PC físico.
+- **iOS:** PWA instalable desde Safari; no hay aplicación nativa publicada.
+
+## Estado y limitaciones
+
+OtroCAD todavía no es un reemplazo completo de AutoCAD/Civil 3D. La cobertura DXF/DWG varía por entidad y por versión. El motor DWG de terceros está bajo MPL-2.0 y su distribución exige conservar los avisos y cumplir las condiciones de esa licencia. No se declara compatibilidad sin pérdida con dibujos que contengan objetos proxy, verticales, bloques dinámicos, XREF, layouts o estilos no representables por el modelo interno.
+
+Los APK y EXE de CI se identifican como alfa/experimentales hasta superar pruebas de instalación y uso en dispositivos físicos. No están firmados para distribución comercial ni para Google Play/Microsoft Store.
 
 ## Compilar Android
+
 Requiere JDK 17, Gradle 8.9 y Android SDK 35:
 
 ```bash
 gradle -p android assembleDebug --no-daemon
 ```
 
-El APK se genera en `android/app/build/outputs/apk/debug/app-debug.apk`.
+## Compilar el motor DWG WebAssembly
 
-## Licencia
-Por definir antes de la distribución pública del producto.
+Requiere Rust estable, target `wasm32-unknown-unknown` y wasm-pack:
 
+```bash
+rustup target add wasm32-unknown-unknown
+cargo test --manifest-path dwg-wasm/Cargo.toml
+wasm-pack build dwg-wasm --target web --release --no-default-features --out-dir ../editor/vendor/dwg --out-name otrocad_dwg
+```
 
-## Descarga Android
+El flujo `Build OtroCAD DWG WebAssembly` ejecuta pruebas de ida y vuelta y publica el runtime compilado en `editor/vendor/dwg/`.
 
-- [Descargar OtroCAD Android 0.4.4 (APK)](https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.4.4/OtroCAD-Android-0.4.4.apk)
-- [Ver notas de la versión](https://github.com/chichoarq1212/otrocad/releases/tag/android-native-0.4.4)
+## Licencias
+
+- El código propio de OtroCAD todavía requiere una decisión de licencia del proyecto.
+- El puente DWG usa acadrust 0.6.8 bajo MPL-2.0. Ver `THIRD_PARTY_NOTICES.md` y `dwg-wasm/README.md`.
