@@ -11,6 +11,8 @@ on:
       - 'icon.svg'
       - 'scripts/**'
       - '.github/workflows/verify-cloudflare-live.yml'
+  pull_request:
+    paths: ['.github/workflows/verify-cloudflare-live.yml']
   workflow_dispatch:
 permissions:
   contents: read
