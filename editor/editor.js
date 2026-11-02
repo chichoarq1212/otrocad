@@ -339,6 +339,20 @@ function handleTap(p){
   if(g.arc)objects.push({type:'arc',pts:g.arc.map(clone),layer:first.layer,color:first.color,lineweight:first.lineweight,linetype:first.linetype});
   save();applySelection([modifyTarget,hit]);modifyTarget=-1;moveBase=null;render();status.textContent='Empalme aplicado';return;
  }
+ if(tool==='chamfer'){
+  const hit=selectAt(q);
+  if(hit<0||objects[hit]?.type!=='line'){status.textContent='Chaflán: selecciona una línea';return}
+  if(modifyTarget<0){modifyTarget=hit;moveBase=clone(q);applySelection([hit]);status.textContent='Chaflán: selecciona la segunda línea';return}
+  if(hit===modifyTarget){status.textContent='Selecciona otra línea';return}
+  const raw=prompt('Distancia del chaflán (una distancia o dos separadas por coma)','0.25');if(raw===null)return;
+  const values=String(raw).trim().replace(/\s/g,'').replace(';',',').split(',').map(Number);
+  if(!values.length||values.length>2||values.some(v=>!Number.isFinite(v)||v<=0)){status.textContent='Introduce una o dos distancias positivas';return}
+  const d1=values[0],d2=values[1]??d1,first=objects[modifyTarget],second=objects[hit],g=chamferGeometry(first,second,moveBase,q,d1,d2);
+  if(!g){status.textContent='No se puede aplicar el chaflán: revisa las líneas y las distancias';return}
+  checkpoint();first[g.a.replace]=clone(g.t1);second[g.b.replace]=clone(g.t2);
+  objects.push({type:'line',a:clone(g.t1),b:clone(g.t2),layer:first.layer,color:first.color,lineweight:first.lineweight,linetype:first.linetype});
+  save();applySelection([modifyTarget,hit,objects.length-1]);modifyTarget=-1;moveBase=null;render();status.textContent='CHAFLÁN aplicado';return;
+ }
  if(tool==='trim'||tool==='extend'){
   if(modifyTarget<0){modifyTarget=selectAt(q);applySelection(modifyTarget>=0?[modifyTarget]:[]);if(modifyTarget<0){status.textContent='Selecciona la línea que deseas modificar';return}status.textContent='Marca el extremo que deseas '+(tool==='trim'?'recortar':'alargar');return}
   const idx=modifyTarget;trimOrExtend(idx,q,tool);return;
@@ -451,6 +465,21 @@ function filletGeometry(first,second,pick1,pick2,radius){
  const mx=t1.x+t2.x-2*center.x,my=t1.y+t2.y-2*center.y,ml=Math.hypot(mx,my);if(ml<1e-9)return null;
  const mid={x:center.x+radius*mx/ml,y:center.y+radius*my/ml};
  return {a,b,t1,t2,arc:[t1,mid,t2]};
+}
+function chamferGeometry(first,second,pick1,pick2,distance1,distance2){
+ if(!first||!second||first.type!=='line'||second.type!=='line'||!Number.isFinite(distance1)||!Number.isFinite(distance2)||distance1<=0||distance2<=0)return null;
+ const intersection=lineIntersection(first.a,first.b,second.a,second.b,false);if(!intersection)return null;
+ const p={x:intersection.x,y:intersection.y};
+ const branch=(line,pick)=>{
+  const va={x:line.a.x-p.x,y:line.a.y-p.y},vb={x:line.b.x-p.x,y:line.b.y-p.y},vq={x:pick.x-p.x,y:pick.y-p.y};
+  const dot=v=>v.x*vq.x+v.y*vq.y;
+  const keep=Math.hypot(vq.x,vq.y)<1e-9?(Math.hypot(va.x,va.y)>=Math.hypot(vb.x,vb.y)?'a':'b'):(dot(va)>=dot(vb)?'a':'b');
+  const v=keep==='a'?va:vb,len=Math.hypot(v.x,v.y);
+  return len>1e-9?{keep,replace:keep==='a'?'b':'a',unit:{x:v.x/len,y:v.y/len},len}:null;
+ };
+ const a=branch(first,pick1),b=branch(second,pick2);
+ if(!a||!b||distance1>=a.len-1e-9||distance2>=b.len-1e-9)return null;
+ return {a,b,t1:{x:p.x+a.unit.x*distance1,y:p.y+a.unit.y*distance1},t2:{x:p.x+b.unit.x*distance2,y:p.y+b.unit.y*distance2}};
 }
 function trimOrExtend(index,q,mode){
  const s=objects[index];if(!s||s.type!=='line'){status.textContent=mode.toUpperCase()+' en esta alfa requiere una línea';return}
