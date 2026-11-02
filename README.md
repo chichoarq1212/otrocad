@@ -27,7 +27,7 @@ CAD 2D gratuito en desarrollo para arquitectura, dibujo técnico, ingeniería, t
 - Guardado automático local tras las operaciones de edición, copia previa, recuperación manual y copia de respaldo descargable.
 - Importar DXF y exportar DXF con advertencias para entidades no admitidas o simplificadas.
 - Exportar SVG y PDF.
-- La integración DWG local se está incorporando con un módulo WebAssembly basado en acadrust 0.6.8 (MPL-2.0): lectura DWG→DXF y escritura DXF→DWG AC1032, con lectura de retorno. La compatibilidad final depende de las entidades que el editor pueda representar; no equivale a certificar todos los objetos de AutoCAD, bloques dinámicos, referencias externas o extensiones verticales.
+- La integración DWG local está compilada y publicada en `editor/vendor/dwg/` mediante WebAssembly basado en acadrust 0.6.8 (MPL-2.0): lectura DWG→DXF y escritura DXF→DWG AC1032 (AutoCAD 2018), con lectura de retorno y comprobación de cantidad de entidades antes de descargar. La compatibilidad depende de las entidades que el editor pueda representar; no equivale a certificar todos los objetos de AutoCAD, bloques dinámicos, referencias externas o extensiones verticales.
 - El archivo de proyecto interno y la copia de respaldo siguen siendo formatos de recuperación; DXF/DWG son formatos de intercambio CAD.
 
 ### Proyecto arquitectónico
@@ -36,9 +36,9 @@ CAD 2D gratuito en desarrollo para arquitectura, dibujo técnico, ingeniería, t
 ## Plataformas
 
 - **Web/PWA:** editor en navegador; el service worker cachea recursos publicados para uso offline después de cargarlos.
-- **Android híbrido:** incluye el editor web local para trabajar offline. La integración DWG se empaqueta en esta variante cuando el runtime WebAssembly se compila.
+- **Android híbrido:** incluye el editor web local, runtime DWG WebAssembly y selector Android SAF para abrir y guardar archivos sin conexión. Se sirve desde `WebViewAssetLoader` bajo un origen HTTPS local.
 - **Android nativo Canvas:** variante independiente sin permiso de Internet. Tiene herramientas táctiles propias, pero no toda la paridad del editor web ni DWG.
-- **Windows:** aplicación Electron con editor empaquetado; la validación offline debe incluir el módulo DWG y realizarse también en un PC físico.
+- **Windows:** aplicación Electron con editor y runtime DWG empaquetados; usa un protocolo local seguro para cargar WebAssembly sin red. La compilación CI instala, abre sin conexión y ejecuta una prueba de ida/vuelta DWG cuando el runtime está presente; aún falta validación en un PC físico.
 - **iOS:** PWA instalable desde Safari; no hay aplicación nativa publicada.
 
 ## Estado y limitaciones
