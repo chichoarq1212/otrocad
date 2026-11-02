@@ -10,6 +10,7 @@ const requiredFiles = [
   'manifest.webmanifest',
   'sw.js',
   'icon.svg',
+  'editor-preview.svg',
   'editor/index.html',
   'editor/editor.js',
   'tutorial/index.html',
@@ -27,7 +28,7 @@ for (const relativePath of requiredFiles) {
 fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
 
-for (const relativePath of ['index.html', 'manifest.webmanifest', 'sw.js', 'icon.svg']) {
+for (const relativePath of ['index.html', 'manifest.webmanifest', 'sw.js', 'icon.svg', 'editor-preview.svg']) {
   fs.copyFileSync(path.join(root, relativePath), path.join(output, relativePath));
 }
 
