@@ -51,6 +51,7 @@ jobs:
             adb install -r OtroCAD-Nativo-experimental-debug.apk
             adb shell am start -W -n com.otrocad.app.nativealpha/com.otrocad.app.MainActivity
             adb shell pidof com.otrocad.app.nativealpha
+            python3 tests/android-native-smoke.py
             adb exec-out screencap -p > OtroCAD-nativo-emulador.png
       - uses: actions/upload-artifact@v4
         with:

@@ -27,4 +27,4 @@ Ninguna alternativa está integrada ni validada aquí.
 5. Automatizar pruebas de instalación, firma y versionado sin sobrescribir una release existente; validar los bytes descargados y la versión realmente servida, incluida actualización de service worker y escenarios offline.
 
 ## Android nativo experimental
-Se añadió una variante aislada con identificador propio, actividad Canvas nativa y sin permiso de Internet. Su compilación e inicio deben comprobarse en el emulador y posteriormente en equipos físicos. Es una alfa independiente: no tiene paridad con el editor web, ni DWG auténtico, ni biblioteca de bloques web. La versión híbrida permanece separada.
+Se añadió una variante aislada con identificador propio, actividad Canvas nativa y sin permiso de Internet. Una revisión previa compiló, se instaló y arrancó en un emulador; los cambios posteriores requieren repetir esas pruebas y probarse en equipos físicos. Es una alfa independiente: no tiene paridad con el editor web, ni DWG auténtico, ni biblioteca de bloques web. La versión híbrida permanece separada.
