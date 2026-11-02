@@ -41,8 +41,11 @@ jobs:
           test "$(head -c 6 /tmp/otrocad-demo.dwg)" = AC1015
           upstream-libredwg/programs/dwgread -O DXF -o /tmp/otrocad-return.dxf /tmp/otrocad-demo.dwg
           upstream-libredwg/programs/dwg2dxf -m -o /tmp/otrocad-minimal.dxf /tmp/otrocad-demo.dwg
-          python3 tests/audit-demo-dxf.py /tmp/otrocad-return.dxf
-          python3 tests/audit-demo-dxf.py /tmp/otrocad-minimal.dxf
+          full=0
+          minimal=0
+          python3 tests/audit-demo-dxf.py /tmp/otrocad-return.dxf || full=$?
+          python3 tests/audit-demo-dxf.py /tmp/otrocad-minimal.dxf || minimal=$?
+          test "$full" -eq 0 && test "$minimal" -eq 0
       - name: Conservar archivos para inspección
         if: always()
         uses: actions/upload-artifact@v4
