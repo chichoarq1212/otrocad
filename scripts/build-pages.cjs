@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 const root = process.cwd();
 const output = path.join(root, 'dist');
@@ -38,6 +39,24 @@ fs.cpSync(path.join(root, 'editor'), path.join(output, 'editor'), { recursive: t
 fs.cpSync(path.join(root, 'tutorial'), path.join(output, 'tutorial'), { recursive: true });
 fs.cpSync(path.join(root, 'descargas'), path.join(output, 'descargas'), { recursive: true });
 fs.cpSync(path.join(root, 'herramientas'), path.join(output, 'herramientas'), { recursive: true });
+
+// Any change to a deployed file changes the service-worker cache and build identity.
+const hash = crypto.createHash('sha256');
+function hashDirectory(dir, prefix = '') {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
+    const relative = prefix ? prefix + '/' + entry.name : entry.name;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) hashDirectory(full, relative);
+    else { hash.update(relative + '\0'); hash.update(fs.readFileSync(full)); }
+  }
+}
+hashDirectory(output);
+const buildId = hash.digest('hex').slice(0, 20);
+const workerPath = path.join(output, 'sw.js');
+const worker = fs.readFileSync(workerPath, 'utf8');
+if (!/^const CACHE='otrocad-pc-offline-[^']+';/m.test(worker)) throw new Error('No se encontró la versión de caché del service worker');
+fs.writeFileSync(workerPath, worker.replace(/^const CACHE='otrocad-pc-offline-[^']+';/m, `const CACHE='otrocad-pc-offline-${buildId}';`));
+fs.writeFileSync(path.join(output, 'build-info.json'), JSON.stringify({buildId}) + '\n');
 
 console.log('OtroCAD listo para Cloudflare Workers: solo se publican los archivos web en /dist.');
 console.log('Se excluyen android/, .github/, tests/ y el resto del código de desarrollo.');

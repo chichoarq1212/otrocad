@@ -24,25 +24,34 @@ jobs:
           node scripts/build-pages.cjs
           node scripts/verify-pages.cjs
           grep -q '0.5.4' dist/descargas/index.html
-      - name: Wait for Cloudflare deployment and verify actual public response
+      - name: Verify deployed files match this exact build and the APK downloads
         shell: bash
         run: |
           set -euo pipefail
-          URL="https://otrocad.cristhian-torres-arq.workers.dev/descargas/"
+          BASE="https://otrocad.cristhian-torres-arq.workers.dev"
+          matched=0
           for i in $(seq 1 18); do
-            echo "Attempt $i: $URL"
+            echo "Checking public build (attempt $i)"
             if curl --fail --location --silent --show-error --max-time 15 \
               -H 'Cache-Control: no-cache, no-store' \
-              "$URL?verify=${GITHUB_SHA}-$i" -o /tmp/otrocad-live.html; then
-              if grep -q 'Descargar APK Android 0.5.4' /tmp/otrocad-live.html && \
-                 grep -q 'OtroCAD-Android-0.5.4-test.apk' /tmp/otrocad-live.html; then
-                echo "PASS: Cloudflare publicly serves OtroCAD 0.5.4"
-                exit 0
-              fi
-              echo "Still stale: response does not include 0.5.4 APK"
-              grep -oE '0\\.5\\.[0-9]+' /tmp/otrocad-live.html | sort -u | head || true
+              "$BASE/build-info.json?verify=${GITHUB_SHA}-$i" -o /tmp/otrocad-build-info.json && \
+              cmp -s dist/build-info.json /tmp/otrocad-build-info.json; then
+              matched=1
+              break
             fi
             sleep 20
           done
-          echo "::error::Cloudflare is still serving outdated content. Check Workers deployment source, build command, and output directory."
-          exit 1
+          if [ "$matched" != 1 ]; then
+            echo "::error::Cloudflare does not yet serve the build generated from this commit."
+            exit 1
+          fi
+          for file in index.html editor/index.html editor/editor.js editor/demo/vivienda.js sw.js descargas/index.html; do
+            curl --fail --location --silent --show-error --max-time 20 \
+              -H 'Cache-Control: no-cache, no-store' \
+              "$BASE/$file?verify=${GITHUB_SHA}" -o /tmp/otrocad-live-file
+            cmp "dist/$file" /tmp/otrocad-live-file || { echo "::error::Public file differs: $file"; exit 1; }
+          done
+          APK="https://github.com/chichoarq1212/otrocad/releases/download/android-native-0.5.4-test/OtroCAD-Android-0.5.4-test.apk"
+          curl --fail --location --silent --show-error --max-time 90 "$APK" -o /tmp/otrocad-download.apk
+          unzip -tq /tmp/otrocad-download.apk
+          echo "Public build matches this commit and the linked test APK is a readable archive. Device functionality requires separate validation."
