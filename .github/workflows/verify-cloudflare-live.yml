@@ -27,6 +27,7 @@ jobs:
           node scripts/verify-pages.cjs
           grep -q '0.5.4' dist/descargas/index.html
       - name: Verify deployed files match this exact build and the APK downloads
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
