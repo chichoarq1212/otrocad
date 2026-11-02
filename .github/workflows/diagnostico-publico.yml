@@ -26,3 +26,8 @@ jobs:
           print("Repositorio:",repr(a[max(0,i-100):i+200]))
           print("Publicado:",repr(b[max(0,i-100):i+200]))
           PY
+      - name: Comprobar descarga real del APK nativo
+        run: |
+          curl -fsSL --max-time 90 https://github.com/chichoarq1212/otrocad/releases/download/android-nativo-experimental-41454372080-1/OtroCAD-Nativo-experimental-debug.apk -o /tmp/otrocad-nativo.apk
+          unzip -tq /tmp/otrocad-nativo.apk
+          sha256sum /tmp/otrocad-nativo.apk
