@@ -360,6 +360,35 @@ public class CadView extends View {
         PointF q=constrain(snap(raw));
         if(tool.equals("SELECT")){int h=hit(q);setSelection(h>=0?Arrays.asList(h):Collections.emptyList());say(h<0?"Sin selección":"Objeto seleccionado");invalidate();return;}
         if(tool.equals("ERASE")){if(selectedIndices().isEmpty()){int h=hit(q);if(h>=0)setSelection(Arrays.asList(h));}deleteSelected();return;}
+        if(tool.equals("MIRROR")){
+            if(moveTargets.isEmpty()){
+                moveTargets.addAll(selectedIndices());
+                if(moveTargets.isEmpty()){
+                    int h=hit(q);if(h<0){say("Selecciona uno o varios objetos");return;}
+                    setSelection(Arrays.asList(h));moveTargets.add(h);say("Objeto seleccionado · indica el primer punto del eje");invalidate();return;
+                }
+            }
+            if(moveBase==null){moveBase=new PointF(q.x,q.y);say("Indica el segundo punto del eje de simetría");invalidate();return;}
+            if(Math.hypot(q.x-moveBase.x,q.y-moveBase.y)<1e-6){say("El eje de simetría debe tener longitud");return;}
+            for(int idx:moveTargets){
+                if(idx<0||idx>=entities.size())return;
+                String type=entities.get(idx).type;
+                if(!Arrays.asList("LINE","POLY","POLYGON","RECT","CIRCLE","ARC").contains(type)){
+                    say("SIMETRÍA no disponible para "+type+"; no se modificó el dibujo");return;
+                }
+            }
+            checkpoint();
+            for(int idx:moveTargets){
+                Entity e=entities.get(idx);
+                if(e.type.equals("RECT")&&e.pts.size()>=2){
+                    PointF a=e.pts.get(0),b=e.pts.get(1);ArrayList<PointF> corners=new ArrayList<>();
+                    corners.add(new PointF(a.x,a.y));corners.add(new PointF(b.x,a.y));corners.add(new PointF(b.x,b.y));corners.add(new PointF(a.x,b.y));
+                    e.pts=corners;e.type="POLYGON";
+                }
+                for(PointF p:e.pts){double[] v=NativeTransform.mirror(p.x,p.y,moveBase.x,moveBase.y,q.x,q.y);if(v==null){say("Eje de simetría inválido");return;}p.x=(float)v[0];p.y=(float)v[1];}
+            }
+            int count=moveTargets.size();moveTargets.clear();moveBase=null;persistLocal();invalidate();say("SIMETRÍA aplicada · "+count+" objeto(s)");return;
+        }
         if(tool.equals("ROTATE")||tool.equals("SCALE")){
             if(moveTargets.isEmpty()){
                 moveTargets.addAll(selectedIndices());
@@ -546,7 +575,7 @@ public class CadView extends View {
             if(parts.length<2){say("Indica el valor: RO grados o SC factor");return;}
             try{double value=Double.parseDouble(parts[1]);if(!Double.isFinite(value)||((cmd.equals("SC")||cmd.equals("SCALE"))&&value<=0))throw new NumberFormatException();setTransformValue(value);setTool(cmd.equals("RO")||cmd.equals("ROTATE")?"ROTATE":"SCALE");}catch(NumberFormatException ex){say("Valor de transformación no válido");}return;
         }
-        String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("POL","POLYGON");m.put("L","LINE");m.put("PL","POLY");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
+        String[] a=u.split("\\s+");String c=a[0];Map<String,String> m=new HashMap<>();m.put("POL","POLYGON");m.put("L","LINE");m.put("PL","POLY");m.put("MI","MIRROR");m.put("MIR","MIRROR");m.put("PLINE","POLY");m.put("REC","RECT");m.put("RECTANG","RECT");m.put("C","CIRCLE");m.put("A","ARC");m.put("D","DIM");m.put("H","HATCH");m.put("M","MOVE");m.put("CO","COPY");m.put("O","OFFSET");m.put("E","ERASE");m.put("T","TEXT");m.put("V","SELECT");
         String t=m.getOrDefault(c,c);if(Arrays.asList("LINE","POLY","RECT","CIRCLE","ARC","DIM","HATCH","MOVE","COPY","OFFSET","ERASE","TEXT","SELECT","PAN","LEADER","ELLIPSE","POLYGON").contains(t)){setTool(t);return;}
         if(c.equals("UNDO")||c.equals("U")){undo();return;}if(c.equals("REDO")){redo();return;}if(c.equals("DELETE")){deleteSelected();return;}
         try{String z=s.replace("@","");if(z.contains("<")){String[] p=z.split("<");float len=Float.parseFloat(p[0]),ang=(float)Math.toRadians(Float.parseFloat(p[1]));PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):(tool.equals("ARC")&&!arcPoints.isEmpty()?arcPoints.get(arcPoints.size()-1):(anchor==null?new PointF(0,0):anchor));handle(new PointF(base.x+len*(float)Math.cos(ang),base.y+len*(float)Math.sin(ang)));return;}if(z.contains(",")){String[] p=z.split(",");float x=Float.parseFloat(p[0]),y=Float.parseFloat(p[1]);PointF base=tool.equals("POLY")&&!poly.isEmpty()?poly.get(poly.size()-1):(tool.equals("ARC")&&!arcPoints.isEmpty()?arcPoints.get(arcPoints.size()-1):(anchor==null?new PointF(0,0):anchor));if(s.startsWith("@")){x+=base.x;y+=base.y;}handle(new PointF(x,y));return;}}catch(Exception ignored){}
