@@ -1,4 +1,4 @@
-const CACHE='otrocad-pc-offline-45';
+const CACHE='otrocad-pc-offline-46';
 const ASSETS=['./','./index.html','./editor/','./editor/index.html','./editor/editor.js','./tutorial/','./tutorial/index.html','./descargas/','./descargas/index.html','./herramientas/','./herramientas/index.html','./manifest.webmanifest','./icon.svg','./editor-preview.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('otrocad-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
@@ -9,7 +9,7 @@ self.addEventListener('fetch',event=>{
   const cache=await caches.open(CACHE);
   // Network-first: installed PC/PWA receives new editor builds while remaining usable offline.
   // Do not ignore the query string for network requests; it can be used to force an update.
-  try{const response=await fetch(req,{cache:'no-cache'});if(response.ok){await cache.put(req,response.clone());return response;}}
+  try{const response=await fetch(req,{cache:'no-store'});if(response.ok){await cache.put(req,response.clone());return response;}}
   catch(error){}
   const cached=await cache.match(req,{ignoreSearch:true});
   if(cached)return cached;
