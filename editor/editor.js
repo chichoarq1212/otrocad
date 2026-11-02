@@ -493,9 +493,10 @@ $('#cmd').addEventListener('input',updateCursorCommand);
 applyCanvasTheme(cadTheme);
 $('#canvasTheme').addEventListener('change',e=>applyCanvasTheme(e.target.value));$('#canvasTheme').value=cadTheme;
 $('#cmd').addEventListener('keydown',e=>{
- if(e.key==='Enter'||e.key===' '&&$('#cmd').value.trim()===''){e.preventDefault();e.stopPropagation();submitCommand()}
+ if(e.key==='Enter'||e.key===' '&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();e.stopPropagation();submitCommand();$('#cmd').blur()}
  else if(e.key==='Escape'){e.preventDefault();cancelCurrentAction();$('#cmd').blur();stage.focus({preventScroll:true})}
 });
+$('#cmdRun').addEventListener('click',()=>{submitCommand();$('#cmd').blur()});
 document.addEventListener('pointerdown',e=>{if(contextMenuEl&&!contextMenuEl.contains(e.target))hideCadContextMenu()});
 contextMenuEl.addEventListener('contextmenu',e=>e.preventDefault());
 
