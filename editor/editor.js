@@ -264,7 +264,7 @@ function commitEntity(endPoint){
  else if(tool==='dim'||tool==='dimaligned')objects.push({type:tool,a:clone(start),b:clone(endPoint),...style,layer:'Cotas'});
  else if(tool==='rect'||tool==='hatch'||tool==='ellipse')objects.push({type:tool,a:clone(start),b:clone(endPoint),...(tool==='hatch'?{hatchPattern:$('#hatchPattern')?.value||'ANSI31',hatchSpacing:Number($('#hatchSpacing')?.value||10)}:{}),...style});
  else if(tool==='circle')objects.push({type:'circle',a:clone(start),b:clone(endPoint),...style});
- else if(tool==='polygon'){const n=Math.max(3,Math.min(64,polySides));const r=distance(start,endPoint);const pts=[];for(let i=0;i<n;i++){const a=2*Math.PI*i/n;pts.push({x:start.x+r*Math.cos(a),y:start.y+r*Math.sin(a)})}objects.push({type:'polygon',pts,...style})}
+ else if(tool==='polygon'){const n=Math.max(3,Math.min(64,polySides));const r=distance(start,endPoint);const pts=[];for(let i=0;i<n;i++){const a=Math.atan2(endPoint.y-start.y,endPoint.x-start.x)+2*Math.PI*i/n;pts.push({x:start.x+r*Math.cos(a),y:start.y+r*Math.sin(a)})}objects.push({type:'polygon',pts,...style})}
  save();applySelection([objects.length-1]);start=null;temp=null;render();updatePrompt();
 }
 function finishPoly(){if(poly.length<2){status.textContent='La polilínea necesita al menos dos puntos';return false}if(lockedLayers.has($('#layer').value)){status.textContent='La capa actual está bloqueada';return false}checkpoint();objects.push({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)});save();poly=[];start=null;temp=null;render();updatePrompt();status.textContent='Polilínea terminada';return true}
@@ -276,17 +276,16 @@ function doOffset(q){
   offsetDistancePreset=false;status.textContent='Indica el lado del desfase';return;
  }
  const s=objects[selected],d=offsetDistance,style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype},before=objects.length;
- checkpoint();
  if(s.type==='line'){
   const dx=s.b.x-s.a.x,dy=s.b.y-s.a.y,L=Math.hypot(dx,dy)||1;
   const side=((q.x-s.a.x)*(-dy/L)+(q.y-s.a.y)*(dx/L))>=0?1:-1,ox=-dy/L*d*side,oy=dx/L*d*side;
-  objects.push({type:'line',a:{x:s.a.x+ox,y:s.a.y+oy},b:{x:s.b.x+ox,y:s.b.y+oy},...style});
+  checkpoint();objects.push({type:'line',a:{x:s.a.x+ox,y:s.a.y+oy},b:{x:s.b.x+ox,y:s.b.y+oy},...style});
  }else if(s.type==='circle'){
   const r=distance(s.a,s.b),newR=r+(distance(q,s.a)>r?d:-d);
-  if(newR<=0){status.textContent='El desfase dejaría un radio no válido';return}objects.push({type:'circle',a:clone(s.a),b:{x:s.a.x+newR,y:s.a.y},...style});
+  if(newR<=0){status.textContent='El desfase dejaría un radio no válido';return}checkpoint();objects.push({type:'circle',a:clone(s.a),b:{x:s.a.x+newR,y:s.a.y},...style});
  }else if(s.type==='rect'){
-  const minX=Math.min(s.a.x,s.b.x),maxX=Math.max(s.a.x,s.b.x),minY=Math.min(s.a.y,s.b.y),maxY=Math.max(s.a.y,s.b.y),cx=(minX+maxX)/2,cy=(minY+maxY)/2,expand=distance(q,{x:cx,y:cy})>Math.hypot(maxX-minX,maxY-minY)/2?d:-d;
-  if(maxX-minX<=2*Math.abs(expand)||maxY-minY<=2*Math.abs(expand)){status.textContent='El desfase dejaría un rectángulo no válido';return}objects.push({type:'rect',a:{x:minX-expand,y:minY-expand},b:{x:maxX+expand,y:maxY+expand},...style});
+  const minX=Math.min(s.a.x,s.b.x),maxX=Math.max(s.a.x,s.b.x),minY=Math.min(s.a.y,s.b.y),maxY=Math.max(s.a.y,s.b.y),inside=q.x>=minX&&q.x<=maxX&&q.y>=minY&&q.y<=maxY,expand=inside?-d:d;
+  if(inside&&(maxX-minX<=2*d||maxY-minY<=2*d)){status.textContent='El desfase dejaría un rectángulo no válido';return}checkpoint();objects.push({type:'rect',a:{x:minX-expand,y:minY-expand},b:{x:maxX+expand,y:maxY+expand},...style});
  }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
  if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([objects.length-1]);render();status.textContent='OFFSET creado';
 }
@@ -327,6 +326,19 @@ function handleTap(p){
  if(tool==='offset'){doOffset(q);return}
  if(tool==='poly'){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Polilínea: marca otro vértice o pulsa Enter';return}
  if(tool==='explode'){explodeAt(q);return}
+ if(tool==='fillet'){
+  const hit=selectAt(q);
+  if(hit<0||objects[hit]?.type!=='line'){status.textContent='Empalme: selecciona una línea';return}
+  if(modifyTarget<0){modifyTarget=hit;moveBase=clone(q);applySelection([hit]);status.textContent='Empalme: selecciona la segunda línea';return}
+  if(hit===modifyTarget){status.textContent='Selecciona otra línea';return}
+  const raw=prompt('Radio del empalme (0 para esquina)', '0');if(raw===null)return;
+  const radius=Number(String(raw).trim().replace(',','.'));if(String(raw).trim()===''||!Number.isFinite(radius)||radius<0){status.textContent='Introduce un radio válido';return}
+  const first=objects[modifyTarget],second=objects[hit],g=filletGeometry(first,second,moveBase,q,radius);
+  if(!g){status.textContent='No se puede empalmar: comprueba las líneas y el radio';return}
+  checkpoint();first[g.a.replace]=clone(g.t1);second[g.b.replace]=clone(g.t2);
+  if(g.arc)objects.push({type:'arc',pts:g.arc.map(clone),layer:first.layer,color:first.color,lineweight:first.lineweight,linetype:first.linetype});
+  save();applySelection([modifyTarget,hit]);modifyTarget=-1;moveBase=null;render();status.textContent='Empalme aplicado';return;
+ }
  if(tool==='trim'||tool==='extend'){
   if(modifyTarget<0){modifyTarget=selectAt(q);applySelection(modifyTarget>=0?[modifyTarget]:[]);if(modifyTarget<0){status.textContent='Selecciona la línea que deseas modificar';return}status.textContent='Marca el extremo que deseas '+(tool==='trim'?'recortar':'alargar');return}
   const idx=modifyTarget;trimOrExtend(idx,q,tool);return;
@@ -418,6 +430,28 @@ function lineIntersection(a,b,c,d,segments=true){
  if(segments&&(t< -1e-8||t>1+1e-8||u< -1e-8||u>1+1e-8))return null;
  return {x:a.x+t*rx,y:a.y+t*ry,t,u};
 }
+function filletGeometry(first,second,pick1,pick2,radius){
+ if(!first||!second||first.type!=='line'||second.type!=='line'||!Number.isFinite(radius)||radius<0)return null;
+ const intersection=lineIntersection(first.a,first.b,second.a,second.b,false);if(!intersection)return null;
+ const p={x:intersection.x,y:intersection.y};
+ const branch=(line,pick)=>{
+  const va={x:line.a.x-p.x,y:line.a.y-p.y},vb={x:line.b.x-p.x,y:line.b.y-p.y},vq={x:pick.x-p.x,y:pick.y-p.y};
+  const dot=v=>v.x*vq.x+v.y*vq.y;
+  const keep=Math.hypot(vq.x,vq.y)<1e-9?(Math.hypot(va.x,va.y)>=Math.hypot(vb.x,vb.y)?'a':'b'):(dot(va)>=dot(vb)?'a':'b'),v=keep==='a'?va:vb,len=Math.hypot(v.x,v.y);
+  return len>1e-9?{keep,replace:keep==='a'?'b':'a',unit:{x:v.x/len,y:v.y/len},len}:null;
+ };
+ const a=branch(first,pick1),b=branch(second,pick2);if(!a||!b)return null;
+ const dot=Math.max(-1,Math.min(1,a.unit.x*b.unit.x+a.unit.y*b.unit.y)),theta=Math.acos(dot);
+ if(theta<1e-6||Math.PI-theta<1e-6)return null;
+ if(radius===0)return {a,b,t1:p,t2:p,arc:null};
+ const t=radius/Math.tan(theta/2);if(!Number.isFinite(t)||t>=a.len-1e-9||t>=b.len-1e-9)return null;
+ const t1={x:p.x+a.unit.x*t,y:p.y+a.unit.y*t},t2={x:p.x+b.unit.x*t,y:p.y+b.unit.y*t};
+ const bis={x:a.unit.x+b.unit.x,y:a.unit.y+b.unit.y},bl=Math.hypot(bis.x,bis.y),cl=radius/Math.sin(theta/2);
+ const center={x:p.x+bis.x/bl*cl,y:p.y+bis.y/bl*cl};
+ const mx=t1.x+t2.x-2*center.x,my=t1.y+t2.y-2*center.y,ml=Math.hypot(mx,my);if(ml<1e-9)return null;
+ const mid={x:center.x+radius*mx/ml,y:center.y+radius*my/ml};
+ return {a,b,t1,t2,arc:[t1,mid,t2]};
+}
 function trimOrExtend(index,q,mode){
  const s=objects[index];if(!s||s.type!=='line'){status.textContent=mode.toUpperCase()+' en esta alfa requiere una línea';return}
  const endpoint=distance(q,s.a)<=distance(q,s.b)?'a':'b',a=s.a,b=s.b,other=[];
@@ -434,7 +468,8 @@ function trimOrExtend(index,q,mode){
 function explodeAt(q){
  const i=selectAt(q);if(i<0){status.textContent='Selecciona una polilínea o rectángulo';return}
  const s=objects[i];if(s.groupId){const id=s.groupId,ids=objects.map((o,j)=>o.groupId===id?j:-1).filter(j=>j>=0);checkpoint();ids.forEach(j=>delete objects[j].groupId);applySelection(ids);save();render();status.textContent='Bloque desagrupado · '+ids.length+' elementos editables';return}
- const segments=entitySegments(s);if(!segments.length||s.type==='line'){status.textContent='Esta entidad no requiere EXPLODE';return}
+ if(!['poly','polygon','rect'].includes(s.type)){status.textContent='EXPLODE disponible para bloques, polilíneas, polígonos y rectángulos';return}
+ const segments=entitySegments(s);if(!segments.length){status.textContent='Esta entidad no requiere EXPLODE';return}
  checkpoint();const style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype};
  const parts=segments.map(([a,b])=>({type:'line',a:clone(a),b:clone(b),...style}));
  objects.splice(i,1,...parts);applySelection(parts.map((_,k)=>i+k));save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
@@ -634,7 +669,7 @@ document.addEventListener('keydown',e=>{
   e.preventDefault();$('#cmd').value += e.key;updateCursorCommand();return;
  }
 },true);
-const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',BH:'hatch',BHATCH:'hatch',D:'dim',DIM:'dim',DLI:'dim',DIMLINEAR:'dim',DAL:'dimaligned',DIMALIGNED:'dimaligned',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
+const aliases={F:'fillet',FILLET:'fillet',DI:'measure',DIST:'measure',DISTANCE:'measure',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',BH:'hatch',BHATCH:'hatch',D:'dim',DIM:'dim',DLI:'dim',DIMLINEAR:'dim',DAL:'dimaligned',DIMALIGNED:'dimaligned',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',O:'offset',OFFSET:'offset',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
 function parseCoordinate(raw,base){
  const s=raw.trim().replace(/\s+/g,'');let m;
  if((m=s.match(/^@?(-?\d+(?:[.,]\d+)?),(-?\d+(?:[.,]\d+)?)$/))){const x=Number(m[1].replace(',','.')),y=Number(m[2].replace(',','.'));return s.startsWith('@')?{x:base.x+x,y:base.y+y}:{x,y}}
@@ -666,7 +701,7 @@ function runCommand(raw){
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
- if(c==='F'||c==='FILLET'||c==='CHA'||c==='CHAMFER'){status.textContent=c+' · empalme/chaflán aún no implementado';return}
+ if(c==='CHA'||c==='CHAMFER'){status.textContent=c+' · chaflán aún no implementado';return}
  const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;

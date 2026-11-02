@@ -43,6 +43,7 @@ jobs:
           node --check sw.js
           node --check tests/grips.test.cjs
           node tests/grips.test.cjs
+          node tests/cad-precision.test.cjs
           node tests/storage-dxf.test.cjs
           node tests/build-version.test.cjs
           node tests/offline-worker.test.cjs
