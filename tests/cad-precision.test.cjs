@@ -45,3 +45,16 @@ ex.objects=[{type:'rect',a:{x:0,y:0},b:{x:1,y:1}}];
 vm.runInContext('explodeAt({x:0,y:0})',ex);
 assert.equal(ex.objects.length,2); assert.equal(ex.objects[0].type,'line');
 console.log('EXPLODE protege curvas y convierte geometría compatible: OK');
+
+const fillet = {};
+vm.createContext(fillet);
+vm.runInContext(src.slice(src.indexOf('function lineIntersection('),src.indexOf('function trimOrExtend(')),fillet);
+fillet.l1={type:'line',a:{x:0,y:0},b:{x:5,y:0}};
+fillet.l2={type:'line',a:{x:0,y:0},b:{x:0,y:5}};
+const rounded=vm.runInContext('filletGeometry(l1,l2,{x:4,y:0},{x:0,y:4},1)',fillet);
+assert.ok(Math.abs(rounded.t1.x-1)<1e-8); assert.ok(Math.abs(rounded.t2.y-1)<1e-8);
+assert.ok(Math.abs(rounded.arc[1].x-(1-Math.SQRT1_2))<1e-8);
+assert.ok(Math.abs(rounded.arc[1].y-(1-Math.SQRT1_2))<1e-8);
+assert.equal(vm.runInContext('filletGeometry(l1,l2,{x:4,y:0},{x:0,y:4},10)',fillet),null);
+assert.equal(vm.runInContext('filletGeometry(l1,l2,{x:4,y:0},{x:0,y:4},0).arc',fillet),null);
+console.log('Empalme: tangencia, radio cero y radio excesivo verificados');
