@@ -9,6 +9,12 @@ public final class NativeTransform {
     public static double[] scale(double x,double y,double bx,double by,double factor) {
         return new double[]{bx+(x-bx)*factor,by+(y-by)*factor};
     }
+    public static double[] lineIntersection(double ax,double ay,double bx,double by,double cx,double cy,double dx,double dy) {
+        double rx=bx-ax,ry=by-ay,sx=dx-cx,sy=dy-cy,den=rx*sy-ry*sx;
+        if(!Double.isFinite(den)||Math.abs(den)<1e-12)return null;
+        double qx=cx-ax,qy=cy-ay,t=(qx*sy-qy*sx)/den,u=(qx*ry-qy*rx)/den;
+        return new double[]{ax+t*rx,ay+t*ry,t,u};
+    }
     public static double[] mirror(double x,double y,double ax,double ay,double bx,double by) {
         double dx=bx-ax,dy=by-ay,len2=dx*dx+dy*dy;
         if(!Double.isFinite(len2)||len2<1e-18)return null;
