@@ -2,7 +2,7 @@
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,selectedSet=new Set(),modifyTargets=[],poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
 let lastCommand='',cursorCommandEl=null,contextMenuEl=null;
-let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,osEnd=true,osMid=true,osCenter=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,offsetDistancePreset=false,printing=false,units='m',gridStep=1,polarStep=15,snapRadius=12,hiddenLayers=new Set(),lockedLayers=new Set();
+let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,offsetDistancePreset=false,printing=false,units='m',gridStep=1,polarStep=15,snapRadius=12,hiddenLayers=new Set(),lockedLayers=new Set();
 const colors={General:'#dce8f5',Muros:'#56b7e8',Cotas:'#f3c83e',Detalles:'#c69cff',Topografía:'#70d6a3',Vialidad:'#ff9b6b'};
 function resolveCadColor(s,lightBackground=false){
  const base=String(s.color||colors[s.layer]||colors.General).toLowerCase();
@@ -31,36 +31,22 @@ function round(p){return{x:Math.round(p.x*1000)/1000,y:Math.round(p.y*1000)/1000
 function distance(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
 function angle(a,b){return Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI}
 function normalize(a){return (a%360+360)%360}
-let activeSnap=null;
-function snapCandidate(p){
- if(!osnapOn)return null;
- let best=null,limit=snapRadius/zoom;
- for(const s of objects){
-  if(hiddenLayers.has(s.layer))continue;
-  const pts=[];
-  if(osEnd){
-   if(s.a)pts.push({point:s.a,type:'PUNTO FINAL'});
-   if(s.b&&s.type!=='circle')pts.push({point:s.b,type:'PUNTO FINAL'});
-   if(s.pts)for(const v of s.pts)pts.push({point:v,type:'PUNTO FINAL'});
-   if((s.type==='rect'||s.type==='hatch')&&s.a&&s.b)pts.push({point:{x:s.a.x,y:s.b.y},type:'PUNTO FINAL'},{point:{x:s.b.x,y:s.a.y},type:'PUNTO FINAL'});
-  }
-  if(osMid){
-   if(s.a&&s.b&&['line','leader','dim'].includes(s.type))pts.push({point:{x:(s.a.x+s.b.x)/2,y:(s.a.y+s.b.y)/2},type:'PUNTO MEDIO'});
-   if(s.pts&&s.pts.length>1)for(let i=1;i<s.pts.length;i++)pts.push({point:{x:(s.pts[i-1].x+s.pts[i].x)/2,y:(s.pts[i-1].y+s.pts[i].y)/2},type:'PUNTO MEDIO'});
-  }
-  if(osCenter&&s.a&&s.type==='circle')pts.push({point:s.a,type:'CENTRO'});
-  for(const candidate of pts){const d=distance(p,candidate.point);if(d<limit){limit=d;best=candidate}}
- }
- return best;
-}
 function snapPoint(p){
- const candidate=snapCandidate(p);activeSnap=candidate;
- if(candidate)return {...candidate.point};
- const q={...p};
+ let q={...p},best=null,limit=snapRadius/zoom;
+ if(osnapOn){
+  for(const s of objects){
+   const pts=[];
+   if(s.a)pts.push(s.a);if(s.b)pts.push(s.b);
+   if(s.pts)pts.push(...s.pts);
+   if(s.a&&s.b&&s.type==='line')pts.push({x:(s.a.x+s.b.x)/2,y:(s.a.y+s.b.y)/2});
+   if(s.a&&s.type==='circle')pts.push(s.a);
+   for(const v of pts){const d=distance(q,v);if(d<limit){limit=d;best=v}}
+  }
+ }
+ if(best)return {...best};
  if(snapOn){q.x=Math.round(q.x/gridStep)*gridStep;q.y=Math.round(q.y/gridStep)*gridStep}
  return q;
 }
-
 function constrain(p){
  const base=tool==='poly'&&poly.length?poly[poly.length-1]:start;
  if(!base)return p;
@@ -107,7 +93,7 @@ function showDraftSettings(){
  const dlg=document.createElement('dialog');
  dlg.style.cssText='border:1px solid #536a80;border-radius:10px;background:#172333;color:#e8eef6;max-width:92vw;width:430px;padding:18px;box-shadow:0 16px 50px #0009';
  dlg.innerHTML=`<form method="dialog" style="display:grid;gap:12px;font:14px system-ui">
- <h3 style="margin:0;color:#62b8e8">Drafting Settings · Configuración de dibujo</h3><p style="margin:0;color:#bdcee2;font-size:12px">OSNAP + Punto final conecta líneas exactamente. ORTHO restringe direcciones.</p>
+ <h3 style="margin:0;color:#62b8e8">Configuración de dibujo · HP</h3>
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
  <label><input id="setGrid" type="checkbox" ${gridOn?'checked':''}> Rejilla F7</label>
  <label><input id="setSnap" type="checkbox" ${snapOn?'checked':''}> Snap F9</label>
@@ -116,7 +102,6 @@ function showDraftSettings(){
  <label><input id="setOsnap" type="checkbox" ${osnapOn?'checked':''}> Referencias F3</label>
  <label><input id="setCross" type="checkbox" ${crossOn?'checked':''}> Cruceta</label>
  </div>
- <fieldset style="border:1px solid #536a80;border-radius:6px;display:grid;gap:7px"><legend>Referencias a objetos · OSNAP</legend><label><input id="setOsEnd" type="checkbox" ${osEnd?'checked':''}> Punto final (Endpoint)</label><label><input id="setOsMid" type="checkbox" ${osMid?'checked':''}> Punto medio (Midpoint)</label><label><input id="setOsCenter" type="checkbox" ${osCenter?'checked':''}> Centro (Center)</label></fieldset>
  <label>Unidades de dibujo <select id="setUnits" style="width:100%;padding:7px;background:#0e1722;color:white"><option value="m">Metros (m)</option><option value="cm">Centímetros (cm)</option><option value="mm">Milímetros (mm)</option></select></label>
  <label>Espaciado de rejilla <input id="setGridStep" type="number" min="0.001" step="0.1" value="${gridStep}" style="width:100%;padding:7px;background:#0e1722;color:white"></label>
  <label>Incremento polar (grados) <input id="setPolarStep" type="number" min="1" max="90" step="1" value="${polarStep}" style="width:100%;padding:7px;background:#0e1722;color:white"></label>
@@ -126,9 +111,9 @@ function showDraftSettings(){
  document.body.append(dlg);dlg.querySelector('#setUnits').value=units;
  dlg.querySelector('#cancelSettings').onclick=()=>dlg.close();
  dlg.querySelector('#applySettings').onclick=()=>{
-  gridOn=dlg.querySelector('#setGrid').checked;snapOn=dlg.querySelector('#setSnap').checked;orthoOn=dlg.querySelector('#setOrtho').checked;polarOn=dlg.querySelector('#setPolar').checked;osnapOn=dlg.querySelector('#setOsnap').checked;osEnd=dlg.querySelector('#setOsEnd').checked;osMid=dlg.querySelector('#setOsMid').checked;osCenter=dlg.querySelector('#setOsCenter').checked;crossOn=dlg.querySelector('#setCross').checked;
+  gridOn=dlg.querySelector('#setGrid').checked;snapOn=dlg.querySelector('#setSnap').checked;orthoOn=dlg.querySelector('#setOrtho').checked;polarOn=dlg.querySelector('#setPolar').checked;osnapOn=dlg.querySelector('#setOsnap').checked;crossOn=dlg.querySelector('#setCross').checked;
   units=dlg.querySelector('#setUnits').value;gridStep=Math.max(.001,Number(dlg.querySelector('#setGridStep').value)||1);polarStep=Math.max(1,Math.min(90,Number(dlg.querySelector('#setPolarStep').value)||15));snapRadius=Math.max(2,Math.min(40,Number(dlg.querySelector('#setSnapRadius').value)||12));
-  for(const [id,on] of [['gridToggle',gridOn],['snapToggle',snapOn],['orthoToggle',orthoOn],['polarToggle',polarOn],['osnapToggle',osnapOn],['crossToggle',crossOn]])updateToggle('#'+id,on);dlg.close();status.textContent='Drafting Settings aplicado · OSNAP '+(osnapOn?'ON':'OFF');render();
+  dlg.close();status.textContent='Configuración de dibujo aplicada';render();
  };
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
 }
@@ -136,7 +121,7 @@ function updatePrompt(){promptEl.textContent=tool==='select'?'SELECCIÓN · izqu
 function render(){
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':(getComputedStyle($('#stage')).backgroundColor||'#101820');ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
  objects.forEach((s,i)=>{if(!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
- drawSelectionGrips();if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
+ drawSelectionGrips();
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
  if(!printing&&temp)drawEntity(temp,false,true);
  if(!printing&&tool==='poly'&&poly.length)drawEntity({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)},false);
@@ -498,7 +483,7 @@ canvas.addEventListener('pointerdown',e=>{
 });
 canvas.addEventListener('pointermove',e=>{
  const p=pointer(e);cursor=p;updateCursorCommand();$('#crossinfo').textContent='X '+world(p).x.toFixed(3)+' '+units+' · Y '+world(p).y.toFixed(3)+' '+units+' · Z 0.000';
- if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);activeSnap=snapCandidate(world(p));if(activeSnap)status.textContent='OSNAP · '+activeSnap.type+' · clic para conectar';
+ if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);
  if(pointers.size===2&&pinch){const v=[...pointers.values()];zoom=Math.max(2,Math.min(500,pinch.zoom*distance(v[0],v[1])/(pinch.dist||1)));render();return}
  if(drag&&tool==='pan'){offset.x=drag.offset.x+p.x-drag.point.x;offset.y=drag.offset.y+p.y-drag.point.y;render();return}
  if(gripDrag){const s=objects[gripDrag.index];if(s){applyGrip(s,gripDrag.key,snapPoint(world(p)));gripDrag.moved=true;render()}return}
@@ -613,7 +598,7 @@ $('#pdf').onclick=()=>window.print();
 $('#propertiesBtn').onclick=()=>{$('#properties').classList.toggle('open');showProperties()};
 $('#zoomIn').onclick=()=>{zoom*=1.2;render()};$('#zoomOut').onclick=()=>{zoom/=1.2;render()};
 $('#fit').onclick=()=>{if(!objects.length){offset={x:0,y:0};zoom=35;render();return}const ps=[];objects.forEach(o=>{if(o.a)ps.push(o.a);if(o.b)ps.push(o.b);if(o.pts)ps.push(...o.pts)});const xs=ps.map(p=>p.x),ys=ps.map(p=>p.y),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);zoom=Math.min((canvas.clientWidth-80)/(maxx-minx||1),(canvas.clientHeight-80)/(maxy-miny||1));offset.x=-(minx+maxx)/2*zoom;offset.y=(miny+maxy)/2*zoom;render()};
-$('#settingsBtn').onclick=showDraftSettings;$('#draftQuick').onclick=showDraftSettings;$('#snapBtn').onclick=showDraftSettings;$('#unitsBtn').onclick=showDraftSettings;
+$('#settingsBtn').onclick=showDraftSettings;$('#snapBtn').onclick=()=>toggle('osnapToggle');$('#unitsBtn').onclick=showDraftSettings;
 $('#layer').onchange=()=>{$('#drawColor').value=colors[$('#layer').value]||colors.General};
 $('#newLayer').onclick=()=>{const name=prompt('Nombre de la nueva capa');if(name){const op=document.createElement('option');op.textContent=name;$('#layer').append(op);$('#layer').value=name;colors[name]='#62b8e8'}};
 $('#layerColor').onclick=()=>{const c=prompt('Color HEX (ej. #62b8e8)',colors[$('#layer').value]||'#62b8e8');if(c&&/^#[0-9a-f]{6}$/i.test(c)){colors[$('#layer').value]=c;$('#drawColor').value=c}};
