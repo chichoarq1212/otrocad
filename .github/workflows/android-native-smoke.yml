@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - 'android/**'
+      - 'tests/android-native-smoke.py'
       - '.github/workflows/android-native-smoke.yml'
   workflow_dispatch:
 permissions:
