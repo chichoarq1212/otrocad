@@ -69,6 +69,8 @@ vm.createContext(selectionScope);
 vm.runInContext(source.slice(source.indexOf('const CAD_TEXT_FONT_CATALOG='),source.indexOf('\nfunction drawEntity(')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function arcParams('),source.indexOf('\nconst CAD_THEMES=')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function selectAt('),source.indexOf('function gripDescriptors(')),selectionScope);
+vm.runInContext(source.slice(source.indexOf('function entitySegments(s){'),source.indexOf('function lineIntersection(')),selectionScope);
+vm.runInContext(source.slice(source.indexOf('function inSelectionRect('),source.indexOf('function lineIntersection(')),selectionScope);
 selectionScope.objects=[{type:'arc',pts:[{x:1,y:0},{x:0,y:1},{x:-1,y:0}]}];
 assert.equal(vm.runInContext('selectAt({x:0,y:1})',selectionScope),0, 'Seleccionar un arco por su curva');
 assert.equal(vm.runInContext('selectAt({x:0,y:-1})',selectionScope),-1, 'No seleccionar el arco por la semicircunferencia opuesta');
