@@ -427,7 +427,7 @@ function effectivePaperViewports(layout){
  const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
  if(imported.length)return imported.slice(0,20);
  const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
- const modelHeight=Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
+ const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
  return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
 }
 function renderPaperLayout(){
@@ -450,7 +450,7 @@ function renderPaperLayout(){
   layoutRenderTransform={tx:center.x-Number(viewCenter.x||0)*drawingScale,ty:center.y+Number(viewCenter.y||0)*drawingScale,scale:drawingScale};
   if(Number(vp.twist)){ctx.translate(center.x,center.y);ctx.rotate(-Number(vp.twist)*Math.PI/180);ctx.translate(-center.x,-center.y)}
   for(const o of objects)if((o.cadLayout||'Model')==='Model'&&o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
-  for(const o of objects)if((o.cadLayout||'Model')==='Model'&&!o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
+  for(const o of objects)if((o.cadLayout||'Model')==='Model'&&!o.importedHatch&&!hiddenLayers.has(o.layer)&&!(layout.hideModelText&&o.type==='text'))drawEntity(o);
   layoutRenderTransform=null;ctx.restore();
   if(!printing){ctx.save();ctx.strokeStyle='#3b8be1';ctx.lineWidth=1;ctx.setLineDash([5,4]);ctx.strokeRect(center.x-vw/2,center.y-vh/2,vw,vh);ctx.restore()}
  }
@@ -475,12 +475,12 @@ function showCadPaperSettings(){
  '<label>Ancho (mm)<input id="paperWidth" type="number" min="30" max="2000" step="0.1"></label>'+
  '<label>Alto (mm)<input id="paperHeight" type="number" min="30" max="2000" step="0.1"></label>'+
  '<label>Margen guía (mm)<input id="paperMargin" type="number" min="0" max="100" step="1"></label>'+
- '<label>Ventana de dibujo<select id="paperFit"><option value="imported">Conservar VIEWPORT importados</option><option value="all">Encuadrar todo el modelo</option></select></label>'+
+ '<label>Ventana de dibujo<select id="paperFit"><option value="imported">Conservar VIEWPORT importados</option><option value="all">Encuadrar todo el modelo</option></select></label>'+'<label>Escala de la vista (si se encuadra el modelo)<select id="paperScale"><option value="fit">Ajustar a la hoja</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option></select></label>'+'<label class="paper-check"><input type="checkbox" id="paperModelText"> Mostrar anotaciones de Modelo dentro de la ventana</label>'+
  '<p id="paperWarning" role="status"></p><div class="cad-utility-actions"><button type="button" id="paperCancel">Cancelar</button><button type="button" id="paperApply">Aplicar</button></div></form>';
  document.body.append(dialog);
  const byId=id=>dialog.querySelector('#'+id);
  byId('paperWidth').value=layout.paperWidth||420;byId('paperHeight').value=layout.paperHeight||297;byId('paperMargin').value=layout.margin??10;
- byId('paperFit').value=layout.viewportFit==='all'?'all':'imported';
+ byId('paperFit').value=layout.viewportFit==='all'?'all':'imported';byId('paperScale').value=String(layout.plotScale||'fit');byId('paperModelText').checked=!layout.hideModelText;
  const found=sizes.find(p=>Math.abs(Math.max(layout.paperWidth,layout.paperHeight)-p[1])<1&&Math.abs(Math.min(layout.paperWidth,layout.paperHeight)-p[2])<1);
  byId('paperSize').value=found?found[0]:'custom';byId('paperOrientation').value=layout.paperWidth>=layout.paperHeight?'landscape':'portrait';
  const resizeFromPreset=()=>{const preset=sizes.find(p=>p[0]===byId('paperSize').value);if(!preset)return;const vertical=byId('paperOrientation').value==='portrait';byId('paperWidth').value=vertical?preset[2]:preset[1];byId('paperHeight').value=vertical?preset[1]:preset[2]};
@@ -489,7 +489,7 @@ function showCadPaperSettings(){
  byId('paperApply').onclick=()=>{
   const pw=Number(byId('paperWidth').value),ph=Number(byId('paperHeight').value),margin=Number(byId('paperMargin').value);
   if(!Number.isFinite(pw)||!Number.isFinite(ph)||pw<30||ph<30||pw>2000||ph>2000||!Number.isFinite(margin)||margin<0||margin>=Math.min(pw,ph)/3){byId('paperWarning').textContent='Revisa las medidas y los márgenes de impresión.';return}
-  layout.paperWidth=pw;layout.paperHeight=ph;layout.margin=margin;layout.viewportFit=byId('paperFit').value;
+  layout.paperWidth=pw;layout.paperHeight=ph;layout.margin=margin;layout.viewportFit=byId('paperFit').value;layout.plotScale=byId('paperScale').value;layout.hideModelText=!byId('paperModelText').checked;
   saveLayoutState();render();status.textContent='Hoja '+layout.name+' · '+pw+' × '+ph+' mm';dialog.close();
  };
  dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
