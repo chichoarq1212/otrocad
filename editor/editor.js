@@ -1807,7 +1807,7 @@ function buildDxf(){
   add(0,'ENDTAB',0,'ENDSEC',0,'SECTION',2,'ENTITIES');
  objects.forEach(o=>{
   const a=o.a,b=o.b,layer=dxfLayer(o),color=String(o.color||colors[layer]||colors.General),rgb=/^#[0-9a-f]{6}$/i.test(color)?parseInt(color.slice(1),16):0xffffff;
-  const common=[100,'AcDbEntity',8,layer,370,Math.round(Number(o.lineweight||.25)*100),6,o.linetype==='DASHED'?'DASHED':'CONTINUOUS',420,rgb];
+  const space=String(o.cadLayout||'Model');const common=[100,'AcDbEntity',8,layer,67,space==='Model'?0:1,410,space,370,Math.round(Number(o.lineweight||.25)*100),6,o.linetype==='DASHED'?'DASHED':'CONTINUOUS',420,rgb];
   const line=(p,q)=>add(0,'LINE',...common,100,'AcDbLine',10,p.x,20,p.y,30,0,11,q.x,21,q.y,31,0);
   const textEntity=(p,value,height,rotation=0,source={})=>{
     const valueText=String(value||'').replace(/\r/g,''),styleName=dxfTextStyleName(source),widthFactor=Number(source.textWidthFactor||1),oblique=Number(source.textObliqueAngle||0);
