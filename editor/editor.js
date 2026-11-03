@@ -1414,8 +1414,9 @@ function parseDxfEntities(source){
   if(rec.type==='ENDSEC'){originalEntities=false;continue}
   const h=str(rec,5,'').toUpperCase();if(originalEntities&&h)entitiesHandles.add(h);
  }
- const paperSpaceRecords=[],paperBlockBreakdown={};
+ const paperSpaceRecords=[],paperBlockBreakdown={},nestedBlockParse=Number(arguments[1]||0)>0;
  for(const [blockName,geometry] of blockRecords){
+  if(nestedBlockParse)break;
   if(!/^\*PAPER_SPACE(?:\d+)?$/i.test(blockName))continue;
   const paperLayout=paperBlockToLayout.get(blockName)||'Papel sin asociación';let count=0;
   for(const rec of geometry){
