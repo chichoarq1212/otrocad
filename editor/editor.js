@@ -1011,8 +1011,9 @@ function parseDxfEntities(source){
   const vertices=[];for(let j=i+1;j<records.length&&records[j].type!=='SEQEND';j++)if(records[j].type==='VERTEX')vertices.push({x:get(records[j],10),y:get(records[j],20),bulge:get(records[j],42)});
   polylineVertices.set(records[i],vertices);
  }
- const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId)=>{
+ const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId,insertStyle)=>{
   const item={...sourceItem,groupId},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
+  if(sourceItem.layer==='0'&&insertStyle){item.layer=insertStyle.layer;item.color=insertStyle.color}
   let points=null;
   if(sourceItem.type==='circle'&&nonUniform&&sourceItem.a&&sourceItem.b){
    const center=sourceItem.a,r=distance(center,sourceItem.b);points=Array.from({length:49},(_,i)=>{const t=i/48*Math.PI*2;return transformPoint({x:center.x+r*Math.cos(t),y:center.y+r*Math.sin(t)})});
@@ -1073,7 +1074,7 @@ function parseDxfEntities(source){
    for(let row=0;row<rows;row++)for(let column=0;column<columns;column++){
     const transformPoint=p=>{const x=(p.x-base.x+column*get(r,44))*scaleX,y=(p.y-base.y+row*get(r,45))*scaleY;return{x:origin.x+x*cos-y*sin,y:origin.y+x*sin+y*cos}};
     const groupId='dxf-insert-'+depth+'-'+out.length+'-'+row+'-'+column;
-    for(const piece of pieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId));
+    for(const piece of pieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId,st));
    }
    if(columns*rows>1)note('MINSERT expandido a entidades editables');
    note('INSERT/MINSERT importado como grupo editable');
@@ -1086,7 +1087,7 @@ function parseDxfEntities(source){
    const pieces=parseBlockItems(geometry,Number(arguments[1]||0));
    if(!pieces.length){warn('DIMENSION sin entidades compatibles omitida');continue}
    const groupId='dxf-dimension-'+out.length;
-   for(const item of pieces)out.push({...item,groupId});
+   for(const item of pieces)out.push({...item,groupId,layer:item.layer==='0'?st.layer:item.layer,color:item.layer==='0'?st.color:item.color});
    note('DIMENSION dibujada como geometría no asociativa');
    if(pieces.importWarnings?.length)warn('DIMENSION con elementos gráficos no compatibles');
   }
