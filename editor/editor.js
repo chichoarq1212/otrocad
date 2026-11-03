@@ -252,6 +252,62 @@ function showProperties(){
  if(s.a&&s.b){[['X inicial',s.a.x],['Y inicial',s.a.y],['X final',s.b.x],['Y final',s.b.y]].forEach(([k,v])=>{const inp=document.createElement('input');inp.type='number';inp.step='0.001';inp.value=Number(v).toFixed(3);addLabel(k,inp);coordInputs.push([k,inp])})}
  const apply=document.createElement('button');apply.textContent='Aplicar propiedades';apply.onclick=()=>{checkpoint();s.color=color.value;s.lineweight=Number(weight.value);s.linetype=type.value;if(textInput){s.text=textInput.value;const height=Number(heightInput.value);if(Number.isFinite(height)&&height>0){s.textHeightWorld=height;delete s.textHeight}}coordInputs.forEach(([k,inp])=>{const v=Number(inp.value);if(!Number.isFinite(v))return;if(k==='X inicial')s.a.x=v;if(k==='Y inicial')s.a.y=v;if(k==='X final')s.b.x=v;if(k==='Y final')s.b.y=v});save();render();status.textContent='Propiedades actualizadas'};content.append(apply);
 }
+function selectionForUtility(){return selectedItems().filter(i=>objects[i]&&!hiddenLayers.has(objects[i].layer)&&!lockedLayers.has(objects[i].layer))}
+function showArrayDialog(){
+ const ids=selectionForUtility();if(!ids.length){status.textContent='Matriz: selecciona primero uno o varios objetos';alert('Selecciona primero uno o varios objetos para crear la matriz.');return}
+ const sources=ids.map(i=>clone(objects[i]));
+ const dlg=document.createElement('dialog');dlg.className='cad-utility-dialog';
+ dlg.innerHTML=`<form method="dialog"><h3>Matriz rectangular</h3><p>Se copiarán ${ids.length} objeto(s). Las distancias se miden entre elementos, en ${units}.</p><div class="cad-utility-grid"><label>Filas<input id="arrayRows" type="number" min="1" max="50" value="2" step="1"></label><label>Columnas<input id="arrayCols" type="number" min="1" max="50" value="2" step="1"></label><label>Separación horizontal<input id="arrayDx" type="number" step="any" value="2"></label><label>Separación vertical<input id="arrayDy" type="number" step="any" value="2"></label></div><p class="cad-utility-error" role="alert"></p><div class="cad-utility-actions"><button type="button" id="arrayCancel">Cancelar</button><button type="button" id="arrayApply">Crear matriz</button></div></form>`;
+ document.body.append(dlg);dlg.querySelector('#arrayCancel').onclick=()=>dlg.close();
+ dlg.querySelector('#arrayApply').onclick=()=>{
+  const rows=Number(dlg.querySelector('#arrayRows').value),cols=Number(dlg.querySelector('#arrayCols').value),dx=Number(dlg.querySelector('#arrayDx').value),dy=Number(dlg.querySelector('#arrayDy').value),error=dlg.querySelector('.cad-utility-error');
+  if(!Number.isInteger(rows)||!Number.isInteger(cols)||rows<1||cols<1||rows>50||cols>50){error.textContent='Usa entre 1 y 50 filas y columnas.';return}
+  if(rows*cols<=1||(rows*cols-1)*sources.length>1000){error.textContent='Crea al menos una copia y un máximo de 1000 objetos nuevos.';return}
+  if(!Number.isFinite(dx)||!Number.isFinite(dy)||(cols>1&&dx===0)||(rows>1&&dy===0)){error.textContent='Indica separaciones válidas distintas de cero para las filas o columnas repetidas.';return}
+  if(sources.some(s=>lockedLayers.has(s.layer))){error.textContent='Desbloquea las capas antes de crear la matriz.';return}
+  checkpoint();const created=[];
+  for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){if(row===0&&col===0)continue;const groups=new Map();for(const source of sources){const cp=clone(source);if(cp.groupId){if(!groups.has(cp.groupId))groups.set(cp.groupId,newGroupId());cp.groupId=groups.get(cp.groupId)}translate(cp,col*dx,row*dy);objects.push(cp);created.push(objects.length-1)}}
+  save();applySelection(created);setTool('select');render();status.textContent='Matriz creada · '+created.length+' objeto(s) nuevos';dlg.close();
+ };
+ dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
+}
+function selectedCircles(){return selectionForUtility().map(i=>objects[i]).filter(s=>s.type==='circle'&&s.a&&s.b&&distance(s.a,s.b)>1e-9)}
+function createCircleAnnotations(mode){
+ const circles=selectedCircles();if(!circles.length){status.textContent='Selecciona uno o varios círculos';alert('Selecciona primero uno o varios círculos.');return}
+ const layer=mode==='center'?$('#layer').value:'Cotas';if(lockedLayers.has(layer)){status.textContent='La capa '+layer+' está bloqueada';alert('La capa '+layer+' está bloqueada.');return}
+ checkpoint();const created=[];const style=currentStyle(layer);style.linetype='CONTINUOUS';
+ for(const circle of circles){const r=distance(circle.a,circle.b),center=circle.a,id=newGroupId();
+  if(mode==='center'){const d=r*.2;for(const [a,b] of [[{x:center.x-d,y:center.y},{x:center.x+d,y:center.y}],[{x:center.x,y:center.y-d},{x:center.x,y:center.y+d}]]){objects.push({type:'line',a,b,...style,groupId:id});created.push(objects.length-1)}}
+  else{const vx=(circle.b.x-center.x)/r,vy=(circle.b.y-center.y)/r,first=mode==='diameter'?{x:center.x-vx*r,y:center.y-vy*r}:clone(center),end={x:center.x+vx*r,y:center.y+vy*r};objects.push({type:'line',a:first,b:end,...style,groupId:id});created.push(objects.length-1);objects.push({type:'text',a:{x:end.x,y:end.y},text:(mode==='diameter'?'Ø':'R')+(mode==='diameter'?2*r:r).toFixed(2)+' '+units,textHeightWorld:Math.max(r*.10,.001),...style,groupId:id});created.push(objects.length-1)}
+ }
+ save();applySelection(created);setTool('select');render();status.textContent=(mode==='center'?'Marcas de centro':'Cotas no asociativas')+' creadas: '+circles.length;
+}
+function selectedArea(){
+ const ids=selectionForUtility(),areas=[];
+ for(const i of ids){const s=objects[i];let value=null;
+  if((s.type==='rect'||s.type==='hatch')&&s.a&&s.b)value=Math.abs((s.b.x-s.a.x)*(s.b.y-s.a.y));
+  else if(s.type==='circle'&&s.a&&s.b)value=Math.PI*distance(s.a,s.b)**2;
+  else if(s.type==='ellipse'&&s.a&&s.b)value=Math.PI*Math.abs((s.b.x-s.a.x)*(s.b.y-s.a.y));
+  else if(s.type==='polygon'&&s.pts?.length>=3){let sum=0;for(let j=0;j<s.pts.length;j++){const p=s.pts[j],q=s.pts[(j+1)%s.pts.length];sum+=p.x*q.y-q.x*p.y}value=Math.abs(sum)/2}
+  if(value!==null)areas.push(value);
+ }
+ if(!areas.length){status.textContent='Área: selecciona un rectángulo, polígono, círculo o elipse';alert('Selecciona un rectángulo, polígono, círculo o elipse para medir el área.');return}
+ const total=areas.reduce((a,b)=>a+b,0),msg='Área total: '+total.toFixed(3)+' '+units+'² · '+areas.length+' objeto(s)'+(areas.length<ids.length?' · '+(ids.length-areas.length)+' no compatibles':'');status.textContent=msg;alert(msg);
+}
+function createCenterline(){
+ const lines=selectionForUtility().map(i=>objects[i]);
+ if(lines.length!==2||lines.some(s=>s.type!=='line'||!s.a||!s.b)){alert('Selecciona exactamente dos líneas paralelas para crear el eje.');return}
+ const [a,b]=lines,la=distance(a.a,a.b),lb=distance(b.a,b.b);if(la<1e-9||lb<1e-9){status.textContent='Las líneas deben tener longitud';return}
+ const ux=(a.b.x-a.a.x)/la,uy=(a.b.y-a.a.y)/la,vx=(b.b.x-b.a.x)/lb,vy=(b.b.y-b.a.y)/lb;
+ if(Math.abs(ux*vy-uy*vx)>1e-6){alert('Las líneas deben ser paralelas. No se modificó el dibujo.');return}
+ const project=p=>p.x*ux+p.y*uy,normal=p=>-p.x*uy+p.y*ux;
+ const lo=Math.max(Math.min(project(a.a),project(a.b)),Math.min(project(b.a),project(b.b))),hi=Math.min(Math.max(project(a.a),project(a.b)),Math.max(project(b.a),project(b.b)));
+ if(hi-lo<1e-9){alert('Las líneas no tienen un tramo coincidente.');return}
+ const layer=$('#layer').value;if(lockedLayers.has(layer)){alert('Desbloquea la capa actual antes de crear el eje.');return}
+ const n=(normal(a.a)+normal(b.a))/2,point=t=>({x:ux*t-uy*n,y:uy*t+ux*n});
+ checkpoint();objects.push({type:'line',a:point(lo),b:point(hi),...currentStyle(layer),linetype:'DASHED'});save();applySelection([objects.length-1]);setTool('select');render();status.textContent='Eje creado entre líneas paralelas';
+}
+
 function pointFromInputs(){const anchor=activeAnchor();const ls=$('#dynLen').value.trim(),as=$('#dynAngle').value.trim();if(!anchor||!ls||!as)return null;const len=Number(ls),ang=Number(as);if(!Number.isFinite(len)||len<0||!Number.isFinite(ang))return null;const rad=ang*Math.PI/180;return round({x:anchor.x+len*Math.cos(rad),y:anchor.y+len*Math.sin(rad)})}
 function currentStyle(layer){const picked=($('#drawColor')?.value||'#dce8f5').toLowerCase();const color=picked==='#dce8f5'&&layer!=='General'?(colors[layer]||picked):picked;return {layer,color,lineweight:Number($('#lineweight')?.value||.25),linetype:$('#linetype')?.value||'CONTINUOUS'}}
 function commitEntity(endPoint){
@@ -730,7 +786,16 @@ function runCommand(raw){
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
- if(c==='CHA'||c==='CHAMFER'){status.textContent=c+' · chaflán aún no implementado';return}
+ if(c==='ARRAY'||c==='ARRAYRECT'){showArrayDialog();return}
+ if(c==='AREA'){selectedArea();return}
+ if(c==='CENTERMARK'){createCircleAnnotations('center');return}
+ if(c==='CENTERLINE'){createCenterline();return}
+ if(c==='DIMRADIUS'){createCircleAnnotations('radius');return}
+ if(c==='DIMDIAMETER'){createCircleAnnotations('diameter');return}
+ if(c==='CHA'||c==='CHAMFER'){setTool('chamfer');return}
+ if(c==='F'||c==='FILLET'){setTool('fillet');return}
+ if(c==='DLI'||c==='DIMLINEAR'){setTool('dim');return}
+ if(c==='DAL'||c==='DIMALIGNED'){setTool('dimaligned');return}
  const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
@@ -741,6 +806,12 @@ document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.data
 const furnitureList=Array.isArray(window.otroCadFurnitureCatalog)?window.otroCadFurnitureCatalog:[];
 for(const item of furnitureList){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('#blockChoice').append(option)}
 $('#insertFurniture').onclick=()=>{activeFurniture=furnitureList.find(item=>item.id===$('#blockChoice').value)||null;if(!activeFurniture){status.textContent='No se encontró el símbolo';return}setTool('furniture');status.textContent='Toca el punto de inserción · '+activeFurniture.name};
+$('#arrayRect').onclick=showArrayDialog;
+$('#centerMark').onclick=()=>createCircleAnnotations('center');
+$('#centerLine').onclick=createCenterline;
+$('#dimRadius').onclick=()=>createCircleAnnotations('radius');
+$('#dimDiameter').onclick=()=>createCircleAnnotations('diameter');
+$('#measureArea').onclick=selectedArea;
 $('#finish-poly').onclick=finishPoly;
 $('#acceptPoint').onclick=()=>{const q=pointFromInputs();if(!q)return;if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)};
 $('#undo').onclick=()=>{if(undo.length){backupPrevious();redo.push(clone(objects));objects=undo.pop();clearSelection();save();render()}};
