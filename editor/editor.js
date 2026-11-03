@@ -438,8 +438,9 @@ function handleTap(p){
   save();applySelection([modifyTarget,hit,objects.length-1]);modifyTarget=-1;moveBase=null;render();status.textContent='CHAFLÁN aplicado';return;
  }
  if(tool==='trim'||tool==='extend'){
-  if(modifyTarget<0){modifyTarget=selectAt(q);applySelection(modifyTarget>=0?[modifyTarget]:[]);if(modifyTarget<0){status.textContent='Selecciona la línea que deseas modificar';return}status.textContent='Marca el extremo que deseas '+(tool==='trim'?'recortar':'alargar');return}
-  const idx=modifyTarget;trimOrExtend(idx,q,tool);return;
+  const pick=world(p),idx=selectAt(pick);if(idx<0){status.textContent='Toca el tramo que deseas modificar';return}
+  const mode=tool==='trim'&&p.shiftForTrim?'extend':tool;
+  if(mode==='trim')quickTrim(idx,pick);else trimOrExtend(idx,pick,'extend');return;
  }
  if(['move','copy','rotate','mirror','scale'].includes(tool)){
   if(modifyTargets.length===0){
@@ -565,6 +566,17 @@ function chamferGeometry(first,second,pick1,pick2,distance1,distance2){
  if(!a||!b||distance1>=a.len-1e-9||distance2>=b.len-1e-9)return null;
  return {a,b,t1:{x:p.x+a.unit.x*distance1,y:p.y+a.unit.y*distance1},t2:{x:p.x+b.unit.x*distance2,y:p.y+b.unit.y*distance2}};
 }
+function quickTrim(index,pick){
+ const shape=objects[index];if(!shape||shape.type!=='line'){status.textContent='RECORTAR rápido admite líneas; otras entidades aún no son compatibles';return}
+ const a=shape.a,b=shape.b,dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18){status.textContent='Línea sin longitud';return}
+ const t=Math.max(0,Math.min(1,((pick.x-a.x)*dx+(pick.y-a.y)*dy)/den)),cuts=[0,1];
+ objects.forEach((other,i)=>{if(i===index||hiddenLayers.has(other.layer))return;for(const [c,d] of entitySegments(other)){const h=lineIntersection(a,b,c,d,true);if(h&&h.t>1e-8&&h.t<1-1e-8)cuts.push(h.t)}});
+ cuts.sort((x,y)=>x-y);const bounds=cuts.filter((x,i)=>i===0||Math.abs(x-cuts[i-1])>1e-8);if(bounds.length<3){status.textContent='No hay un borde de corte que cruce esta línea';return}
+ if(bounds.some(x=>Math.abs(x-t)<1e-7)){status.textContent='Toca un tramo, no exactamente la intersección';return}
+ let n=0;while(n<bounds.length-2&&t>bounds[n+1])n++;const lo=bounds[n],hi=bounds[n+1],point=v=>({x:a.x+dx*v,y:a.y+dy*v}),pieces=[];
+ if(lo>1e-8)pieces.push({...clone(shape),a:clone(a),b:point(lo)});if(hi<1-1e-8)pieces.push({...clone(shape),a:point(hi),b:clone(b)});
+ checkpoint();objects.splice(index,1,...pieces);clearSelection();save();render();status.textContent='Tramo recortado · toca otro tramo o pulsa Esc';
+}
 function trimOrExtend(index,q,mode){
  const s=objects[index];if(!s||s.type!=='line'){status.textContent=mode.toUpperCase()+' en esta alfa requiere una línea';return}
  const endpoint=distance(q,s.a)<=distance(q,s.b)?'a':'b',a=s.a,b=s.b,other=[];
@@ -606,12 +618,12 @@ document.body.append(contextMenuEl);
 try{lastCommand=localStorage.getItem('otrocad-last-command')||''}catch(e){}
 function updateCursorCommand(){
  const value=$('#cmd').value.trim();
- if(!value){cursorCommandEl.hidden=true;return}
+ if(!value&&tool!=='trim'&&tool!=='extend'){cursorCommandEl.hidden=true;return}
  cursorCommandEl.hidden=false;
  const maxX=Math.max(8,stage.clientWidth-210),maxY=Math.max(8,stage.clientHeight-42);
  cursorCommandEl.style.left=Math.max(8,Math.min(cursor.x+12,maxX))+'px';
  cursorCommandEl.style.top=Math.max(8,Math.min(cursor.y+12,maxY))+'px';
- cursorCommandEl.querySelector('.cmd-value').textContent=value;
+ cursorCommandEl.querySelector('.cmd-value').textContent=value||(tool==='trim'?'Toca para recortar · Shift + clic: alargar':'Toca el extremo para alargar');
 }
 function hideCadContextMenu(){if(contextMenuEl)contextMenuEl.hidden=true}
 function addCadMenuDivider(){const line=document.createElement('div');line.className='cad-menu-sep';contextMenuEl.append(line)}
@@ -699,7 +711,7 @@ canvas.addEventListener('pointerdown',e=>{
  if(tool==='select'){
   if(selectionClickAnchor){selectionStart=null;selectionBox={a:selectionClickAnchor,b:p};selectionAdditive=multiSelectOn||!!(e.shiftKey||e.ctrlKey||e.metaKey);finishSelectionWindow(selectionBox);selectionClickAnchor=null;selectionBox=null;render();return}
   const grip=findGripAt(p);if(grip){checkpoint();gripDrag={...grip,before:clone(objects[grip.index]),moved:false,historyAdded:true};return}selectionStart=p;selectionBox=null;selectionAdditive=multiSelectOn||!!(e.shiftKey||e.ctrlKey||e.metaKey);return}
- handleTap(p);
+ p.shiftForTrim=e.shiftKey;handleTap(p);
 });
 canvas.addEventListener('pointermove',e=>{
  const p=pointer(e);
