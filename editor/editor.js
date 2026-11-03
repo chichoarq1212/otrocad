@@ -872,7 +872,7 @@ async function getDwgRuntime(){
  }
  return dwgRuntimePromise;
 }
-$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const dxfBytes=engine.dwg_to_dxf(new Uint8Array(await f.arrayBuffer()));const dxf=new TextDecoder('utf-8').decode(dxfBytes);arr=parseDxfEntities(dxf)}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
+$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
 function parseDxfEntities(source){
  const lines=source.replace(/\r/g,'').split('\n'),pairs=[];
  for(let i=0;i+1<lines.length;i+=2){const code=Number(lines[i].trim());if(Number.isFinite(code))pairs.push([code,lines[i+1].trim()])}
@@ -887,6 +887,79 @@ function parseDxfEntities(source){
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
  const out=[],warnings={};let inEntities=false;
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
+ const buildPolylinePoints=(vertices,closed)=>{
+  const points=[];if(!vertices.length)return points;
+  points.push({x:vertices[0].x,y:vertices[0].y});
+  const count=closed?vertices.length:vertices.length-1;
+  for(let i=0;i<count;i++){
+   const start=vertices[i],end=vertices[(i+1)%vertices.length],bulge=Number(start.bulge||0);
+   if(Math.abs(bulge)<1e-9){points.push({x:end.x,y:end.y});continue}
+   const dx=end.x-start.x,dy=end.y-start.y,chord=Math.hypot(dx,dy),sweep=4*Math.atan(bulge);
+   if(chord<1e-9||!Number.isFinite(sweep)){points.push({x:end.x,y:end.y});continue}
+   const offset=chord*(1-bulge*bulge)/(4*bulge),mx=(start.x+end.x)/2,my=(start.y+end.y)/2;
+   const cx=mx-dy/chord*offset,cy=my+dx/chord*offset,radius=Math.hypot(start.x-cx,start.y-cy);
+   const startAngle=Math.atan2(start.y-cy,start.x-cx),steps=Math.max(4,Math.ceil(Math.abs(sweep)/(Math.PI/18)));
+   for(let step=1;step<=steps;step++){const angle=startAngle+sweep*step/steps;points.push({x:cx+radius*Math.cos(angle),y:cy+radius*Math.sin(angle)})}
+  }
+  if(closed&&points.length>1&&distance(points[0],points[points.length-1])<1e-8)points.pop();
+  return points;
+ };
+ const lightPolylineVertices=r=>{
+  const vertices=[];let current=null;
+  for(const [code,value] of r.pairs){
+   if(code===10){if(current)vertices.push(current);current={x:Number(value),y:0,bulge:0}}
+   else if(code===20&&current)current.y=Number(value);
+   else if(code===42&&current)current.bulge=Number(value);
+  }
+  if(current)vertices.push(current);
+  return vertices.filter(v=>Number.isFinite(v.x)&&Number.isFinite(v.y));
+ };
+ const sampleArc=pts=>{
+  if(!pts||pts.length!==3)return pts||[];
+  const [a,b,c]=pts,d=2*(a.x*(b.y-c.y)+b.x*(c.y-a.y)+c.x*(a.y-b.y));
+  if(Math.abs(d)<1e-9)return pts;
+  const aa=a.x*a.x+a.y*a.y,bb=b.x*b.x+b.y*b.y,cc=c.x*c.x+c.y*c.y;
+  const cx=(aa*(b.y-c.y)+bb*(c.y-a.y)+cc*(a.y-b.y))/d,cy=(aa*(c.x-b.x)+bb*(a.x-c.x)+cc*(b.x-a.x))/d;
+  const angle=p=>Math.atan2(p.y-cy,p.x-cx),a1=angle(a),am=angle(b),a3=angle(c),span=v=>(v+Math.PI*2)%(Math.PI*2);
+  const ccwEnd=span(a3-a1),ccwMid=span(am-a1),direction=ccwMid<=ccwEnd?1:-1,sweep=direction===1?ccwEnd:span(a1-a3);
+  const steps=Math.max(4,Math.ceil(sweep/(Math.PI/24))),radius=Math.hypot(a.x-cx,a.y-cy);
+  return Array.from({length:steps+1},(_,i)=>{const t=a1+direction*sweep*i/steps;return{x:cx+radius*Math.cos(t),y:cy+radius*Math.sin(t)}});
+ };
+ const polylineVertices=new Map();
+ for(let i=0;i<records.length;i++)if(records[i].type==='POLYLINE'){
+  const vertices=[];for(let j=i+1;j<records.length&&records[j].type!=='SEQEND';j++)if(records[j].type==='VERTEX')vertices.push({x:get(records[j],10),y:get(records[j],20),bulge:get(records[j],42)});
+  polylineVertices.set(records[i],vertices);
+ }
+ const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId)=>{
+  const item={...sourceItem,groupId},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
+  let points=null;
+  if(sourceItem.type==='circle'&&nonUniform&&sourceItem.a&&sourceItem.b){
+   const center=sourceItem.a,r=distance(center,sourceItem.b);points=Array.from({length:49},(_,i)=>{const t=i/48*Math.PI*2;return transformPoint({x:center.x+r*Math.cos(t),y:center.y+r*Math.sin(t)})});
+  }else if(sourceItem.type==='arc'&&nonUniform&&sourceItem.pts?.length===3){
+   points=sampleArc(sourceItem.pts).map(transformPoint);
+  }else if(sourceItem.type==='ellipse'&&rotated&&sourceItem.a&&sourceItem.b){
+   const cx=sourceItem.a.x,cy=sourceItem.a.y,rx=Math.abs(sourceItem.b.x-cx),ry=Math.abs(sourceItem.b.y-cy);
+   points=Array.from({length:65},(_,i)=>{const t=i/64*Math.PI*2;return transformPoint({x:cx+rx*Math.cos(t),y:cy+ry*Math.sin(t)})});
+  }else if((sourceItem.type==='rect'||sourceItem.type==='hatch')&&rotated&&sourceItem.a&&sourceItem.b){
+   const a=sourceItem.a,b=sourceItem.b;points=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}].map(transformPoint);
+  }
+  if(points){
+   const solidHatch=sourceItem.type==='hatch'&&sourceItem.hatchPattern==='SOLID'&&Number(sourceItem.hatchOpacity??.18)===1;
+   item.type=solidHatch?'polygon':'poly';item.pts=points;if(solidHatch)item.solidFill=true;delete item.a;delete item.b;
+   if(sourceItem.type==='ellipse')warn('elipses rotadas aproximadas');
+   if(sourceItem.type==='hatch'&&!solidHatch)warn('HATCH rotado convertido a contorno');
+  }else{
+   if(sourceItem.a)item.a=transformPoint(sourceItem.a);
+   if(sourceItem.b)item.b=transformPoint(sourceItem.b);
+   if(sourceItem.pts)item.pts=sourceItem.pts.map(transformPoint);
+  }
+  if(sourceItem.type==='text'){
+   const angle=Number(sourceItem.textRotation||0)*Math.PI/180,dx=Math.cos(angle)*scaleX,dy=Math.sin(angle)*scaleY;
+   item.textRotation=(Math.atan2(dy,dx)+rotation)*180/Math.PI;
+   item.textHeightWorld=Number(sourceItem.textHeightWorld||.4)*Math.sqrt(Math.abs(scaleX*scaleY));
+  }
+  return item;
+ };
  const header=records.find(r=>r.type==='SECTION'&&str(r,2).toUpperCase()==='HEADER');const unitIndex=header?.pairs.findIndex(p=>p[0]===9&&p[1]==='$INSUNITS')??-1;const unitCode=unitIndex>=0?Number(header.pairs[unitIndex+1]?.[1]):0;const unitMap={4:'mm',5:'cm',6:'m'};if(unitCode&&!unitMap[unitCode])warn('unidades DXF no admitidas; valores sin convertir');out.drawingUnits=unitMap[unitCode]||null;
  for(const r of records){
   if(r.type==='SECTION'){inEntities=str(r,2).toUpperCase()==='ENTITIES';continue}
@@ -895,16 +968,32 @@ function parseDxfEntities(source){
   const st=style(r),type=r.type;
   if(type==='LINE')out.push({type:'line',a:{x:get(r,10),y:get(r,20)},b:{x:get(r,11),y:get(r,21)},...st});
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
-  else if(type==='LWPOLYLINE'){const xs=all(r,10),ys=all(r,20),pts=xs.map((x,i)=>({x,y:ys[i]??0}));if(all(r,42).some(v=>v!==0))warn('polilíneas curvas simplificadas');if(pts.length>1)out.push({type:get(r,70,0)&1?'polygon':'poly',pts,...st})}
+  else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))warn('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
+  else if(type==='POLYLINE'){
+   const flags=get(r,70,0),vertices=polylineVertices.get(r)||[];
+   if(flags&(8|16|64)){warn('polilíneas 3D o malla no compatibles omitidas');continue}
+   if(vertices.length<2){warn('POLYLINE sin vértices omitida');continue}
+   const closed=Boolean(flags&1),pts=buildPolylinePoints(vertices,closed);
+   if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st});
+   if(vertices.some(v=>Math.abs(v.bulge)>1e-9))warn('polilíneas curvas aproximadas');
+  }
   else if(type==='ARC'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40),a1=get(r,50)*Math.PI/180,a2=get(r,51)*Math.PI/180,span=(a2-a1+Math.PI*2)%(Math.PI*2);if(rad>0&&span>0){const pts=[a1,a1+span/2,a1+span].map(t=>({x:a.x+rad*Math.cos(t),y:a.y+rad*Math.sin(t)}));out.push({type:'arc',pts,...st})}else warn('arcos no válidos omitidos')}
-  else if(type==='INSERT'){
+  else if(type==='INSERT'||type==='MINSERT'){
    const name=str(r,2).toUpperCase(),geometry=blockRecords.get(name),depth=Number(arguments[1]||0);
-   if(!geometry?.length||depth>=5||get(r,41,1)!==1||get(r,42,1)!==1||get(r,50)!==0||get(r,70,1)>1||get(r,71,1)>1){warn('INSERT no compatible omitido');continue}
+   const scaleX=get(r,41,1),scaleY=get(r,42,1),rotation=get(r,50)*Math.PI/180;
+   const columns=Math.max(1,Math.round(get(r,70,1))),rows=Math.max(1,Math.round(get(r,71,1)));
+   if(!geometry?.length||depth>=5||!Number.isFinite(scaleX)||!Number.isFinite(scaleY)||Math.abs(scaleX)<1e-9||Math.abs(scaleY)<1e-9||columns*rows>256){warn('INSERT no compatible omitido');continue}
    const blockLines=[];for(const [key,items] of blockRecords){const base=blockBases.get(key)||{x:0,y:0};blockLines.push('0','BLOCK','2',key,'10',String(base.x),'20',String(base.y));for(const item of items)blockLines.push('0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]]));blockLines.push('0','ENDBLK')}
    const blockSource=['0','SECTION','2','BLOCKS',...blockLines,'0','ENDSEC','0','SECTION','2','ENTITIES',...geometry.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n');
-   const pieces=parseDxfEntities(blockSource,depth+1),base=blockBases.get(name)||{x:0,y:0},dx=get(r,10)-base.x,dy=get(r,20)-base.y,groupId='dxf-insert-'+depth+'-'+out.length;
-   for(const item of pieces){if(item.a){item.a.x+=dx;item.a.y+=dy}if(item.b){item.b.x+=dx;item.b.y+=dy}if(item.pts)item.pts.forEach(point=>{point.x+=dx;point.y+=dy});out.push({...item,groupId})}
-   warn('INSERT descompuesto, sin atributos de bloque');if(pieces.importWarnings?.length)warn('INSERT con contenido simplificado u omitido');
+   const pieces=parseDxfEntities(blockSource,depth+1),base=blockBases.get(name)||{x:0,y:0},origin={x:get(r,10),y:get(r,20)},cos=Math.cos(rotation),sin=Math.sin(rotation);
+   for(let row=0;row<rows;row++)for(let column=0;column<columns;column++){
+    const transformPoint=p=>{const x=(p.x-base.x+column*get(r,44))*scaleX,y=(p.y-base.y+row*get(r,45))*scaleY;return{x:origin.x+x*cos-y*sin,y:origin.y+x*sin+y*cos}};
+    const groupId='dxf-insert-'+depth+'-'+out.length+'-'+row+'-'+column;
+    for(const piece of pieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId));
+   }
+   if(columns*rows>1)warn('MINSERT expandido a entidades editables');
+   warn('INSERT/MINSERT descompuesto, sin atributos de bloque');
+   if(pieces.importWarnings?.length)warn('INSERT con contenido simplificado u omitido');
   }
   else if(type==='DIMENSION'){
    const geometry=blockRecords.get(str(r,2).toUpperCase());
@@ -932,13 +1021,27 @@ function parseDxfEntities(source){
    else if(length>0&&ratio>0&&end>begin){const pts=Array.from({length:65},(_,i)=>{const t=begin+(end-begin)*i/64;return{x:a.x+vx*Math.cos(t)-vy*ratio*Math.sin(t),y:a.y+vy*Math.cos(t)+vx*ratio*Math.sin(t)}});out.push({type:'poly',pts,...st});warn('elipses rotadas o parciales simplificadas')}
    else warn('elipses no válidas omitidas');
   }
-  else if(type==='TEXT'||type==='MTEXT'){
+  else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'){
    const raw=type==='MTEXT'?r.pairs.filter(p=>p[0]===3||p[0]===1).map(p=>p[1]).join(''):str(r,1,'');
    if(type==='MTEXT'&&/[{}]|\\\\[A-Za-z]/.test(raw.replace(/\\\\P/g,'')))warn('formato de texto múltiple simplificado');
    const value=raw.replace(/\\\\P/g,'\\n').replace(/\\\\~/g,' '),vx=get(r,11,1),vy=get(r,21,0);
    const rotation=r.pairs.some(p=>p[0]===50)?get(r,50):(type==='MTEXT'?Math.atan2(vy,vx)*180/Math.PI:0);
    out.push({type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:get(r,40,0.4),...st})
   }
+  else if(type==='SOLID'||type==='TRACE'||type==='3DFACE'){
+   const pts=[10,11,12,13].filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10)}));
+   while(pts.length>3&&distance(pts[pts.length-1],pts[pts.length-2])<1e-9)pts.pop();
+   if(pts.length>=3)out.push({type:'polygon',pts,...st});else warn(type+' no compatible omitido');
+  }
+  else if(type==='SPLINE'){
+   const fitX=all(r,11),fitY=all(r,21),controlX=all(r,10),controlY=all(r,20),xs=fitX.length>=2?fitX:controlX,ys=fitY.length>=2?fitY:controlY,pts=xs.map((x,i)=>({x,y:ys[i]??0}));
+   if(pts.length>=2){out.push({type:'poly',pts,...st});warn(fitX.length>=2?'SPLINE aproximada por puntos de ajuste':'SPLINE aproximada por puntos de control')}else warn('SPLINE sin puntos compatibles omitida');
+  }
+  else if(type==='LEADER'){
+   const xs=all(r,10),ys=all(r,20),pts=xs.map((x,i)=>({x,y:ys[i]??0}));
+   if(pts.length>=2)out.push({type:'poly',pts,...st});else warn('LEADER sin vértices omitida');
+  }
+  else if(type==='VERTEX'||type==='SEQEND'){}
   else warn(type+' omitido');
  }
  out.importWarnings=Object.entries(warnings).map(([name,count])=>count+' '+name);

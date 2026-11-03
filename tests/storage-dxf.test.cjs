@@ -148,3 +148,65 @@ assert.ok(imported.some(x=>x.groupId?.startsWith('dxf-dimension')&&x.type==='tex
 assert.ok(imported.some(x=>x.type==='polygon'&&x.solidFill&&x.pts.length===3),'solid polygon hatch should be retained');
 assert.ok(imported.some(x=>x.type==='text'&&x.text==='MURO'&&x.textRotation===90),'rotated text should retain its angle');
 console.log('DXF checks passed: block translation, dimension graphics, polygon hatch and rotated text');
+
+
+const transformedBlockFixture=[
+ '0','SECTION','2','BLOCKS',
+ '0','BLOCK','2','DOOR','10','1','20','0',
+ '0','LINE','8','Muros','10','1','20','0','11','3','21','0',
+ '0','TEXT','8','Textos','10','1','20','1','40','0.5','50','0','1','PUERTA',
+ '0','ENDBLK','0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','INSERT','2','DOOR','10','10','20','20','41','2','42','1','50','90',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const transformedBlocks=context.parseDxfEntities(transformedBlockFixture);
+const transformedLine=transformedBlocks.find(x=>x.type==='line');
+const transformedText=transformedBlocks.find(x=>x.type==='text');
+assert.ok(transformedLine,'Rotated/scaled block line should import');
+assert.ok(Math.abs(transformedLine.a.x-10)<1e-8&&Math.abs(transformedLine.a.y-20)<1e-8,'Block base point should align with insertion point');
+assert.ok(Math.abs(transformedLine.b.x-10)<1e-8&&Math.abs(transformedLine.b.y-24)<1e-8,'Block line should preserve scale and 90-degree rotation');
+assert.ok(transformedText,'Block text should import');
+assert.ok(Math.abs(transformedText.a.x-9)<1e-8&&Math.abs(transformedText.a.y-20)<1e-8,'Block text position should be transformed');
+assert.ok(Math.abs(transformedText.textRotation-90)<1e-8,'Block text rotation should be transformed');
+assert.ok(transformedText.textHeightWorld>0.7&&transformedText.textHeightWorld<0.71,'Block text height should follow geometric scale');
+
+const minsertFixture=[
+ '0','SECTION','2','BLOCKS',
+ '0','BLOCK','2','UNIT','10','0','20','0',
+ '0','LINE','10','0','20','0','11','1','21','0',
+ '0','ENDBLK','0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','MINSERT','2','UNIT','10','10','20','20','70','2','71','2','44','5','45','3',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const minserted=context.parseDxfEntities(minsertFixture).filter(x=>x.type==='line');
+assert.equal(minserted.length,4,'MINSERT should expand its row/column array');
+assert.ok(minserted.some(x=>Math.abs(x.a.x-15)<1e-8&&Math.abs(x.a.y-20)<1e-8),'MINSERT column spacing should be retained');
+assert.ok(minserted.some(x=>Math.abs(x.a.x-10)<1e-8&&Math.abs(x.a.y-23)<1e-8),'MINSERT row spacing should be retained');
+
+const legacyPolylineFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','POLYLINE','8','Muros','66','1','70','1',
+ '0','VERTEX','10','0','20','0',
+ '0','VERTEX','10','2','20','0',
+ '0','VERTEX','10','1','20','1',
+ '0','SEQEND',
+ '0','POLYLINE','8','Muros','66','1','70','0',
+ '0','VERTEX','10','0','20','0','42','0.41421356237',
+ '0','VERTEX','10','2','20','0',
+ '0','SEQEND',
+ '0','LWPOLYLINE','8','Muros','90','2','70','0',
+ '10','0','20','0','42','0.41421356237',
+ '10','2','20','0',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const legacyPolylines=context.parseDxfEntities(legacyPolylineFixture);
+const closedLegacy=legacyPolylines.find(x=>x.type==='polygon');
+const curvedLegacy=legacyPolylines.find(x=>x.type==='poly');
+assert.ok(closedLegacy&&closedLegacy.pts.length===3,'Legacy closed POLYLINE should import as a polygon');
+assert.ok(curvedLegacy&&curvedLegacy.pts.length>3,'Legacy bulged POLYLINE should be tessellated into curve points');
+assert.ok(curvedLegacy.pts.some(p=>p.y<0),'Bulge direction should be preserved');
+const curvedLight=legacyPolylines.filter(x=>x.type==='poly').at(-1);
+assert.ok(curvedLight&&curvedLight.pts.length>3,'LWPOLYLINE bulges should be tessellated too');
+console.log('Advanced DXF import checks passed: scaled/rotated blocks, MINSERT arrays and legacy/bulged polylines');
