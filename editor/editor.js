@@ -465,6 +465,68 @@ function cancelGripDrag(){
  gripDrag=null;render();
 }
 
+function openTextEditor(index){
+ const s=objects[index];if(!s||s.type!=='text'){status.textContent='Selecciona primero un objeto de texto';return false}
+ const dlg=document.createElement('dialog');dlg.className='cad-utility-dialog cad-text-editor';
+ const fontOptions=CAD_TEXT_FONT_CATALOG.map(font=>'<option value="'+font.id+'">'+font.label+'</option>').join('');
+ dlg.innerHTML='<form method="dialog"><h3>Editor de texto CAD</h3><p>Modifica el contenido, la altura real del dibujo, la tipografía y la composición. Los cambios se guardan en el objeto seleccionado.</p>'+
+ '<label class="cad-text-content">Contenido<textarea id="cadTextValue" rows="4" spellcheck="false"></textarea></label>'+
+ '<div class="cad-text-grid"><label>Tipografía<select id="cadTextFont">'+fontOptions+'</select></label>'+
+ '<label>Altura ('+units+')<input id="cadTextHeight" type="number" min="0.001" step="any"></label>'+
+ '<label>Factor de ancho<input id="cadTextWidthFactor" type="number" min="0.05" max="20" step="0.05"></label>'+
+ '<label>Rotación (°)<input id="cadTextRotation" type="number" step="0.1"></label>'+
+ '<label>Inclinación (°)<input id="cadTextOblique" type="number" min="-80" max="80" step="0.5"></label>'+
+ '<label>Color<input id="cadTextColor" type="color"></label>'+
+ '<label>Alineación horizontal<select id="cadTextAlign"><option value="0">Izquierda</option><option value="1">Centro</option><option value="2">Derecha</option><option value="3">Alinear</option><option value="5">Ajustar</option></select></label>'+
+ '<label>Alineación vertical<select id="cadTextVertical"><option value="0">Línea base</option><option value="1">Inferior</option><option value="2">Centro</option><option value="3">Superior</option></select></label>'+
+ '<label>Ancho de MTEXT ('+units+')<input id="cadTextMTextWidth" type="number" min="0" step="any"></label>'+
+ '<label>Interlineado<input id="cadTextLineSpacing" type="number" min="0.5" max="4" step="0.05"></label>'+
+ '<label>Ancho para Alinear/Ajustar ('+units+')<input id="cadTextFitWidth" type="number" min="0" step="any"></label></div>'+
+ '<div class="cad-text-checks"><label><input id="cadTextBold" type="checkbox"> Negrita</label><label><input id="cadTextItalic" type="checkbox"> Cursiva</label><label><input id="cadTextIsMText" type="checkbox"> Texto multilínea (MTEXT)</label></div>'+
+ '<label>Posición del bloque MTEXT<select id="cadTextAttachment"><option value="1">Superior izquierda</option><option value="2">Superior centro</option><option value="3">Superior derecha</option><option value="4">Centro izquierda</option><option value="5">Centro</option><option value="6">Centro derecha</option><option value="7">Inferior izquierda</option><option value="8">Inferior centro</option><option value="9">Inferior derecha</option></select></label>'+
+ '<div class="cad-text-presets"><span>Alturas rápidas</span><button type="button" data-height-m="0.12">Pequeño</button><button type="button" data-height-m="0.18">Normal</button><button type="button" data-height-m="0.25">Mediano</button><button type="button" data-height-m="0.35">Título</button></div>'+
+ '<div class="cad-text-preview-label">VISTA PREVIA</div><div id="cadTextPreview" class="cad-text-preview"></div>'+
+ '<div class="cad-utility-error" id="cadTextError" role="alert"></div><div class="cad-utility-actions"><button type="button" id="cadTextCancel">Cancelar</button><button type="button" id="cadTextApply">Aplicar cambios</button></div></form>';
+ document.body.append(dlg);
+ const $d=id=>dlg.querySelector('#'+id),font=cadFontEntryForFile(s.textFontFile)||CAD_TEXT_FONT_CATALOG[0],value=String(s.text||'');
+ $d('cadTextValue').value=value;$d('cadTextFont').value=font.id;
+ $d('cadTextHeight').value=Number(s.textHeightWorld||Number(s.textHeight||14)/Math.max(zoom,.001));
+ $d('cadTextWidthFactor').value=Number(s.textWidthFactor||s.textStyleWidthFactor||1);
+ $d('cadTextRotation').value=Number(s.textRotation||0);$d('cadTextOblique').value=Number(s.textObliqueAngle||s.textStyleObliqueAngle||0);
+ $d('cadTextColor').value=/^#[0-9a-f]{6}$/i.test(s.color||'')?s.color:(colors[s.layer]||colors.General);
+ $d('cadTextAlign').value=String(Number(s.textHorizontalAlignment||0));$d('cadTextVertical').value=String(Number(s.textVerticalAlignment||0));
+ $d('cadTextMTextWidth').value=Number(s.mtextWidthWorld||0);$d('cadTextLineSpacing').value=Number(s.mtextLineSpacingFactor||1);
+ $d('cadTextFitWidth').value=Number(s.textFitWidthWorld||0);$d('cadTextBold').checked=Boolean(s.textFontBold)||/(?:bd|bold|bi)\.(?:ttf|otf)$/i.test(String(s.textFontFile||''));
+ $d('cadTextItalic').checked=Boolean(s.textFontItalic)||/(?:italic|oblique|i|it|z|bi)\.(?:ttf|otf)$/i.test(String(s.textFontFile||''));
+ $d('cadTextIsMText').checked=Boolean(s.isMText)||Number(s.mtextWidthWorld||0)>0||value.includes('\n');
+ $d('cadTextAttachment').value=String(Number(s.mtextAttachment||1));
+ const preview=$d('cadTextPreview'),previewUpdate=()=>{
+  const selectedFont=CAD_TEXT_FONT_CATALOG.find(item=>item.id===$d('cadTextFont').value)||CAD_TEXT_FONT_CATALOG[0];
+  preview.style.fontFamily=selectedFont.family;preview.style.fontWeight=$d('cadTextBold').checked?'700':'400';preview.style.fontStyle=$d('cadTextItalic').checked?'italic':'normal';
+  preview.style.fontSize=Math.max(12,Math.min(30,Number($d('cadTextHeight').value)*20||16))+'px';
+  preview.textContent=$d('cadTextValue').value||'Vista previa del texto';
+ };
+ ['cadTextFont','cadTextBold','cadTextItalic','cadTextHeight','cadTextValue'].forEach(id=>$d(id).addEventListener('input',previewUpdate));
+ dlg.querySelectorAll('[data-height-m]').forEach(button=>button.onclick=()=>{$d('cadTextHeight').value=(Number(button.dataset.heightM)*(units==='mm'?1000:units==='cm'?100:1)).toFixed(3);previewUpdate()});
+ $d('cadTextCancel').onclick=()=>dlg.close();
+ $d('cadTextApply').onclick=()=>{
+  const newText=$d('cadTextValue').value,height=Number($d('cadTextHeight').value),widthFactor=Number($d('cadTextWidthFactor').value),rotation=Number($d('cadTextRotation').value),oblique=Number($d('cadTextOblique').value),mtextWidth=Number($d('cadTextMTextWidth').value),lineSpacing=Number($d('cadTextLineSpacing').value),fitWidth=Number($d('cadTextFitWidth').value),error=$d('cadTextError');
+  if(!newText.trim()){error.textContent='El contenido no puede quedar vacío.';return}
+  if(!Number.isFinite(height)||height<=0||!Number.isFinite(widthFactor)||widthFactor<.05||widthFactor>20||!Number.isFinite(rotation)||!Number.isFinite(oblique)||oblique< -80||oblique>80||!Number.isFinite(mtextWidth)||mtextWidth<0||!Number.isFinite(lineSpacing)||lineSpacing<.5||lineSpacing>4||!Number.isFinite(fitWidth)||fitWidth<0){error.textContent='Revisa altura, ancho, rotación, inclinación e interlineado.';return}
+  const selectedFont=CAD_TEXT_FONT_CATALOG.find(item=>item.id===$d('cadTextFont').value)||CAD_TEXT_FONT_CATALOG[0],bold=$d('cadTextBold').checked,italic=$d('cadTextItalic').checked,fontFile=cadFontVariantFile(selectedFont,bold,italic),isMText=$d('cadTextIsMText').checked||newText.includes('\n'),horizontal=Number($d('cadTextAlign').value),vertical=Number($d('cadTextVertical').value);
+  checkpoint();s.text=newText;s.textHeightWorld=height;delete s.textHeight;s.textWidthFactor=widthFactor;s.textRotation=rotation;s.textObliqueAngle=oblique;s.textFontFile=fontFile;s.textFontFamily=selectedFont.family;s.textFontBold=bold;s.textFontItalic=italic;s.textStyleFixedHeight=0;s.textStyleWidthFactor=widthFactor;s.textStyleObliqueAngle=oblique;s.textStyleName='OTROCAD_'+selectedFont.id.replace(/[^a-z0-9]+/gi,'_').toUpperCase()+(bold?'_B':'')+(italic?'_I':'');s.color=$d('cadTextColor').value;
+  delete s.mtextRaw;delete s.mtextPlain;
+  if(isMText){s.isMText=true;s.mtextWidthWorld=mtextWidth;s.mtextAttachment=Number($d('cadTextAttachment').value);s.mtextLineSpacingFactor=lineSpacing;s.mtextPlain=newText;delete s.textAlignmentPoint;delete s.textFitWidthWorld}
+  else{delete s.isMText;delete s.mtextWidthWorld;delete s.mtextAttachment;delete s.mtextLineSpacingFactor;s.textHorizontalAlignment=horizontal;s.textVerticalAlignment=vertical;if((horizontal===3||horizontal===5)&&fitWidth>0){s.textFitWidthWorld=fitWidth;const angle=rotation*Math.PI/180;s.textAlignmentPoint={x:s.a.x+fitWidth*Math.cos(angle),y:s.a.y+fitWidth*Math.sin(angle)}}else{delete s.textFitWidthWorld;delete s.textAlignmentPoint}}
+  save();render();showProperties();status.textContent='Texto actualizado · '+selectedFont.label+' · altura '+height+' '+units;dlg.close();
+ };
+ dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();previewUpdate();$d('cadTextValue').focus();return true;
+}
+function editSelectedText(){
+ const ids=selectedItems().filter(i=>objects[i]?.type==='text');
+ if(ids.length!==1){status.textContent=ids.length?'Edita un texto a la vez para conservar su contenido individual':'Selecciona un texto o haz doble clic sobre él';return false}
+ return openTextEditor(ids[0]);
+}
 function showProperties(){
  const box=$('#properties'),content=$('#propContent'),ids=selectedItems();
  if(ids.length>1){box.classList.add('open');content.textContent=ids.length+' objetos seleccionados. Puedes moverlos, copiarlos o eliminarlos como conjunto.';return}
@@ -474,12 +536,17 @@ function showProperties(){
  const color=document.createElement('input');color.type='color';color.value=/^#[0-9a-f]{6}$/i.test(s.color||'')?s.color:(colors[s.layer]||colors.General);addLabel('Color de línea',color);
  const weight=document.createElement('select');['0.13','0.18','0.25','0.35','0.50','0.70','1.00'].forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v+' mm';weight.append(o)});weight.value=String(s.lineweight||.25);addLabel('Grosor de línea',weight);
  const type=document.createElement('select');[['CONTINUOUS','Continua'],['DASHED','Discontinua']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;type.append(o)});type.value=s.linetype||'CONTINUOUS';addLabel('Tipo de línea',type);
- let textInput=null,heightInput=null;
- if(s.type==='text'){textInput=document.createElement('input');textInput.type='text';textInput.value=s.text||'';addLabel('Contenido',textInput);heightInput=document.createElement('input');heightInput.type='number';heightInput.min='0.001';heightInput.step='0.01';heightInput.value=Number(s.textHeightWorld||Number(s.textHeight||14)/zoom).toFixed(3);addLabel('Altura ('+units+')',heightInput)}
+ let heightInput=null;
+ if(s.type==='text'){
+  const edit=document.createElement('button');edit.type='button';edit.textContent='Editar contenido y tipografía…';edit.style.width='100%';edit.style.margin='8px 0';edit.onclick=()=>openTextEditor(selected);content.append(edit);
+  heightInput=document.createElement('input');heightInput.type='number';heightInput.min='0.001';heightInput.step='any';heightInput.value=Number(s.textHeightWorld||Number(s.textHeight||14)/Math.max(zoom,.001));addLabel('Altura del texto ('+units+')',heightInput);
+  const info=document.createElement('small');info.textContent='Fuente: '+String(s.textFontFile||'txt.shx')+' · doble clic sobre el texto para editarlo';content.append(info);
+ }
  const coordInputs=[];
  if(s.a&&s.b){[['X inicial',s.a.x],['Y inicial',s.a.y],['X final',s.b.x],['Y final',s.b.y]].forEach(([k,v])=>{const inp=document.createElement('input');inp.type='number';inp.step='0.001';inp.value=Number(v).toFixed(3);addLabel(k,inp);coordInputs.push([k,inp])})}
- const apply=document.createElement('button');apply.textContent='Aplicar propiedades';apply.onclick=()=>{checkpoint();s.color=color.value;s.lineweight=Number(weight.value);s.linetype=type.value;if(textInput){s.text=textInput.value;const height=Number(heightInput.value);if(Number.isFinite(height)&&height>0){s.textHeightWorld=height;delete s.textHeight}}coordInputs.forEach(([k,inp])=>{const v=Number(inp.value);if(!Number.isFinite(v))return;if(k==='X inicial')s.a.x=v;if(k==='Y inicial')s.a.y=v;if(k==='X final')s.b.x=v;if(k==='Y final')s.b.y=v});save();render();status.textContent='Propiedades actualizadas'};content.append(apply);
+ const apply=document.createElement('button');apply.textContent='Aplicar propiedades';apply.onclick=()=>{checkpoint();s.color=color.value;s.lineweight=Number(weight.value);s.linetype=type.value;if(heightInput){const height=Number(heightInput.value);if(Number.isFinite(height)&&height>0){s.textHeightWorld=height;delete s.textHeight}}coordInputs.forEach(([k,inp])=>{const v=Number(inp.value);if(!Number.isFinite(v))return;if(k==='X inicial')s.a.x=v;if(k==='Y inicial')s.a.y=v;if(k==='X final')s.b.x=v;if(k==='Y final')s.b.y=v});save();render();showProperties();status.textContent='Propiedades actualizadas'};content.append(apply);
 }
+
 function selectionForUtility(){return selectedItems().filter(i=>objects[i]&&!hiddenLayers.has(objects[i].layer)&&!lockedLayers.has(objects[i].layer))}
 function showArrayDialog(){
  const ids=selectionForUtility();if(!ids.length){status.textContent='Matriz: selecciona primero uno o varios objetos';alert('Selecciona primero uno o varios objetos para crear la matriz.');return}
@@ -601,7 +668,7 @@ function handleTap(p){
  }
  if(tool==='text'){
   const value=prompt('Texto de la anotación','');if(value===null)return;if(!value.trim()){status.textContent='No se creó un texto vacío';return}
-  const unitFactor=units==='mm'?1000:units==='cm'?100:1;checkpoint();objects.push({type:'text',a:clone(q),text:value,textHeightWorld:.25*unitFactor,...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);render();status.textContent='Texto creado';return;
+  const unitFactor=units==='mm'?1000:units==='cm'?100:1;checkpoint();objects.push({type:'text',a:clone(q),text:value,textHeightWorld:.25*unitFactor,textStyleName:'OTROCAD_ARIAL',textFontFile:'arial.ttf',textFontFamily:'Arial, Helvetica, sans-serif',textWidthFactor:1,textStyleWidthFactor:1,textFontBold:false,textFontItalic:false,...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);render();status.textContent='Texto creado';return;
  }
  if(tool==='furniture'){
   if(!activeFurniture){status.textContent='Elige un símbolo en BLOQUES';return}
@@ -675,7 +742,7 @@ function handleTap(p){
     transformEntityGeometry(src,mirror,axisAligned);
    }else if(tool==='scale'){
     const factor=Math.hypot(dx,dy),scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});
-    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);if(src.hatchLoops)src.hatchLoops=src.hatchLoops.map(loop=>loop.map(scale));
+    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);if(src.hatchLoops)src.hatchLoops=src.hatchLoops.map(loop=>loop.map(scale));if(src.type==='text'){src.textHeightWorld=Number(src.textHeightWorld||.4)*factor;if(Number(src.mtextWidthWorld)>0)src.mtextWidthWorld*=factor;if(Number(src.textFitWidthWorld)>0)src.textFitWidthWorld*=factor;if(src.textAlignmentPoint)src.textAlignmentPoint=scale(src.textAlignmentPoint)}
    }
   }
   if(tool==='copy')applySelection(created);else applySelection(targets);
@@ -688,9 +755,9 @@ function handleTap(p){
 }
 function transformEntityGeometry(s,transform,axisAligned){
  if(s.type==='rect'&&!axisAligned&&s.a&&s.b){const a=s.a,b=s.b;s.pts=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}].map(transform);s.type='polygon';delete s.a;delete s.b;return}
- if(s.a)s.a=transform(s.a);if(s.b)s.b=transform(s.b);if(s.pts)s.pts=s.pts.map(transform);if(s.hatchLoops)s.hatchLoops=s.hatchLoops.map(loop=>loop.map(transform));
+ const oldAnchor=s.a?clone(s.a):null,oldRotation=Number(s.textRotation||0);if(s.a)s.a=transform(s.a);if(s.b)s.b=transform(s.b);if(s.pts)s.pts=s.pts.map(transform);if(s.hatchLoops)s.hatchLoops=s.hatchLoops.map(loop=>loop.map(transform));if(s.textAlignmentPoint)s.textAlignmentPoint=transform(s.textAlignmentPoint);if(s.type==='text'&&oldAnchor){const rad=oldRotation*Math.PI/180,baseEnd=transform({x:oldAnchor.x+Math.cos(rad),y:oldAnchor.y+Math.sin(rad)}),newAnchor=s.a||transform(oldAnchor);s.textRotation=Math.atan2(baseEnd.y-newAnchor.y,baseEnd.x-newAnchor.x)*180/Math.PI}
 }
-function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy});if(s.hatchLoops)s.hatchLoops.forEach(loop=>loop.forEach(p=>{p.x+=dx;p.y+=dy}))}
+function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.textAlignmentPoint){s.textAlignmentPoint.x+=dx;s.textAlignmentPoint.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy});if(s.hatchLoops)s.hatchLoops.forEach(loop=>loop.forEach(p=>{p.x+=dx;p.y+=dy}))}
 function entitySegments(s){
  const pts=[];
  if(s.type==='line'||s.type==='dim'||s.type==='dimaligned'||s.type==='leader'){if(s.a&&s.b)pts.push([s.a,s.b]);return pts}
@@ -960,6 +1027,7 @@ function pointerEnd(e){
  render();
 }
 canvas.addEventListener('pointerup',pointerEnd);canvas.addEventListener('pointercancel',pointerEnd);
+canvas.addEventListener('dblclick',e=>{const p=pointer(e),hit=selectAt(world(p));if(hit>=0&&objects[hit]?.type==='text'){e.preventDefault();applySelection([hit]);showProperties();openTextEditor(hit)}});
 canvas.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('contextmenu',e=>{
@@ -995,6 +1063,7 @@ document.addEventListener('keydown',e=>{
  if(e.key==='F9'){e.preventDefault();toggle('snapToggle');return}
  if(e.key==='F10'){e.preventDefault();toggle('polarToggle');return}
  if(e.key==='F3'){e.preventDefault();toggle('osnapToggle');return}
+ if(e.key==='F2'){e.preventDefault();editSelectedText();return}
  if(e.key==='Enter'){e.preventDefault();performEnterAction();return}
  if(e.key===' '&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();performEnterAction();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$(e.shiftKey?'#redo':'#undo').click();return}
@@ -1033,6 +1102,7 @@ function runCommand(raw){
  if(c==='BG'||c==='BACKGROUND'||c==='CANVASCOLOR'){const name=(parts[1]||'').toLowerCase();if(CAD_THEMES[name])applyCanvasTheme(name);else status.textContent='BACKGROUND WHITE | BLACK | DARK | GRAPHITE | SLATE | BLUEGRAY';return}
  if(c==='HATCHPATTERN'){const p=parts[1];if(['ANSI31','CROSS','GRID','SOLID'].includes(p)){$('#hatchPattern').value=p;status.textContent='HATCHPATTERN '+p}else status.textContent='HATCHPATTERN ANSI31 | CROSS | GRID | SOLID';return}
  if(c==='PR'||c==='PROPERTIES'||c==='CTRL+1'){$('#properties').classList.toggle('open');showProperties();return}
+ if(['ED','TEXTEDIT','DDEDIT','EDITTEXT','STYLE','TEXTSTYLE'].includes(c)){editSelectedText();return}
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
@@ -1046,7 +1116,7 @@ function runCommand(raw){
  if(c==='F'||c==='FILLET'){setTool('fillet');return}
  if(c==='DLI'||c==='DIMLINEAR'){setTool('dim');return}
  if(c==='DAL'||c==='DIMALIGNED'){setTool('dimaligned');return}
- const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
+ const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',T:'text',TEXT:'text',MTEXT:'text',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
@@ -1056,6 +1126,7 @@ document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.data
 const furnitureList=Array.isArray(window.otroCadFurnitureCatalog)?window.otroCadFurnitureCatalog:[];
 for(const item of furnitureList){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('#blockChoice').append(option)}
 $('#insertFurniture').onclick=()=>{activeFurniture=furnitureList.find(item=>item.id===$('#blockChoice').value)||null;if(!activeFurniture){status.textContent='No se encontró el símbolo';return}setTool('furniture');status.textContent='Toca el punto de inserción · '+activeFurniture.name};
+$('#editTextBtn').onclick=editSelectedText;
 $('#arrayRect').onclick=showArrayDialog;
 $('#centerMark').onclick=()=>createCircleAnnotations('center');
 $('#centerLine').onclick=createCenterline;
@@ -1561,7 +1632,7 @@ function buildDxf(){
   const line=(p,q)=>add(0,'LINE',...common,100,'AcDbLine',10,p.x,20,p.y,30,0,11,q.x,21,q.y,31,0);
   const textEntity=(p,value,height,rotation=0,source={})=>{
     const valueText=String(value||'').replace(/\r/g,''),styleName=dxfTextStyleName(source),widthFactor=Number(source.textWidthFactor||1),oblique=Number(source.textObliqueAngle||0);
-    if(valueText.includes('\n')||Number(source.mtextWidthWorld)>0)add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,41,Number(source.mtextWidthWorld||0),44,Number(source.mtextLineSpacingFactor||1),71,Number(source.mtextAttachment||1),50,rotation,7,styleName,1,valueText.replace(/\n/g,'\\P'));
+    if(Boolean(source.isMText)||valueText.includes('\n')||Number(source.mtextWidthWorld)>0)add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,41,Number(source.mtextWidthWorld||0),44,Number(source.mtextLineSpacingFactor||1),71,Number(source.mtextAttachment||1),50,rotation,7,styleName,1,valueText.replace(/\n/g,'\\P'));
     else{add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,41,widthFactor,50,rotation,51,oblique,7,styleName,71,Number(source.textGenerationFlags||0),72,Number(source.textHorizontalAlignment||0),73,Number(source.textVerticalAlignment||0),1,valueText);if(source.textAlignmentPoint)add(11,source.textAlignmentPoint.x,21,source.textAlignmentPoint.y,31,0)}
    };
   if(['line','dim','dimaligned','leader'].includes(o.type)&&a&&b){line(a,b);if(o.type==='dim'||o.type==='dimaligned')textEntity({x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance(a,b).toFixed(2)+' '+units,12/zoom);if(o.type==='leader'&&o.text)textEntity(b,o.text,12/zoom)}
