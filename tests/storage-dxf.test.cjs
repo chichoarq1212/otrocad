@@ -210,3 +210,64 @@ assert.ok(curvedLegacy.pts.some(p=>p.y<0),'Bulge direction should be preserved')
 const curvedLight=legacyPolylines.filter(x=>x.type==='poly').at(-1);
 assert.ok(curvedLight&&curvedLight.pts.length>3,'LWPOLYLINE bulges should be tessellated too');
 console.log('Advanced DXF import checks passed: scaled/rotated blocks, MINSERT arrays and legacy/bulged polylines');
+
+
+// Real architectural DWG compatibility: hatch islands, curved edges, nested dimension symbols, block attributes.
+const hatchLoopsFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','HATCH','8','Pisos','2','SOLID','70','1','91','2',
+ '92','3','72','0','73','1','93','4',
+ '10','0','20','0','10','10','20','0','10','10','20','10','10','0','20','10','97','0',
+ '92','3','72','0','73','1','93','4',
+ '10','3','20','3','10','7','20','3','10','7','20','7','10','3','20','7','97','0',
+ '75','1','76','1','98','0',
+ '0','HATCH','8','Detalles','2','ANSI31','70','0','91','1',
+ '92','1','93','1','72','2','10','20','20','20','40','2','50','0','51','360','73','1','97','0',
+ '75','1','76','1','52','45','41','1','78','1','53','45','43','0','44','0','45','0','46','0.25','79','0','98','0',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const architecturalHatches=context.parseDxfEntities(hatchLoopsFixture);
+assert.equal(architecturalHatches.length,2,'Both solid hatch with island and curved patterned hatch must import');
+assert.equal(architecturalHatches[0].type,'polygon');
+assert.equal(architecturalHatches[0].hatchLoops.length,2,'Interior island/hole must not be lost');
+assert.equal(architecturalHatches[0].solidFill,true);
+assert.equal(architecturalHatches[1].type,'polygon');
+assert.equal(architecturalHatches[1].hatchPattern,'ANSI31');
+assert.ok(architecturalHatches[1].pts.length>20,'Arc boundary should be tessellated');
+assert.ok(!architecturalHatches.importWarnings.some(w=>w.includes('HATCH')),'Supported hatch geometry must not be marked omitted');
+context.objects=architecturalHatches;accept=true;downloaded=null;handlers.get('#dxf').onclick();
+assert.match(downloaded.content,/\r\nHATCH\r\n/);
+const hatchRoundtrip=context.parseDxfEntities(downloaded.content);
+assert.equal(hatchRoundtrip[0].hatchLoops.length,2,'DXF export must retain the hole');
+assert.equal(hatchRoundtrip[1].hatchPattern,'ANSI31','DXF export must retain hatch pattern name');
+console.log('Architectural HATCH checks passed: curved edges, islands, pattern and DXF round-trip');
+
+const dimensionsAndAttributes=[
+ '0','SECTION','2','BLOCKS',
+ '0','BLOCK','2','ARROW','10','0','20','0',
+ '0','LINE','10','0','20','0','11','1','21','0','0','ENDBLK',
+ '0','BLOCK','2','*D7','10','0','20','0',
+ '0','LINE','10','0','20','0','11','10','21','0',
+ '0','INSERT','2','ARROW','10','10','20','0','0','ENDBLK',
+ '0','BLOCK','2','LABEL','10','0','20','0',
+ '0','ATTDEF','70','0','2','NUM','1','PENDIENTE','10','0','20','0',
+ '0','LINE','10','0','20','0','11','2','21','0','0','ENDBLK',
+ '0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','DIMENSION','2','*D7',
+ '0','INSERT','2','LABEL','10','5','20','5','66','1',
+ '0','ATTRIB','2','NUM','1','DEPTO 1','10','5','20','5','40','0.3',
+ '0','SEQEND',
+ '0','MTEXT','10','1','20','1','40','0.4','1','{\\fArial|b1;SALA\\P\\S1#2; m}',
+ '0','VIEWPORT','10','0','20','0','40','5','41','3','69','2',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const architecturalDims=context.parseDxfEntities(dimensionsAndAttributes);
+assert.equal(architecturalDims.filter(o=>o.groupId?.startsWith('dxf-dimension')).length,2,'Dimension nested INSERT arrow must import');
+assert.ok(architecturalDims.some(o=>o.text==='DEPTO 1'),'Block ATTRIB must appear as editable text');
+assert.ok(!architecturalDims.some(o=>o.text==='PENDIENTE'),'Non-constant ATTDEF should not duplicate the inserted attribute');
+assert.ok(architecturalDims.some(o=>o.text==='SALA\n1/2 m'),'MTEXT formatting must decode into readable text');
+assert.ok(architecturalDims.some(o=>o.mtextRaw?.includes('\\fArial')),'Original MTEXT formatting should be retained for export');
+assert.ok(!architecturalDims.importWarnings.some(w=>/símbolos de cota|VIEWPORT|ATTDEF/.test(w)),'No false omission warning for recovered symbols/attributes');
+assert.ok(architecturalDims.importNotes.some(w=>w.includes('DIMENSION')));
+console.log('Architectural DIMENSION/INSERT checks passed: nested symbols, attributes, formatted MTEXT and viewports');
