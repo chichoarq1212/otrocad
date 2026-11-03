@@ -1003,8 +1003,8 @@ function parseDxfEntities(source){
  const cleanMText=raw=>String(raw||'')
   .replace(/\\U\+([0-9A-Fa-f]{4,6})/g,(_,hex)=>String.fromCodePoint(parseInt(hex,16)))
   .replace(/\\S([^;]*);/g,(_,v)=>v.replace(/[#^]/g,'/'))
-  .replace(/\\[PpX]/g,'\n').replace(/\\~/g,' ').replace(/\\([{}\\])/g,'$1')
-  .replace(/\\(?:[AaCcFfHhQqTtWw]|p)[^;]*;/g,'').replace(/\\[LlOoKk]/g,'')
+  .replace(/\\p[^;]*;/g,'').replace(/\\[PX]/g,'\n').replace(/\\~/g,' ').replace(/\\([{}\\])/g,'$1')
+  .replace(/\\[AaCcFfHhQqTtWw][^;]*;/g,'').replace(/\\[LlOoKk]/g,'')
   .replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').replace(/%%[cC]/g,'Ø').replace(/[{}]/g,'');
  const polylineVertices=new Map();
  for(let i=0;i<records.length;i++)if(records[i].type==='POLYLINE'){
