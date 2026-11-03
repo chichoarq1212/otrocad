@@ -652,7 +652,7 @@ const paperPreviewScope={
  modelExtentsForPaper:()=>({center:{x:0,y:0},width:1,height:1})
 };
 vm.createContext(paperPreviewScope);
-vm.runInContext(source.slice(source.indexOf('function effectivePaperViewports('),source.indexOf('function renderPaperLayout(')),paperPreviewScope);
+vm.runInContext(source.slice(source.indexOf('function cadLayoutScaleHint('),source.indexOf('function renderPaperLayout(')),paperPreviewScope);
 const provisional=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})",paperPreviewScope);
 assert.equal(provisional.length,1,'Un VIEWPORT sin altura debe presentar una vista provisional, no un punto azul ni una hoja vacía');
 assert.equal(provisional[0].estimated,true);
