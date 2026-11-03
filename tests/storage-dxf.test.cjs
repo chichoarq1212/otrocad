@@ -327,7 +327,9 @@ const hatchFallbackFixture=[
 ].join('\n');
 const hatchRecovered=context.parseDxfEntities(hatchFallbackFixture);
 assert.equal(hatchRecovered.length,1,'HATCH should recover non-collinear raw DXF boundary vertices');
-assert.equal(hatchRecovered[0].pts.length,4,'Elevation coordinates must not contaminate hatch boundary');
+assert.equal(hatchRecovered[0].type,'hatch','Recovered rectangular SOLID HATCH should use editable rectangle');
+assert.equal(hatchRecovered[0].a.x,0,'Elevation must not contaminate hatch boundary');
+assert.equal(hatchRecovered[0].b.x,4,'Recovered HATCH must preserve original width');
 assert.ok(hatchRecovered.importNotes.some(w=>w.includes('HATCH con borde reconstruido')));
 assert.ok(!hatchRecovered.importWarnings.some(w=>w.includes('HATCH sin contorno')));
 
