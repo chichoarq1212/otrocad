@@ -1126,7 +1126,7 @@ function parseDxfEntities(source){
     if(vertices.length>=3&&Math.abs(area)>1e-8){loops.push(vertices);note('HATCH con borde reconstruido desde vértices DXF')}
    }
    const pts=loops[0];
-   if(!pts?.length){warn('HATCH sin contorno compatible omitido');continue}
+   if(!pts?.length){warn('HATCH sin contorno compatible omitido');const paths=get(r,91,-1),vertices=r.pairs.filter(p=>p[0]===10).length;diagnose('HATCH',{['rutas de borde='+paths+', pares X/Y='+vertices]:1});continue}
    const minx=Math.min(...pts.map(p=>p.x)),maxx=Math.max(...pts.map(p=>p.x)),miny=Math.min(...pts.map(p=>p.y)),maxy=Math.max(...pts.map(p=>p.y));
    const corners=new Set(pts.map(p=>p.x+','+p.y));
    const rectangular=loops.length===1&&pts.length===4&&minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(x+','+y));
