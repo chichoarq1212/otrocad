@@ -663,8 +663,25 @@ assert.equal(annotated[0].viewHeight,28.5,'La escala escrita 1:75 en una lámina
 assert.match(annotated[0].estimateSource,/escala escrita/);
 paperPreviewScope.objects.pop();
 paperPreviewScope.layoutViewportRecords[0].viewHeight=18;
-assert.equal(vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420}).length",paperPreviewScope),1,'Valid imported viewports must retain their real view height');
-console.log('Paper viewport checks passed: provisional view, explicit scale annotation, imported scale preserved');
+const missingCenter=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})",paperPreviewScope);
+assert.equal(missingCenter[0].viewHeight,18,'La altura real del VIEWPORT no debe reemplazarse');
+assert.equal(Boolean(missingCenter[0].heightEstimated),false);
+paperPreviewScope.layoutViewportRecords[0].viewCenterKnown=false;
+const correctedCenter=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})",paperPreviewScope);
+assert.equal(correctedCenter[0].viewHeight,18,'Conservar la altura real al recuperar solo el centro');
+assert.equal(correctedCenter[0].centerEstimated,true);
+assert.equal(correctedCenter[0].viewCenter.x,0,'Usar el centro geométrico del Modelo cuando el conversor pierde grupos 12/22');
+assert.equal(correctedCenter[0].heightEstimated,false,'No afirmar que se estimó la escala si es válida');
+paperPreviewScope.layoutViewportRecords.push({layout:'P-03',id:3,status:1,width:280,height:200,viewHeight:0,viewCenterKnown:false});
+const mixed=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})",paperPreviewScope);
+assert.equal(mixed.length,2,'Mantener todas las ventanas de una lámina aunque sus campos sean distintos');
+assert.equal(mixed[0].viewHeight,18);
+assert.equal(mixed[1].heightEstimated,true);
+assert.equal(mixed[1].centerEstimated,true);
+const warning=vm.runInContext("describePaperLayoutState({name:'P-03',source:'imported'},effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})).message",paperPreviewScope);
+assert.match(warning,/VISTA PROVISIONAL/);
+assert.match(warning,/CENTRO PROVISIONAL/);
+console.log('Paper viewport checks passed: provisional view, missing center, mixed viewports and preserved height');
 
 
 // Regression: localStorage quota must not prevent NEW when IndexedDB can retain the old drawing.
