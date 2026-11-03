@@ -522,7 +522,7 @@ function openTextEditor(index){
    if(!batchMode)target.textRotation=rotation;
    target.textObliqueAngle=oblique;target.textFontFile=fontFile;target.textFontFamily=selectedFont.family;target.textFontBold=bold;target.textFontItalic=italic;
    target.textStyleFixedHeight=0;target.textStyleWidthFactor=widthFactor;target.textStyleObliqueAngle=oblique;
-   target.textStyleName='OTROCAD_'+selectedFont.id.replace(/[^a-z0-9]+/gi,'_').toUpperCase()+(bold?'_B':'')+(italic?'_I');target.color=$d('cadTextColor').value;
+   target.textStyleName='OTROCAD_'+selectedFont.id.replace(/[^a-z0-9]+/gi,'_').toUpperCase()+(bold?'_B':'')+(italic?'_I':'');target.color=$d('cadTextColor').value;
    if(!batchMode){
     delete target.mtextRaw;delete target.mtextPlain;
     if(isMText){target.isMText=true;target.mtextWidthWorld=mtextWidth;target.mtextAttachment=Number($d('cadTextAttachment').value);target.mtextLineSpacingFactor=lineSpacing;target.mtextPlain=newText;delete target.textAlignmentPoint;delete target.textFitWidthWorld}
