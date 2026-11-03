@@ -66,6 +66,7 @@ jobs:
           node tests/mobile-civil-toolbar.test.cjs
           node tests/dxf-import-regression.test.cjs
           node tests/grips.test.cjs
+          node tests/ios-touch.test.cjs
           node tests/cad-precision.test.cjs
           node tests/storage-dxf.test.cjs
           node tests/dwg-integration.test.cjs
