@@ -1,0 +1,17 @@
+{
+  "name": "otrocad-dwg-wasm",
+  "type": "module",
+  "description": "Local DWG/DXF read-write bridge for OtroCAD using acadrust",
+  "version": "0.1.0",
+  "license": "MPL-2.0",
+  "files": [
+    "otrocad_dwg_bg.wasm",
+    "otrocad_dwg.js",
+    "otrocad_dwg.d.ts"
+  ],
+  "main": "otrocad_dwg.js",
+  "types": "otrocad_dwg.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
