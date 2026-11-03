@@ -433,6 +433,27 @@ function effectivePaperViewports(layout){
  const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
  return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
 }
+function describePaperLayoutState(layout,viewports){
+ const paperCount=objects.filter(x=>x.cadLayout===layout.name).length;
+ const importedCount=layoutViewportRecords.filter(x=>x.layout===layout.name&&x.id!==1).length;
+ const lines=[];
+ if(layout.source!=='new'&&!importedCount&&layout.viewportFit!=='all')
+  lines.push('El archivo no proporcionó un VIEWPORT utilizable para esta hoja. Revisa ⚙ Hoja o el informe de importación.');
+ if(layout.source!=='new'&&paperCount===0)
+  lines.push('No se recuperaron entidades propias del espacio Papel para esta presentación.');
+ if(layout.source!=='new'&&viewports.length&&!objects.some(x=>(x.cadLayout||'Model')==='Model'))
+  lines.push('No se recuperó la geometría de Modelo necesaria para las ventanas gráficas.');
+ return {paperCount,importedCount,message:lines.join(' ')};
+}
+function showPaperLayoutNotice(layout,viewports){
+ let notice=document.getElementById('cadLayoutNotice');
+ if(!notice){notice=document.createElement('div');notice.id='cadLayoutNotice';notice.setAttribute('role','status');$('#stage').append(notice)}
+ const info=describePaperLayoutState(layout,viewports);
+ notice.hidden=!info.message;
+ if(info.message){
+  notice.textContent=layout.name+': '+info.message+' · Papel: '+info.paperCount+' entidades; VIEWPORT: '+info.importedCount;
+ }
+}
 function renderPaperLayout(){
  const layout=paperLayoutsSafe().find(x=>x.name===activeLayout);if(!layout){activeLayout='Model';render();return}
  const w=canvas.clientWidth,h=canvas.clientHeight;
@@ -445,6 +466,7 @@ function renderPaperLayout(){
  ctx.fillStyle='#fff';ctx.fillRect(x0,y0,paperW,paperH);ctx.restore();
  ctx.save();ctx.beginPath();ctx.rect(x0,y0,paperW,paperH);ctx.clip();
  const vps=effectivePaperViewports(layout);
+ showPaperLayoutNotice(layout,vps);
  for(const vp of vps){
   const center=paperPoint(vp.center),vw=Number(vp.width)*scale,vh=Number(vp.height)*scale;
   if(!Number.isFinite(vw)||!Number.isFinite(vh)||vw<=0||vh<=0)continue;
@@ -499,6 +521,7 @@ function showCadPaperSettings(){
 }
 function render(){
  if(activeLayout!=='Model'){renderPaperLayout();return}
+ const oldPaperNotice=document.getElementById('cadLayoutNotice');if(oldPaperNotice)oldPaperNotice.hidden=true;
  const finish=$('#finish-poly');finish.hidden=tool!=='poly'||poly.length===0;finish.disabled=poly.length<2;
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':(getComputedStyle($('#stage')).backgroundColor||'#101820');ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
  // Imported CAD hatches are background fills; keep dimensions, walls and labels visible on top.
