@@ -964,6 +964,7 @@ function parseDxfEntities(source){
  const get=(r,c,d=0)=>{const p=r.pairs.find(x=>x[0]===c);if(!p)return d;const n=Number(p[1]);return Number.isFinite(n)?n:d};
  const all=(r,c)=>r.pairs.filter(x=>x[0]===c).map(x=>Number(x[1]));
  const str=(r,c,d='')=>r.pairs.find(x=>x[0]===c)?.[1]??d;
+ const dxfOpacity=raw=>raw>=0&&(raw>>>24)===2?(raw&255)/255:1;
  // AutoCAD's ACI palette: 10–249 are 24 hues × 10 brightness/saturation steps;
  // 250–255 are true grayscale. 7 adapts to light/dark drawing backgrounds.
  const aciColor=index=>{
@@ -1054,7 +1055,6 @@ function parseDxfEntities(source){
   }
   return defs;
  };
- const dxfOpacity=raw=>raw>=0&&(raw>>>24)===2?(raw&255)/255:1;
  const hatchBoundaries=r=>{
   const pairs=r.pairs,loops=[];let i=pairs.findIndex(p=>p[0]===91);if(i<0)return loops;
   const total=Math.min(512,+pairs[i++][1]||0);
