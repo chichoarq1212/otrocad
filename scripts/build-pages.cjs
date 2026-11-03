@@ -11,6 +11,10 @@ const requiredFiles = [
   'manifest.webmanifest',
   'sw.js',
   'icon.svg',
+  'apple-touch-icon.png',
+  'icon-192.png',
+  'icon-512.png',
+  'ios/index.html',
   'editor-preview.svg',
   'editor-preview-real.jpg',
   'editor/index.html',
@@ -33,12 +37,13 @@ for (const relativePath of requiredFiles) {
 fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
 
-for (const relativePath of ['index.html', 'manifest.webmanifest', 'sw.js', 'icon.svg', 'editor-preview.svg', 'editor-preview-real.jpg']) {
+for (const relativePath of ['index.html', 'manifest.webmanifest', 'sw.js', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'editor-preview.svg', 'editor-preview-real.jpg']) {
   fs.copyFileSync(path.join(root, relativePath), path.join(output, relativePath));
 }
 
 fs.cpSync(path.join(root, 'editor'), path.join(output, 'editor'), { recursive: true });
 fs.cpSync(path.join(root, 'tutorial'), path.join(output, 'tutorial'), { recursive: true });
+fs.cpSync(path.join(root, 'ios'), path.join(output, 'ios'), { recursive: true });
 fs.cpSync(path.join(root, 'descargas'), path.join(output, 'descargas'), { recursive: true });
 fs.cpSync(path.join(root, 'herramientas'), path.join(output, 'herramientas'), { recursive: true });
 
