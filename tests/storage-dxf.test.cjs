@@ -271,3 +271,13 @@ assert.ok(architecturalDims.some(o=>o.mtextRaw?.includes('\\fArial')),'Original 
 assert.ok(!architecturalDims.importWarnings.some(w=>/símbolos de cota|VIEWPORT|ATTDEF/.test(w)),'No false omission warning for recovered symbols/attributes');
 assert.ok(architecturalDims.importNotes.some(w=>w.includes('DIMENSION')));
 console.log('Architectural DIMENSION/INSERT checks passed: nested symbols, attributes, formatted MTEXT and viewports');
+
+const inheritedLayerFixture=[
+ '0','SECTION','2','BLOCKS','0','BLOCK','2','MURO','10','0','20','0',
+ '0','LINE','8','0','10','0','20','0','11','2','21','0','0','ENDBLK','0','ENDSEC',
+ '0','SECTION','2','ENTITIES','0','INSERT','2','MURO','8','Arquitectura','10','5','20','5',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const inheritedLine=context.parseDxfEntities(inheritedLayerFixture).find(o=>o.type==='line');
+assert.equal(inheritedLine.layer,'Arquitectura','Layer 0 geometry inside a block must inherit INSERT layer');
+console.log('INSERT layer inheritance check passed');
