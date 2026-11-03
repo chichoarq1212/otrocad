@@ -253,7 +253,7 @@ function parsePointText(text){
  if(hasHeader){
   const names=firstCells.map(v=>v.toLowerCase().replace(/[^a-z0-9áéíóúñ]/g,''));
   const find=regex=>names.findIndex(v=>regex.test(v));
-  ix=find(/^(x|e|east|easting|este)$/);iy=find(/^(y|n|north|northing|norte)$/);iz=find(/^(z|elev|elevation|cota|height|altitud|nivel)$/);iid=find(/^(id|point|punto|name|nombre|numero|num)$/);
+  ix=find(/^(x|e|east|easting|este)$/);iy=find(/^(y|n|north|northing|norte)$/);iz=find(/^(z|elev|elevation|cota|height|altitud|nivel)$/);iid=find(/^(id|p|point|punto|name|nombre|numero|num)$/);
   if(ix<0||iy<0||iz<0){if(firstCells.length>=4){iid=0;ix=1;iy=2;iz=3}else{ix=0;iy=1;iz=2}}
   start=1;
  }else if(firstCells.length>=4&&!Number.isFinite(numberValue(firstCells[0]))){iid=0;ix=1;iy=2;iz=3}
@@ -270,14 +270,14 @@ function parsePointText(text){
 function parseLandXml(text){
  const xml=new DOMParser().parseFromString(text,'application/xml');
  if(xml.querySelector('parsererror'))throw Error('El archivo LandXML no es válido.');
- const nodes=[...xml.querySelectorAll('CgPoint')],points=[];
+ const nodes=Array.from(xml.getElementsByTagNameNS('*','CgPoint')),points=[];
  const add=(node,index)=>{
-  const values=String(node.textContent||'').trim().split(/[\s,;]+/).map(numberValue);
-  if(values.length<3||values.some(v=>!Number.isFinite(v)))return;
+  const values=String(node.textContent||'').trim().split(/[\s,;]+/).map(numberValue).filter(Number.isFinite);
+  if(values.length<3)return;
   points.push({type:'point',a:{x:values[1],y:values[0]},z:values[2],civilPoint:true,civilPointId:node.getAttribute('name')||node.getAttribute('id')||('P'+(index+1)),layer:'Topografía',color:'#70d6a3',lineweight:.25});
  };
  if(nodes.length)nodes.forEach(add);
- else [...xml.querySelectorAll('Pnts P')].forEach(add);
+ else Array.from(xml.getElementsByTagNameNS('*','P')).filter(node=>node.parentElement?.localName==='Pnts').forEach(add);
  if(!points.length)throw Error('No se encontraron CgPoint ni puntos de superficie Pnts en LandXML.');
  return points;
 }
@@ -323,13 +323,19 @@ function surfaceData(){
  const triangles=all.filter(o=>!id||o.civilSurfaceId===id);
  return triangles.length?{id,triangles}:null;
 }
+function terrainSamples(){
+ const explicit=pointObjects().map(p=>({x:p.a.x,y:p.a.y,z:Number(p.z),id:p.civilPointId}));
+ if(explicit.length>=3)return explicit;
+ const contourVertices=api.getObjects().filter(o=>(o.type==='poly'||o.type==='polygon')&&o.elevation!==undefined&&Number.isFinite(Number(o.elevation))&&Array.isArray(o.pts)).flatMap((o,index)=>o.pts.map((p,i)=>({x:p.x,y:p.y,z:Number(o.elevation),id:'CURVA-'+index+'-'+i})));
+ return explicit.concat(contourVertices);
+}
 function createTin(){
- const pts=pointObjects();if(pts.length<3)throw Error('Importa primero al menos tres puntos con coordenadas XYZ.');
- const data=math.triangulate(pts.map(p=>({x:p.a.x,y:p.a.y,z:Number(p.z),id:p.civilPointId})));
+ const pts=terrainSamples();if(pts.length<3)throw Error('Importa al menos tres puntos XYZ o polilíneas de curvas de nivel con elevación.');
+ const data=math.triangulate(pts);
  const z=data.points.map(p=>p.z),min=Math.min(...z),max=Math.max(...z),id='TIN-'+Date.now().toString(36);
  const triangles=data.triangles.map((tri,index)=>({type:'polygon',pts:tri.map(p=>({x:p.x,y:p.y,z:p.z})),layer:'Superficie TIN',color:elevationColor((tri[0].z+tri[1].z+tri[2].z)/3,min,max),lineweight:.13,solidFill:false,hatchOpacity:.12,importedHatch:true,civilTin:true,civilSurfaceId:id,civilTriangleIndex:index}));
  api.ensureLayer('Superficie TIN','#4ca6d5');
- api.replaceObjects(o=>o.civilTin||o.civilContour||o.civilSlope,triangles,'Superficie TIN creada · '+data.points.length+' puntos · '+triangles.length+' triángulos');
+ api.replaceObjects(o=>o.civilTin||o.civilContour||o.civilSlope,triangles,'Superficie TIN creada · '+data.points.length+' vértices XYZ · '+triangles.length+' triángulos');
  activeSurfaceId=id;try{localStorage.setItem('otrocad-civil-active-surface',id)}catch(e){}
 }
 function createContours(){
