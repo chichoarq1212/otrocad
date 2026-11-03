@@ -281,3 +281,39 @@ const inheritedLayerFixture=[
 const inheritedLine=context.parseDxfEntities(inheritedLayerFixture).find(o=>o.type==='line');
 assert.equal(inheritedLine.layer,'Arquitectura','Layer 0 geometry inside a block must inherit INSERT layer');
 console.log('INSERT layer inheritance check passed');
+
+
+const dimensionDefpointsFixture=[
+ '0','SECTION','2','BLOCKS',
+ '0','BLOCK','2','*D88','10','0','20','0',
+ '0','LINE','8','COTAS','10','0','20','0','11','3','21','0',
+ '0','POINT','8','DEFPOINTS','10','0','20','0',
+ '0','POINT','8','DEFPOINTS','10','3','20','0',
+ '0','TEXT','8','COTAS','10','1','20','0.2','40','0.3','1','3.00',
+ '0','ENDBLK','0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','DIMENSION','2','*D88','8','COTAS',
+ '0','POINT','8','Marcadores','10','8','20','8',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const defpointEntities=context.parseDxfEntities(dimensionDefpointsFixture);
+assert.equal(defpointEntities.filter(o=>o.groupId?.startsWith('dxf-dimension')).length,2,'Dimension geometry must not create visible DEFPOINTS markers');
+assert.ok(!defpointEntities.importWarnings.some(w=>w.includes('DIMENSION')),'DEFPOINTS references are not missing dimension graphics');
+assert.equal(defpointEntities.filter(o=>o.type==='point').length,1,'Visible POINT should remain editable');
+context.objects=defpointEntities;downloaded=null;accept=true;handlers.get('#dxf').onclick();
+assert.match(downloaded.content,/\r\nPOINT\r\n/,'Visible POINT should survive DXF export');
+
+const nestedFailureFixture=[
+ '0','SECTION','2','BLOCKS',
+ '0','BLOCK','2','*D99','10','0','20','0',
+ '0','LINE','10','0','20','0','11','2','21','0',
+ '0','UNSUPPORTED_DWG_ENTITY','10','1','20','1',
+ '0','ENDBLK','0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','DIMENSION','2','*D99',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const nestedFailure=context.parseDxfEntities(nestedFailureFixture);
+assert.ok(nestedFailure.importWarnings.some(w=>w.includes('DIMENSION con elementos gráficos no compatibles')));
+assert.equal(nestedFailure.importDiagnostics['DIMENSION → UNSUPPORTED_DWG_ENTITY omitido'],1,'Report should explain what is missing inside a dimension');
+console.log('Dimension DEFPOINTS and nested diagnostics checks passed');
