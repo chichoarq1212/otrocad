@@ -592,3 +592,51 @@ const anonymousPaper=context.parseDxfEntities(['0','SECTION','2','ENTITIES','0',
 assert.equal(anonymousPaper[0].cadLayout,'Layout1','67 paperspace requires a fallback layout name');
 assert.equal(anonymousPaper.layoutDefinitions[0].name,'Layout1');
 console.log('CAD layout checks passed: native layouts, paper entity separation, viewports, 67 fallback and DXF space roundtrip');
+
+
+// In AutoCAD, the inactive layouts are stored as *Paper_SpaceN BLOCKs.
+// Their geometry must be mapped to the LAYOUT's associated block-table handle.
+const nativePaperFixture=[
+ '0','SECTION','2','TABLES',
+ '0','TABLE','2','BLOCK_RECORD',
+ '0','BLOCK_RECORD','5','A2','2','*Paper_Space',
+ '0','BLOCK_RECORD','5','A3','2','*Paper_Space0',
+ '0','ENDTAB','0','ENDSEC',
+ '0','SECTION','2','OBJECTS',
+ '0','LAYOUT','100','AcDbPlotSettings','44','841','45','594','100','AcDbLayout','1','P-01','71','1','330','A2',
+ '0','LAYOUT','100','AcDbPlotSettings','44','594','45','420','100','AcDbLayout','1','P-03','71','3','330','A3',
+ '0','ENDSEC',
+ '0','SECTION','2','BLOCKS',
+ '0','BLOCK','2','*Paper_Space','330','A2','10','0','20','0',
+ '0','LINE','5','L1','8','MARCO','330','A2','10','0','20','0','11','841','21','0',
+ '0','VIEWPORT','5','V1','8','VPORT','330','A2','69','2','68','1','10','420','20','297','40','700','41','470','12','6','22','5','45','12','17','1','27','2',
+ '0','ENDBLK',
+ '0','BLOCK','2','*Paper_Space0','330','A3','10','0','20','0',
+ '0','TEXT','5','T1','8','CAJETIN','330','A3','10','40','20','380','40','5','1','P-03',
+ '0','LWPOLYLINE','5','P1','8','MARCO','330','A3','90','4','70','1','10','0','20','0','10','594','20','0','10','594','20','420','10','0','20','420',
+ '0','ENDBLK','0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','LINE','5','M1','8','MUROS','10','0','20','0','11','12','21','0',
+ '0','LINE','5','L1','8','MARCO','67','1','410','P-01','10','0','20','0','11','841','21','0',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const nativePaper=context.parseDxfEntities(nativePaperFixture);
+assert.equal(nativePaper.length,4,'Do not duplicate an active paper entity with the same CAD handle');
+assert.equal(nativePaper.filter(x=>x.cadLayout==='Model').length,1);
+assert.equal(nativePaper.filter(x=>x.cadLayout==='P-01').length,1);
+assert.equal(nativePaper.filter(x=>x.cadLayout==='P-03').length,2);
+assert.equal(nativePaper.find(x=>x.type==='text').text,'P-03');
+assert.deepEqual(Array.from(nativePaper.layoutDefinitions.map(x=>x.name)),['P-01','P-03']);
+assert.equal(nativePaper.layoutDefinitions[0].paperWidth,841);
+assert.equal(nativePaper.layoutDefinitions[1].paperWidth,594);
+assert.equal(nativePaper.layoutViewports.length,1,'Recover VIEWPORT embedded in Paper Space blocks');
+assert.equal(nativePaper.layoutViewports[0].layout,'P-01');
+assert.equal(nativePaper.layoutViewports[0].viewCenter.x,7);
+assert.equal(nativePaper.paperBlockRecovery.recovered,3,'Count only formerly hidden paper entities recovered from BLOCKS');
+assert.ok(nativePaper.importNotes.some(s=>s.includes('recuperadas desde BLOCKS')));
+context.objects=nativePaper;
+const nativeRoundtrip=vm.runInContext('buildDxf()',context);
+const nativeAfter=context.parseDxfEntities(nativeRoundtrip);
+assert.equal(nativeAfter.filter(x=>x.cadLayout==='Model').length,1);
+assert.equal(nativeAfter.filter(x=>x.cadLayout==='P-03').length,2);
+console.log('DXF native paper space checks passed: BLOCK_RECORD/LAYOUT handles, inactive paper blocks, viewport restoration, duplicate protection');
