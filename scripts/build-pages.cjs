@@ -15,6 +15,7 @@ const requiredFiles = [
   'editor-preview-real.jpg',
   'editor/index.html',
   'editor/editor.js',
+  'editor/civil3d.js',
   'editor/demo/vivienda.js',
   'editor/library/furnishings.js',
   'tutorial/index.html',
