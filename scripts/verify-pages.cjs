@@ -20,3 +20,12 @@ for(const page of pages){
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.webmanifest'),'utf8'));
 if(manifest.display!=='standalone')throw Error('PWA must be standalone');
 console.log('Local links, pages, assets, and PWA manifest verified');
+
+// Ensure the only advertised Android download is the current, direct .apk asset.
+const apk='https://github.com/chichoarq1212/otrocad/releases/download/android-0.5.5-test/OtroCAD-Android-0.5.5-test.apk';
+for(const page of ['index.html','descargas/index.html']){
+ const html=fs.readFileSync(path.join(root,page),'utf8');
+ if(!html.includes('href="'+apk+'"'))throw Error('Direct APK 0.5.5 link missing in '+page);
+ if(/android-hybrid-test-|OtroCAD-Android-0\.5\.4-test\.apk/.test(html))throw Error('Old APK still advertised in '+page);
+}
+console.log('Direct current APK 0.5.5 links verified in home and downloads');
