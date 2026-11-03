@@ -171,7 +171,8 @@ assert.ok(Math.abs(transformedLine.b.x-10)<1e-8&&Math.abs(transformedLine.b.y-24
 assert.ok(transformedText,'Block text should import');
 assert.ok(Math.abs(transformedText.a.x-9)<1e-8&&Math.abs(transformedText.a.y-20)<1e-8,'Block text position should be transformed');
 assert.ok(Math.abs(transformedText.textRotation-90)<1e-8,'Block text rotation should be transformed');
-assert.ok(transformedText.textHeightWorld>0.7&&transformedText.textHeightWorld<0.71,'Block text height should follow geometric scale');
+assert.ok(Math.abs(transformedText.textHeightWorld-.5)<1e-8,'Non-uniform block scale must preserve the text height along its transformed vertical axis');
+assert.ok(Math.abs(transformedText.textWidthFactor-2)<1e-8,'Non-uniform block scale must preserve the transformed text width independently');
 
 const minsertFixture=[
  '0','SECTION','2','BLOCKS',
