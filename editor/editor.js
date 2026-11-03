@@ -498,14 +498,39 @@ function modelExtentsForPaper(){
  const xs=p.map(v=>v.x),ys=p.map(v=>v.y),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
  return{center:{x:(minx+maxx)/2,y:(miny+maxy)/2},width:Math.max(maxx-minx,.001),height:Math.max(maxy-miny,.001)};
 }
+function cadLayoutScaleHint(layout){
+ const sheetText=objects.filter(o=>o.cadLayout===layout.name&&o.type==='text').map(o=>String(o.text||''));
+ for(const text of sheetText){
+  const match=text.match(/\b(?:ESCALA|ESC\.?|SCALE)\s*(?:DE\s*)?1\s*[:\/]\s*(\d+(?:[.,]\d+)?)/i);
+  if(match){const scale=Number(match[1].replace(',','.'));if(scale>=1&&scale<=10000)return {ratio:scale,source:'escala escrita en la lámina'}}
+ }
+ return null;
+}
+function modelPaperViewportEstimate(vp,layout){
+ const ext=modelExtentsForPaper(),height=Number(vp.height||0),width=Number(vp.width||0);
+ if(!(height>0&&width>0))return null;
+ const unitMm=units==='mm'?1:units==='cm'?10:1000;
+ const annotated=cadLayoutScaleHint(layout),explicit=Number(layout.plotScale)>0?Number(layout.plotScale):null;
+ const ratio=explicit||annotated?.ratio||null;
+ const viewHeight=ratio?height*ratio/unitMm:Math.max(ext.height*1.1,ext.width*height/width*1.1,.01);
+ const reportedCenter=vp.viewCenter||{x:0,y:0};
+ const hasCenter=Boolean(vp.viewCenterKnown)&&Number.isFinite(reportedCenter.x)&&Number.isFinite(reportedCenter.y);
+ return {...vp,viewCenter:hasCenter?reportedCenter:ext.center,viewHeight,estimated:true,
+  estimateSource:ratio?(explicit?'escala elegida por usuario':annotated.source):'encuadre de geometría del Modelo',
+  centerEstimated:!hasCenter,originalViewHeight:vp.viewHeight};
+}
 function effectivePaperViewports(layout){
- const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&Number.isFinite(Number(v.viewHeight))&&Number(v.viewHeight)>1e-8&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
- if(imported.length)return imported.slice(0,20);
- // Imported sheets without a recovered viewport must not display an invented model view.
- // New sheets and the explicit "Encadrar todo el modelo" option can generate a view.
+ const configured=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
+ const usable=configured.filter(v=>Number.isFinite(Number(v.viewHeight))&&Number(v.viewHeight)>1e-8);
+ if(usable.length)return usable.slice(0,20);
+ if(configured.length){
+  // This is explicitly a provisional display, not a replacement for the original CAD scale.
+  return configured.slice(0,20).map(v=>modelPaperViewportEstimate(v,layout)).filter(Boolean);
+ }
  if(layout.source!=='new'&&layout.viewportFit!=='all')return [];
  const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
- const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
+ const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);
+ const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
  return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
 }
 function describePaperLayoutState(layout,viewports){
@@ -513,7 +538,9 @@ function describePaperLayoutState(layout,viewports){
  const importedCount=layoutViewportRecords.filter(x=>x.layout===layout.name&&x.id!==1).length;
  const lines=[];
  if(layout.source!=='new'&&!viewports.length&&layout.viewportFit!=='all')
-  lines.push(importedCount?'La ventana gráfica llegó sin una altura de vista válida; no se puede calcular su escala original.':'El archivo no proporcionó un VIEWPORT utilizable para esta hoja. Revisa ⚙ Hoja o el informe de importación.');
+  lines.push(importedCount?'La ventana gráfica no incluye datos suficientes para dibujar el Modelo.':'El archivo no proporcionó un VIEWPORT utilizable para esta hoja. Revisa ⚙ Hoja o el informe de importación.');
+ const estimated=viewports.filter(v=>v.estimated);
+ if(estimated.length)lines.push('VISTA PROVISIONAL: falta la altura original del VIEWPORT. Se utilizó '+estimated[0].estimateSource+(estimated.some(v=>v.centerEstimated)?' y un centro estimado':'')+'. La escala original aún no está verificada.');
  if(layout.source!=='new'&&paperCount===0)
   lines.push('No se recuperaron entidades propias del espacio Papel para esta presentación.');
  if(layout.source!=='new'&&viewports.length&&!objects.some(x=>(x.cadLayout||'Model')==='Model'))
@@ -1423,7 +1450,7 @@ copyImportReportButton.onclick=async()=>{
  catch(error){console.warn('No se pudo copiar el diagnóstico:',error);alert(report)}
 };
 $('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas');arr.layoutDefinitions=Array.isArray(v.layouts)?v.layouts:[];arr.layoutViewports=Array.isArray(v.viewports)?v.viewports:[]}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!await protectDrawingBeforeReplacement())throw Error('Importación cancelada: conserva o descarga una copia del dibujo anterior.');pushReplacementUndo();objects=arr;layouts=clone(arr.layoutDefinitions||[]);layoutViewportRecords=clone(arr.layoutViewports||[]);activeLayout=layouts.some(l=>l.name===arr.activeCadLayout)?arr.activeCadLayout:'Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
- 'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,'Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model').length+' entidades','Presentaciones: '+(arr.layoutDefinitions||[]).map(l=>l.name+' ('+arr.filter(s=>s.cadLayout===l.name).length+' entidades)').join(', '),'Ventanas gráficas importadas: '+(arr.layoutViewports||[]).length,'Contenido de bloques Papel recuperado: '+(arr.paperBlockRecovery?.recovered||0)+' entidades', 'Pestaña original DWG: '+String(arr.activeCadLayout||'Model'),
+ 'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,'Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model').length+' entidades', 'Etiquetas de texto en Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model'&&s.type==='text').length, 'Anotaciones MULTILEADER recuperadas: '+arr.filter(s=>s.cadSourceEntity==='MLEADER').length,'Presentaciones: '+(arr.layoutDefinitions||[]).map(l=>l.name+' ('+arr.filter(s=>s.cadLayout===l.name).length+' entidades)').join(', '),'Ventanas gráficas importadas: '+(arr.layoutViewports||[]).length,'Contenido de bloques Papel recuperado: '+(arr.paperBlockRecovery?.recovered||0)+' entidades', 'Pestaña original DWG: '+String(arr.activeCadLayout||'Model'),
  'Pérdidas o incompatibilidades:',...(arr.importWarnings?.length?arr.importWarnings:['Ninguna detectada']),
  'Ajustes visuales:',...(arr.importNotes?.length?arr.importNotes:['Ninguno']),
  'Causas dentro de bloques, cotas y sombreados (sin coordenadas):',
@@ -1551,6 +1578,19 @@ function parseDxfEntities(source){
  }
  if(paperSpaceRecords.length>100000)throw Error('Presentaciones demasiado grandes (más de 100000 entidades en BLOCKS)');
  const paperRecordsForImport=[...records,{type:'SECTION',pairs:[[2,'ENTITIES']]},...paperSpaceRecords,{type:'ENDSEC',pairs:[]}];
+ const insertAttributeTags=new Map();
+ for(let i=0;i<paperRecordsForImport.length;i++){
+  const rec=paperRecordsForImport[i];
+  if((rec.type!=='INSERT'&&rec.type!=='MINSERT')||get(rec,66,0)!==1)continue;
+  const tags=new Set();
+  for(let j=i+1;j<paperRecordsForImport.length;j++){
+   const next=paperRecordsForImport[j];
+   if(next.type==='SEQEND')break;
+   if(next.type!=='ATTRIB')break;
+   tags.add(str(next,2,'').toUpperCase());
+  }
+  insertAttributeTags.set(rec,tags);
+ }
  const out=[],warnings={},notes={},diagnostics={};let inEntities=false,activeAttributeGroup=null;
  const diagnose=(scope,counts)=>{for(const [name,count] of Object.entries(counts||{})){const key=scope+' → '+name;diagnostics[key]=(diagnostics[key]||0)+count}};
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
@@ -1818,14 +1858,16 @@ function parseDxfEntities(source){
    const columns=Math.max(1,Math.round(get(r,70,1))),rows=Math.max(1,Math.round(get(r,71,1)));
    if(!geometry?.length||depth>=5||!Number.isFinite(scaleX)||!Number.isFinite(scaleY)||Math.abs(scaleX)<1e-9||Math.abs(scaleY)<1e-9||columns*rows>256){warn('INSERT no compatible omitido');continue}
    const pieces=parseBlockItems(geometry,depth),base=blockBases.get(name)||{x:0,y:0},origin={x:get(r,10),y:get(r,20)},cos=Math.cos(rotation),sin=Math.sin(rotation);
+   const linkedAttributes=get(r,66)===1,attributeTags=insertAttributeTags.get(r)||new Set();
+   const displayPieces=pieces.filter(p=>!p.cadAttributeTemplate||p.cadAttributeConstant||!attributeTags.has(String(p.cadAttributeTag||'').toUpperCase()));
    for(let row=0;row<rows;row++)for(let column=0;column<columns;column++){
     const transformPoint=p=>{const x=(p.x-base.x+column*get(r,44))*scaleX,y=(p.y-base.y+row*get(r,45))*scaleY;return{x:origin.x+x*cos-y*sin,y:origin.y+x*sin+y*cos}};
     const groupId='dxf-insert-'+depth+'-'+out.length+'-'+row+'-'+column;
-    for(const piece of pieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId,st));
+    for(const piece of displayPieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId,st));
    }
    if(columns*rows>1)note('MINSERT expandido a entidades editables');
    note('INSERT/MINSERT importado como grupo editable');
-   if(get(r,66)===1)activeAttributeGroup='dxf-insert-'+depth+'-'+(out.length-pieces.length)+'-0-0';
+   if(linkedAttributes)activeAttributeGroup='dxf-insert-'+depth+'-'+(out.length-displayPieces.length)+'-0-0';
    if(pieces.importWarnings?.length){warn('INSERT con entidades no compatibles');diagnose('INSERT '+name,pieces.importWarningCounts);diagnose('INSERT '+name,pieces.importDiagnostics)}
   }
   else if(type==='DIMENSION'){
@@ -1886,7 +1928,7 @@ function parseDxfEntities(source){
    else warn('elipses no válidas omitidas');
   }
   else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'||type==='ATTDEF'){
-   if(type==='ATTDEF'&&!(get(r,70)&2))continue; // non-constant attributes are represented by their INSERT's ATTRIB entities
+   if((type==='ATTDEF'||type==='ATTRIB')&&(get(r,70)&1))continue; // invisible CAD attributes stay hidden
    const raw=type==='MTEXT'?r.pairs.filter(p=>p[0]===3||p[0]===1).map(p=>p[1]).join(''):str(r,1,'');
    const value=type==='MTEXT'?cleanMText(raw):raw;
    if(type==='MTEXT'&&/\\(?:[AaCcFfHhQqTtWw]|p|S)/.test(raw))note('MTEXT con formato visual aproximado');
@@ -1900,8 +1942,23 @@ function parseDxfEntities(source){
    }else{
     item.isMText=true;item.mtextRaw=raw;item.mtextPlain=value;item.mtextWidthWorld=Math.max(0,get(r,41,0));item.mtextAttachment=Math.max(1,Math.min(9,Math.round(get(r,71,1))));item.mtextLineSpacingFactor=get(r,44,1);item.mtextLineSpacingStyle=get(r,73,1);
    }
-   if(type==='ATTRIB'&&activeAttributeGroup)item.groupId=activeAttributeGroup;
+   if(type==='ATTDEF'){item.cadAttributeTemplate=true;item.cadAttributeConstant=Boolean(get(r,70)&2);item.cadAttributeTag=str(r,2,'')}
+   if(type==='ATTRIB'){item.cadAttributeTag=str(r,2,'');if(activeAttributeGroup)item.groupId=activeAttributeGroup;}
    out.push(item);
+  }
+  else if(type==='MULTILEADER'||type==='MLEADER'){
+   const fragments=r.pairs.filter(([code])=>code===304).map(([,value])=>value);
+   const raw=fragments.join('');
+   const value=cleanMText(raw);
+   const positionCode=r.pairs.some(p=>p[0]===12)&&r.pairs.some(p=>p[0]===22)?12:10;
+   const loc={x:get(r,positionCode),y:get(r,positionCode+10)};
+   const height=get(r,44,0)>1e-8?get(r,44):get(r,41,0);
+   if(value.trim()&&Number.isFinite(loc.x)&&Number.isFinite(loc.y)){
+    out.push({type:'text',a:loc,text:value,isMText:true,cadSourceEntity:'MLEADER',textHeightWorld:height>1e-8?height:.25,mtextWidthWorld:Math.max(0,get(r,43,0)),mtextAttachment:get(r,171,1),mtextRaw:raw,textWidthFactor:1,textRotation:0,...st});
+    note('Texto de MULTILEADER recuperado; geometría de flecha no asociativa');
+   }else{
+    warn('MULTILEADER sin contenido MText utilizable');
+   }
   }
   else if(type==='SOLID'||type==='TRACE'||type==='3DFACE'){
    // AutoCAD SOLID/TRACE vertex order is 1-2-4-3 (not 1-2-3-4).
@@ -1922,7 +1979,7 @@ function parseDxfEntities(source){
    if(pts.length>=2)out.push({type:'poly',pts,...st});else warn('LEADER sin vértices omitida');
   }
   else if(type==='VIEWPORT'){
-    const vp={layout:st.cadLayout,center:{x:get(r,10),y:get(r,20)},width:get(r,40),height:get(r,41),viewCenter:{x:get(r,12)+get(r,17),y:get(r,22)+get(r,27)},viewHeight:get(r,45),twist:get(r,51),status:get(r,68,1),id:get(r,69)};
+    const vp={layout:st.cadLayout,center:{x:get(r,10),y:get(r,20)},width:get(r,40),height:get(r,41),viewCenter:{x:get(r,12)+get(r,17),y:get(r,22)+get(r,27)},viewHeight:get(r,45),viewCenterKnown:r.pairs.some(p=>p[0]===12&&Number.isFinite(Number(p[1])))&&r.pairs.some(p=>p[0]===22&&Number.isFinite(Number(p[1]))),twist:get(r,51),status:get(r,68,1),id:get(r,69)};
     if(vp.width>0&&vp.height>0&&(vp.id!==1||vp.viewHeight>0)){(out.layoutViewports??=[]).push(vp);note('VIEWPORT de presentación preservado para vista en papel')}
    }
   else if(type==='VERTEX'||type==='SEQEND'){}
