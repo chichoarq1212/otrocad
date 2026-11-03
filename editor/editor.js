@@ -1818,14 +1818,16 @@ function parseDxfEntities(source){
    const columns=Math.max(1,Math.round(get(r,70,1))),rows=Math.max(1,Math.round(get(r,71,1)));
    if(!geometry?.length||depth>=5||!Number.isFinite(scaleX)||!Number.isFinite(scaleY)||Math.abs(scaleX)<1e-9||Math.abs(scaleY)<1e-9||columns*rows>256){warn('INSERT no compatible omitido');continue}
    const pieces=parseBlockItems(geometry,depth),base=blockBases.get(name)||{x:0,y:0},origin={x:get(r,10),y:get(r,20)},cos=Math.cos(rotation),sin=Math.sin(rotation);
+   const linkedAttributes=get(r,66)===1;
+   const displayPieces=linkedAttributes?pieces.filter(p=>!p.cadAttributeTemplate||p.cadAttributeConstant):pieces;
    for(let row=0;row<rows;row++)for(let column=0;column<columns;column++){
     const transformPoint=p=>{const x=(p.x-base.x+column*get(r,44))*scaleX,y=(p.y-base.y+row*get(r,45))*scaleY;return{x:origin.x+x*cos-y*sin,y:origin.y+x*sin+y*cos}};
     const groupId='dxf-insert-'+depth+'-'+out.length+'-'+row+'-'+column;
-    for(const piece of pieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId,st));
+    for(const piece of displayPieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId,st));
    }
    if(columns*rows>1)note('MINSERT expandido a entidades editables');
    note('INSERT/MINSERT importado como grupo editable');
-   if(get(r,66)===1)activeAttributeGroup='dxf-insert-'+depth+'-'+(out.length-pieces.length)+'-0-0';
+   if(linkedAttributes)activeAttributeGroup='dxf-insert-'+depth+'-'+(out.length-displayPieces.length)+'-0-0';
    if(pieces.importWarnings?.length){warn('INSERT con entidades no compatibles');diagnose('INSERT '+name,pieces.importWarningCounts);diagnose('INSERT '+name,pieces.importDiagnostics)}
   }
   else if(type==='DIMENSION'){
@@ -1886,7 +1888,7 @@ function parseDxfEntities(source){
    else warn('elipses no válidas omitidas');
   }
   else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'||type==='ATTDEF'){
-   if(type==='ATTDEF'&&!(get(r,70)&2))continue; // non-constant attributes are represented by their INSERT's ATTRIB entities
+   if(type==='ATTDEF'&&(get(r,70)&1))continue; // invisible attribute definitions stay hidden
    const raw=type==='MTEXT'?r.pairs.filter(p=>p[0]===3||p[0]===1).map(p=>p[1]).join(''):str(r,1,'');
    const value=type==='MTEXT'?cleanMText(raw):raw;
    if(type==='MTEXT'&&/\\(?:[AaCcFfHhQqTtWw]|p|S)/.test(raw))note('MTEXT con formato visual aproximado');
@@ -1900,7 +1902,8 @@ function parseDxfEntities(source){
    }else{
     item.isMText=true;item.mtextRaw=raw;item.mtextPlain=value;item.mtextWidthWorld=Math.max(0,get(r,41,0));item.mtextAttachment=Math.max(1,Math.min(9,Math.round(get(r,71,1))));item.mtextLineSpacingFactor=get(r,44,1);item.mtextLineSpacingStyle=get(r,73,1);
    }
-   if(type==='ATTRIB'&&activeAttributeGroup)item.groupId=activeAttributeGroup;
+   if(type==='ATTDEF'){item.cadAttributeTemplate=true;item.cadAttributeConstant=Boolean(get(r,70)&2);item.cadAttributeTag=str(r,2,'')}
+   if(type==='ATTRIB'){item.cadAttributeTag=str(r,2,'');if(activeAttributeGroup)item.groupId=activeAttributeGroup;}
    out.push(item);
   }
   else if(type==='SOLID'||type==='TRACE'||type==='3DFACE'){
