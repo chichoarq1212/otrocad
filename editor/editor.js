@@ -1336,9 +1336,14 @@ function parseDxfEntities(source){
    out.push(item);
   }
   else if(type==='SOLID'||type==='TRACE'||type==='3DFACE'){
-   const pts=[10,11,12,13].filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10)}));
-   while(pts.length>3&&distance(pts[pts.length-1],pts[pts.length-2])<1e-9)pts.pop();
-   if(pts.length>=3)out.push({type:'polygon',pts,...st});else warn(type+' no compatible omitido');
+   // AutoCAD SOLID/TRACE vertex order is 1-2-4-3 (not 1-2-3-4).
+   // The previous outline-only import lost the opaque gray areas of many floor plans.
+   const order=type==='3DFACE'?[10,11,12,13]:[10,11,13,12];
+   const pts=order.filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10)}));
+   while(pts.length>3&&distance(pts.at(-1),pts.at(-2))<1e-9)pts.pop();
+   if(pts.length>=3)out.push({type:'polygon',pts,solidFill:true,importedHatch:true,...st});
+   else warn(type+' no compatible omitido');
+   if(type==='3DFACE')note('3DFACE proyectada a relleno 2D');
   }
   else if(type==='SPLINE'){
    const fitX=all(r,11),fitY=all(r,21),controlX=all(r,10),controlY=all(r,20),xs=fitX.length>=2?fitX:controlX,ys=fitY.length>=2?fitY:controlY,pts=xs.map((x,i)=>({x,y:ys[i]??0}));
