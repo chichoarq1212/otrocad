@@ -29,6 +29,81 @@ let storageWarningShown=false;
 function storageWarning(){if(!storageWarningShown){storageWarningShown=true;alert('No se pudo guardar la copia local. Descarga una copia del proyecto y comprueba el espacio o los permisos del navegador.')}}
 function backupPrevious(){try{localStorage.setItem('otrocad-drawing-previous',JSON.stringify({shapes:objects,units,layouts:typeof layouts==='undefined'?[]:layouts,viewports:typeof layoutViewportRecords==='undefined'?[]:layoutViewportRecords,activeLayout:typeof activeLayout==='undefined'?'Model':activeLayout}));return true}catch(e){storageWarning();return false}}
 function checkpoint(){const backedUp=backupPrevious();undo.push(clone(objects));if(undo.length>100)undo.shift();redo=[];return backedUp}
+
+function cadRecoverySnapshot(){
+ return {version:3,savedAt:Date.now(),shapes:objects,units,layouts,viewports:layoutViewportRecords,activeLayout};
+}
+function cadRecoveryDatabase(){
+ return new Promise((resolve,reject)=>{
+  if(typeof indexedDB==='undefined'){reject(new Error('IndexedDB no disponible'));return}
+  let request;
+  try{request=indexedDB.open('OtroCADRecovery',1)}catch(error){reject(error);return}
+  request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('snapshots'))request.result.createObjectStore('snapshots')};
+  request.onerror=()=>reject(request.error||new Error('No se pudo abrir IndexedDB'));
+  request.onsuccess=()=>resolve(request.result);
+ });
+}
+async function cadRecoveryWrite(key,value){
+ const db=await cadRecoveryDatabase();
+ try{await new Promise((resolve,reject)=>{
+  const txn=db.transaction('snapshots','readwrite');
+  txn.oncomplete=()=>resolve();
+  txn.onerror=()=>reject(txn.error||new Error('No se pudo guardar en IndexedDB'));
+  txn.onabort=()=>reject(txn.error||new Error('Se canceló el respaldo'));
+  try{txn.objectStore('snapshots').put(value,key)}catch(error){reject(error)}
+ })}finally{db.close()}
+}
+async function cadRecoveryRead(key){
+ const db=await cadRecoveryDatabase();
+ try{return await new Promise((resolve,reject)=>{
+  const txn=db.transaction('snapshots','readonly');
+  const req=txn.objectStore('snapshots').get(key);
+  req.onsuccess=()=>resolve(req.result||null);
+  req.onerror=()=>reject(req.error||new Error('No se pudo recuperar el respaldo'));
+  txn.onabort=()=>reject(txn.error||new Error('Se canceló la lectura'));
+ })}finally{db.close()}
+}
+function cadRecoveryRestoreCandidate(record){
+ if(typeof record==='string'){try{record=JSON.parse(record)}catch(error){return null}}
+ if(Array.isArray(record))return {shapes:record,savedAt:0};
+ return record&&Array.isArray(record.shapes)?record:null;
+}
+async function protectDrawingBeforeReplacement(){
+ if(!objects.length&&!layouts.length&&!layoutViewportRecords.length)return true;
+ const snapshot=cadRecoverySnapshot();
+ let text;
+ try{text=JSON.stringify(snapshot)}catch(error){alert('No se pudo preparar la copia del dibujo actual. No se cambió nada.');return false}
+ let backedUpLocally=false;
+ try{
+  localStorage.setItem('otrocad-drawing-previous',text);
+  backedUpLocally=true;
+ }catch(error){console.warn('Respaldo en localStorage no disponible; probando IndexedDB:',error)}
+ // Keep a separate durable recovery point so a subsequent Undo checkpoint
+ // on the new drawing cannot overwrite the prior imported project.
+ try{
+  await cadRecoveryWrite('previous',snapshot);
+  status.textContent='Dibujo anterior protegido en almacenamiento ampliado del navegador';
+  return true;
+ }catch(error){console.warn('No se pudo guardar una segunda copia en IndexedDB:',error)}
+ if(backedUpLocally)return true;
+ // A download plus explicit acknowledgement is the last resort; never silently discard a plan.
+ try{
+  await download('otrocad-respaldo-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json',text,'application/json');
+ }catch(error){alert('El navegador no permite guardar una copia. Se conservará el dibujo actual.');return false}
+ return confirm('El navegador no tiene espacio para guardar otra copia local. Se ha solicitado descargar el archivo de respaldo OtroCAD.\n\nComprueba que el archivo .json aparece en Descargas antes de continuar.\n\n¿Confirmas que ya guardaste el respaldo y deseas continuar?');
+}
+function pushReplacementUndo(){
+ undo.push(clone(objects));if(undo.length>100)undo.shift();redo=[];
+}
+async function cadReadLastBackup(){
+ let fromLocal=null,fromDatabase=null;
+ try{fromLocal=cadRecoveryRestoreCandidate(localStorage.getItem('otrocad-drawing-previous'))}catch(error){console.warn('No se pudo leer respaldo local:',error)}
+ try{fromDatabase=cadRecoveryRestoreCandidate(await cadRecoveryRead('previous'))}catch(error){console.warn('No se pudo leer respaldo ampliado:',error)}
+ if(!fromDatabase)return fromLocal;
+ if(!fromLocal)return fromDatabase;
+ return Number(fromDatabase.savedAt||0)>Number(fromLocal.savedAt||0)?fromDatabase:fromLocal;
+}
+
 function selectedItems(){const out=new Set(selectedSet);if(selected>=0)out.add(selected);return [...out].filter(i=>i>=0&&i<objects.length).sort((a,b)=>a-b)}
 function applySelection(indices,additive=false){const next=additive?new Set(selectedItems()):new Set(),groups=new Set();for(const i of indices)if(i>=0&&i<objects.length){next.add(i);if(objects[i]?.groupId)groups.add(objects[i].groupId)}if(groups.size)objects.forEach((o,j)=>{if(groups.has(o.groupId)&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer))next.add(j)});selectedSet=next;selected=next.size?[...next].sort((a,b)=>a-b).at(-1):-1}
 function clearSelection(){selected=-1;selectedSet.clear()}
@@ -1303,10 +1378,30 @@ $('#finish-poly').onclick=finishPoly;
 $('#acceptPoint').onclick=()=>{const q=pointFromInputs();if(!q)return;if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)};
 $('#undo').onclick=()=>{if(undo.length){backupPrevious();redo.push(clone(objects));objects=undo.pop();clearSelection();save();render()}};
 $('#redo').onclick=()=>{if(redo.length){backupPrevious();undo.push(clone(objects));objects=redo.pop();clearSelection();save();render()}};
-$('#newDrawing').onclick=()=>{if(objects.length&&!confirm('¿Crear un dibujo nuevo? El dibujo actual será reemplazado. Descarga una copia antes si deseas conservarlo.'))return;if(!checkpoint()&&objects.length){alert('No se creó el dibujo nuevo porque no se pudo conservar la copia anterior.');return}objects=[];layouts=[];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;clearSelection();saveLayoutState();refreshLayoutTabs();save();render();status.textContent='Nuevo dibujo creado'};
+$('#newDrawing').onclick=async()=>{
+ if((objects.length||layouts.length||layoutViewportRecords.length)&&!confirm('¿Crear un dibujo nuevo? Primero se conservará una copia recuperable del dibujo actual.'))return;
+ if(!await protectDrawingBeforeReplacement()){status.textContent='Nuevo dibujo cancelado: el plano original no se modificó';return}
+ pushReplacementUndo();objects=[];layouts=[];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;
+ clearSelection();start=null;temp=null;poly=[];arcPoints=[];modifyTarget=-1;modifyTargets=[];drag=null;selectionStart=null;selectionBox=null;
+ offset={x:0,y:0};zoom=35;lastConvertedDxf=null;lastImportReport=[];
+ saveLayoutState();refreshLayoutTabs();const stored=save();render();
+ status.textContent=stored?'Dibujo nuevo creado · plano anterior respaldado':'Dibujo nuevo creado · comprueba el almacenamiento antes de salir';
+};
 $('#save').onclick=()=>{if(save())status.textContent='Copia local guardada en este navegador'};
-$('#recover').onclick=()=>{let previous;try{previous=JSON.parse(localStorage.getItem('otrocad-drawing-previous')||'null')}catch(e){alert('No se puede leer la copia anterior.');return}const shapes=Array.isArray(previous)?previous:previous?.shapes;if(!Array.isArray(shapes)){alert('No hay una copia anterior disponible en este navegador.');return}if(!confirm('¿Recuperar la copia anterior? El dibujo actual pasará a ser la copia anterior.'))return;if(!checkpoint()&&objects.length){alert('No se recuperó la copia porque no se pudo conservar el dibujo actual.');return}objects=shapes;if(['m','cm','mm'].includes(previous?.units))units=previous.units;layouts=Array.isArray(previous?.layouts)?previous.layouts:[];layoutViewportRecords=Array.isArray(previous?.viewports)?previous.viewports:[];activeLayout=typeof previous?.activeLayout==='string'&&layouts.some(l=>l.name===previous.activeLayout)?previous.activeLayout:'Model';clearSelection();saveLayoutState();refreshLayoutTabs();if(save())status.textContent='Copia anterior recuperada';render()};
-$('#demoHouse').onclick=async()=>{if(objects.length&&!confirm('¿Abrir la vivienda de demostración? Se conservará una copia anterior en este navegador.'))return;try{const demo=clone(window.otroCadDemo);if(!Array.isArray(demo.shapes)||!demo.shapes.length)throw Error('La demostración está vacía.');if(!checkpoint()&&objects.length)throw Error('No se abrió el ejemplo porque no se pudo conservar el dibujo anterior.');objects=demo.shapes;units='m';layouts=[];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();clearSelection();save();$('#fit').click();status.textContent='Vivienda de demostración · '+objects.length+' entidades editables'}catch(e){alert('No se pudo abrir la demostración: '+e.message)}};
+$('#recover').onclick=async()=>{
+ const previous=await cadReadLastBackup();
+ if(!previous){alert('No hay una copia anterior disponible en el navegador.');return}
+ if(!confirm('¿Recuperar la copia anterior? Se protegerá primero el dibujo que tienes abierto.'))return;
+ if(!await protectDrawingBeforeReplacement())return;
+ pushReplacementUndo();objects=clone(previous.shapes);
+ if(['m','cm','mm'].includes(previous.units))units=previous.units;
+ layouts=clone(Array.isArray(previous.layouts)?previous.layouts:[]);
+ layoutViewportRecords=clone(Array.isArray(previous.viewports)?previous.viewports:[]);
+ activeLayout=layouts.some(l=>l.name===previous.activeLayout)?previous.activeLayout:'Model';
+ clearSelection();saveLayoutState();refreshLayoutTabs();const stored=save();render();
+ status.textContent=stored?'Copia anterior recuperada':'Copia recuperada · almacenamiento local pendiente';
+};
+$('#demoHouse').onclick=async()=>{if(objects.length&&!confirm('¿Abrir la vivienda de demostración? Primero se protegerá el dibujo actual.'))return;try{const demo=clone(window.otroCadDemo);if(!Array.isArray(demo.shapes)||!demo.shapes.length)throw Error('La demostración está vacía.');if(!await protectDrawingBeforeReplacement())return;pushReplacementUndo();objects=demo.shapes;units='m';layouts=[];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();clearSelection();save();$('#fit').click();status.textContent='Vivienda de demostración · '+objects.length+' entidades editables'}catch(e){alert('No se pudo abrir la demostración: '+e.message)}};
 $('#open').onclick=()=>$('#file').click();
 let dwgRuntimePromise=null;
 async function getDwgRuntime(){
@@ -1327,7 +1422,7 @@ copyImportReportButton.onclick=async()=>{
  try{await navigator.clipboard.writeText(report);status.textContent='Diagnóstico CAD copiado. Puedes pegarlo en el chat.'}
  catch(error){console.warn('No se pudo copiar el diagnóstico:',error);alert(report)}
 };
-$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas');arr.layoutDefinitions=Array.isArray(v.layouts)?v.layouts:[];arr.layoutViewports=Array.isArray(v.viewports)?v.viewports:[]}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;layouts=clone(arr.layoutDefinitions||[]);layoutViewportRecords=clone(arr.layoutViewports||[]);activeLayout=layouts.some(l=>l.name===arr.activeCadLayout)?arr.activeCadLayout:'Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
+$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas');arr.layoutDefinitions=Array.isArray(v.layouts)?v.layouts:[];arr.layoutViewports=Array.isArray(v.viewports)?v.viewports:[]}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!await protectDrawingBeforeReplacement())throw Error('Importación cancelada: conserva o descarga una copia del dibujo anterior.');pushReplacementUndo();objects=arr;layouts=clone(arr.layoutDefinitions||[]);layoutViewportRecords=clone(arr.layoutViewports||[]);activeLayout=layouts.some(l=>l.name===arr.activeCadLayout)?arr.activeCadLayout:'Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
  'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,'Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model').length+' entidades','Presentaciones: '+(arr.layoutDefinitions||[]).map(l=>l.name+' ('+arr.filter(s=>s.cadLayout===l.name).length+' entidades)').join(', '),'Ventanas gráficas importadas: '+(arr.layoutViewports||[]).length,'Contenido de bloques Papel recuperado: '+(arr.paperBlockRecovery?.recovered||0)+' entidades', 'Pestaña original DWG: '+String(arr.activeCadLayout||'Model'),
  'Pérdidas o incompatibilidades:',...(arr.importWarnings?.length?arr.importWarnings:['Ninguna detectada']),
  'Ajustes visuales:',...(arr.importNotes?.length?arr.importNotes:['Ninguno']),
@@ -1971,7 +2066,7 @@ $('#newLayer').onclick=()=>{const name=prompt('Nombre de la nueva capa');if(name
 $('#layerColor').onclick=()=>{const c=prompt('Color HEX (ej. #62b8e8)',colors[$('#layer').value]||'#62b8e8');if(c&&/^#[0-9a-f]{6}$/i.test(c)){colors[$('#layer').value]=c;$('#drawColor').value=c}};
 $('#layerVisibility').onclick=()=>{const l=$('#layer').value;if(hiddenLayers.has(l)){hiddenLayers.delete(l);$('#layerVisibility').textContent='Ocultar capa';status.textContent='Capa '+l+' visible'}else{hiddenLayers.add(l);$('#layerVisibility').textContent='Mostrar capa';status.textContent='Capa '+l+' oculta';applySelection(selectedItems().filter(i=>objects[i]?.layer!==l))}render()};
 $('#layerLock').onclick=()=>{const l=$('#layer').value;if(lockedLayers.has(l)){lockedLayers.delete(l);$('#layerLock').textContent='Bloquear capa';status.textContent='Capa '+l+' desbloqueada'}else{lockedLayers.add(l);$('#layerLock').textContent='Desbloquear capa';status.textContent='Capa '+l+' bloqueada';applySelection(selectedItems().filter(i=>objects[i]?.layer!==l))}render()};
-$('#erase').onclick=()=>{if(selectedItems().length)deleteSelection();else if(confirm('¿Borrar todo el dibujo?')){checkpoint();objects=[];clearSelection();save();render()}};
+$('#erase').onclick=async()=>{if(selectedItems().length){deleteSelection();return}if(!confirm('¿Borrar todo el dibujo? Primero se guardará una copia recuperable.'))return;if(!await protectDrawingBeforeReplacement())return;pushReplacementUndo();objects=[];clearSelection();save();render()};
 try{const saved=JSON.parse(localStorage.getItem('otrocad-drawing')||'[]');if(Array.isArray(saved))objects=saved}catch(e){}
 try{const sheet=JSON.parse(localStorage.getItem('otrocad-layout-state')||'{}');
  if(Array.isArray(sheet.layouts))layouts=sheet.layouts;if(Array.isArray(sheet.viewports))layoutViewportRecords=sheet.viewports;

@@ -657,3 +657,63 @@ assert.equal(vm.runInContext("effectivePaperViewports({name:'P-03',source:'impor
 paperPreviewScope.layoutViewportRecords[0].viewHeight=18;
 assert.equal(vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420}).length",paperPreviewScope),1,'Valid imported viewports must retain their real view height');
 console.log('Paper viewport checks passed: invalid scale rejected, imported scale preserved');
+
+
+// Regression: localStorage quota must not prevent NEW when IndexedDB can retain the old drawing.
+(async()=>{
+ const fallback={
+  objects:[{type:'line',a:{x:0,y:0},b:{x:4,y:0}}],layouts:[{name:'P-01'}],
+  layoutViewportRecords:[],activeLayout:'P-01',units:'m',status:{textContent:''},
+  localStorage:{setItem(){throw Error('QuotaExceededError')}},console:{warn(){}},
+  cadRecoverySnapshot(){return {shapes:fallback.objects,layouts:fallback.layouts,savedAt:5}},
+  cadRecoveryWrite:async(key,snapshot)=>{fallback.savedKey=key;fallback.savedDrawing=snapshot},
+  download:async()=>{throw Error('No debe descargar si IndexedDB guarda la copia')},
+  confirm:()=>true,alert(){throw Error('No debe bloquear mediante alert')},savedKey:null
+ };
+ vm.createContext(fallback);
+ vm.runInContext(source.slice(source.indexOf('async function protectDrawingBeforeReplacement(){'),source.indexOf('function pushReplacementUndo(){')),fallback);
+ assert.equal(await vm.runInContext('protectDrawingBeforeReplacement()',fallback),true);
+ assert.equal(fallback.savedKey,'previous');
+ assert.equal(fallback.savedDrawing.shapes[0].b.x,4);
+ assert.equal(fallback.savedDrawing.layouts[0].name,'P-01');
+
+ let approve=false,requestedDownload=null;
+ const noDb={
+  objects:[{type:'line',a:{x:0,y:0},b:{x:7,y:0}}],layouts:[],
+  layoutViewportRecords:[],activeLayout:'Model',units:'m',status:{textContent:''},
+  localStorage:{setItem(){throw Error('quota')}},console:{warn(){}},
+  cadRecoverySnapshot(){return {shapes:noDb.objects,savedAt:10}},
+  cadRecoveryWrite:async()=>{throw Error('IndexedDB unavailable')},
+  download:async(name,content)=>{requestedDownload={name,content}},
+  confirm:()=>approve,alert(){throw Error('Debe ofrecer descarga')}
+ };
+ vm.createContext(noDb);
+ vm.runInContext(source.slice(source.indexOf('async function protectDrawingBeforeReplacement(){'),source.indexOf('function pushReplacementUndo(){')),noDb);
+ assert.equal(await vm.runInContext('protectDrawingBeforeReplacement()',noDb),false,'No borrar sin confirmar que se descargó el respaldo');
+ assert.match(requestedDownload.name,/otrocad-respaldo.*\.json/);
+ assert.equal(JSON.parse(requestedDownload.content).shapes[0].b.x,7);
+ approve=true;
+ assert.equal(await vm.runInContext('protectDrawingBeforeReplacement()',noDb),true);
+
+ let approvedSafety=false;const buttons={};
+ const newScope={
+  objects:[{type:'line',a:{x:0,y:0},b:{x:8,y:0}}],layouts:[{name:'P-03'}],layoutViewportRecords:[{id:2}],activeLayout:'P-03',hideModelAnnotations:true,
+  undo:[],redo:[],clone:x=>JSON.parse(JSON.stringify(x)),clearSelection(){},saveLayoutState(){},
+  refreshLayoutTabs(){},render(){},save:()=>true,status:{textContent:''},offset:{x:10,y:-10},zoom:3,
+  confirm:()=>true,protectDrawingBeforeReplacement:async()=>approvedSafety,
+  $:key=>(buttons[key] ||= {}),selectionStart:null,selectionBox:null,selected:0,poly:[],arcPoints:[],
+  modifyTargets:[],lastImportReport:['previo'],lastConvertedDxf:'data',pushReplacementUndo:()=>newScope.undo.push(JSON.parse(JSON.stringify(newScope.objects)))
+ };
+ vm.createContext(newScope);
+ vm.runInContext(source.slice(source.indexOf("$('#newDrawing').onclick="),source.indexOf("\n$('#save').onclick=")),newScope);
+ await buttons['#newDrawing'].onclick();
+ assert.equal(newScope.objects.length,1,'No reemplazar dibujo si no hay respaldo');
+ approvedSafety=true;
+ await buttons['#newDrawing'].onclick();
+ assert.equal(newScope.objects.length,0,'Nuevo dibujo abre lienzo vacío');
+ assert.equal(newScope.layouts.length,0,'Nuevo dibujo limpia los layouts activos');
+ assert.equal(newScope.undo.length,1,'El cambio sigue siendo reversible en memoria');
+ assert.equal(newScope.undo[0][0].b.x,8);
+ assert.equal(newScope.status.textContent,'Dibujo nuevo creado · plano anterior respaldado');
+ console.log('New drawing checks passed: IndexedDB, download, cancellation and reset');
+})().catch(error=>{console.error(error);process.exitCode=1});
