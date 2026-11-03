@@ -230,7 +230,7 @@ function drawEntity(s,sel=false,preview=false){
   const oblique=Math.max(-80,Math.min(80,Number(s.textObliqueAngle||0)))*Math.PI/180,flags=Number(s.textGenerationFlags||0);
   const horizontal=Number(s.textHorizontalAlignment||0),vertical=Number(s.textVerticalAlignment||0);let renderWidthFactor=widthFactor;
   if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=ctx.measureText(value).width*renderWidthFactor,target=Number(s.textFitWidthWorld)*zoom;if(natural>0)renderWidthFactor*=target/natural}
-  const anchor=(!mtext&&(horizontal||vertical)&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
+  const anchor=(!mtext&&(horizontal||vertical)&&horizontal!==3&&horizontal!==5&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
   ctx.translate(anchor.x,anchor.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);
   ctx.transform(renderWidthFactor*(flags&2?-1:1),0,Math.tan(oblique),flags&4?-1:1,0,0);
   const lineHeight=size*1.2*(Number(s.mtextLineSpacingFactor)>0?Math.max(.5,Math.min(4,Number(s.mtextLineSpacingFactor))):1);
