@@ -1354,10 +1354,22 @@ function parseDxfEntities(source){
  };
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
+ const blockNameToHandle=new Map(),handleToLayout=new Map();let inBtrTable=false,inTablesSection=false;
+ for(const record of records){
+  if(record.type==='SECTION'){inTablesSection=str(record,2).toUpperCase()==='TABLES';continue}
+  if(record.type==='ENDSEC'){inTablesSection=false;inBtrTable=false;continue}
+  if(!inTablesSection)continue;
+  if(record.type==='TABLE'){inBtrTable=str(record,2).toUpperCase()==='BLOCK_RECORD';continue}
+  if(record.type==='ENDTAB'){inBtrTable=false;continue}
+  if(inBtrTable&&record.type==='BLOCK_RECORD'){
+   const h=str(record,5,'').trim().toUpperCase(),name=str(record,2,'').toUpperCase();
+   if(h&&name)blockNameToHandle.set(name,h);
+  }
+ }
  const importedLayouts=[];
  for(const record of records){
   if(record.type!=='LAYOUT')continue;
-  let part='',name='',width=0,height=0,margin=8,tabOrder=1;
+  let part='',name='',width=0,height=0,margin=8,tabOrder=1,blockHandle='';
   for(const [code,value] of record.pairs){
    if(code===100){part=value;continue}
    if(part==='AcDbPlotSettings'){
@@ -1368,16 +1380,33 @@ function parseDxfEntities(source){
    if(part==='AcDbLayout'){
     if(code===1)name=String(value).trim();
     if(code===71)tabOrder=Number(value);
+    if(code===330)blockHandle=String(value).trim().toUpperCase();
    }
   }
   if(name&&name.toLowerCase()!=='model'){
-   importedLayouts.push({name,paperWidth:Number.isFinite(width)&&width>0?width:420,paperHeight:Number.isFinite(height)&&height>0?height:297,margin:Number.isFinite(margin)?margin:8,tabOrder:Number.isFinite(tabOrder)?tabOrder:1,source:'imported'});
+   if(blockHandle)handleToLayout.set(blockHandle,name);
+   importedLayouts.push({name,blockHandle,paperWidth:Number.isFinite(width)&&width>0?width:420,paperHeight:Number.isFinite(height)&&height>0?height:297,margin:Number.isFinite(margin)?margin:8,tabOrder:Number.isFinite(tabOrder)?tabOrder:1,source:'imported'});
   }
  }
+ const paperBlockToLayout=new Map(),unknownPaperBlocks=[];
+ for(const [blockName] of blockRecords){
+  if(!/^\*PAPER_SPACE(?:\d+)?$/i.test(blockName))continue;
+  const blockHandle=blockNameToHandle.get(blockName)||'',layoutName=handleToLayout.get(blockHandle);
+  if(layoutName)paperBlockToLayout.set(blockName,layoutName);else unknownPaperBlocks.push(blockName);
+ }
+ const unmatchedLayouts=importedLayouts.filter(l=>![...paperBlockToLayout.values()].includes(l.name));
+ for(const blockName of unknownPaperBlocks){
+  const suffix=blockName.replace(/^\*PAPER_SPACE/i,'');
+  const name=unknownPaperBlocks.length===1&&unmatchedLayouts.length===1?unmatchedLayouts[0].name:(suffix?'Papel recuperado '+suffix:'Papel recuperado');
+  paperBlockToLayout.set(blockName,name);
+ }
+ const activePaperLayout=paperBlockToLayout.get('*PAPER_SPACE')||(importedLayouts.length===1?importedLayouts[0].name:'Papel sin asociación');
  const entitySpace=r=>{
   const name=str(r,410,'').trim();
   if(name)return name.toLowerCase()==='model'?'Model':name;
-  return get(r,67,0)===1?'Layout1':'Model';
+  const owner=str(r,330,'').toUpperCase();
+  if(handleToLayout.has(owner))return handleToLayout.get(owner);
+  return get(r,67,0)===1?activePaperLayout:'Model';
  };
  const out=[],warnings={},notes={},diagnostics={};let inEntities=false,activeAttributeGroup=null;
  const diagnose=(scope,counts)=>{for(const [name,count] of Object.entries(counts||{})){const key=scope+' → '+name;diagnostics[key]=(diagnostics[key]||0)+count}};
