@@ -226,16 +226,18 @@ function drawEntity(s,sel=false,preview=false){
   const fontFile=String(s.textFontFile||'txt.shx'),fontFamily=s.textFontFamily||cadFontFamilyFromFile(fontFile);
   const fontBold=Boolean(s.textFontBold)||/(?:bd|bold)/i.test(fontFile),fontItalic=Boolean(s.textFontItalic)||/(?:italic|oblique)/i.test(fontFile);
   ctx.font=(fontBold?'bold ':'')+(fontItalic?'italic ':'')+size+'px '+fontFamily;
-  const value=String(s.text||'Texto'),mtext=Number(s.mtextWidthWorld||0)>0,widthFactor=Math.max(.05,Math.min(20,Number(s.textWidthFactor)||1));
+  const value=String(s.text||'Texto'),mtext=Boolean(s.isMText)||Number(s.mtextWidthWorld||0)>0,widthFactor=Math.max(.05,Math.min(20,Number(s.textWidthFactor)||1));
   const oblique=Math.max(-80,Math.min(80,Number(s.textObliqueAngle||0)))*Math.PI/180,flags=Number(s.textGenerationFlags||0);
-  const horizontal=Number(s.textHorizontalAlignment||0),vertical=Number(s.textVerticalAlignment||0);
+  const horizontal=Number(s.textHorizontalAlignment||0),vertical=Number(s.textVerticalAlignment||0);let renderWidthFactor=widthFactor;
+  if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=ctx.measureText(value).width*renderWidthFactor,target=Number(s.textFitWidthWorld)*zoom;if(natural>0)renderWidthFactor*=target/natural}
   const anchor=(!mtext&&(horizontal||vertical)&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
   ctx.translate(anchor.x,anchor.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);
-  ctx.transform(widthFactor*(flags&2?-1:1),0,Math.tan(oblique),flags&4?-1:1,0,0);
+  ctx.transform(renderWidthFactor*(flags&2?-1:1),0,Math.tan(oblique),flags&4?-1:1,0,0);
   const lineHeight=size*1.2*(Number(s.mtextLineSpacingFactor)>0?Math.max(.5,Math.min(4,Number(s.mtextLineSpacingFactor))):1);
   if(mtext){
-   const boxWidth=Number(s.mtextWidthWorld)*zoom/widthFactor;
-   const lines=wrapCadTextLines(value,boxWidth,t=>ctx.measureText(t).width);
+   const requestedWidth=Number(s.mtextWidthWorld||0)*zoom/widthFactor;
+   const lines=requestedWidth>0?wrapCadTextLines(value,requestedWidth,t=>ctx.measureText(t).width):value.split('\n');
+   const boxWidth=requestedWidth>0?requestedWidth:Math.max(0,...lines.map(line=>ctx.measureText(line).width));
    const attachment=Math.max(1,Math.min(9,Math.round(Number(s.mtextAttachment||1)))),column=(attachment-1)%3,row=Math.floor((attachment-1)/3);
    ctx.textAlign=column===0?'left':column===1?'center':'right';ctx.textBaseline='top';
    const x=column===0?0:column===1?boxWidth/2:boxWidth,totalHeight=lines.length*lineHeight,y=row===0?0:row===1?-totalHeight/2:-totalHeight;
@@ -1401,12 +1403,12 @@ function parseDxfEntities(source){
    const styleName=str(r,7,'STANDARD')||'STANDARD',textStyle=textStyles.get(styleName.toUpperCase())||{name:styleName,fontFile:'txt.shx',bigFontFile:'',fixedHeight:0,widthFactor:1,obliqueAngle:0,generationFlags:0,lastHeight:0};
    const entityHeight=get(r,40,0),height=entityHeight>1e-9?entityHeight:(textStyle.fixedHeight>1e-9?textStyle.fixedHeight:.4);
    const vx=get(r,11,1),vy=get(r,21,0),rotation=r.pairs.some(p=>p[0]===50)?get(r,50):(type==='MTEXT'?Math.atan2(vy,vx)*180/Math.PI:0);
-   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:height,textStyleName:styleName,textFontFile:textStyle.fontFile,textBigFontFile:textStyle.bigFontFile,textFontFamily:cadFontFamilyFromFile(textStyle.fontFile),textFontBold:/(?:bd|bold)/i.test(textStyle.fontFile),textFontItalic:/(?:italic|oblique)/i.test(textStyle.fontFile),textWidthFactor:type==='MTEXT'?textStyle.widthFactor:(get(r,41,textStyle.widthFactor)||textStyle.widthFactor),textObliqueAngle:type==='MTEXT'?textStyle.obliqueAngle:get(r,51,textStyle.obliqueAngle),textGenerationFlags:textStyle.generationFlags,textStyleFixedHeight:textStyle.fixedHeight,textStyleWidthFactor:textStyle.widthFactor,textStyleObliqueAngle:textStyle.obliqueAngle,...st};
+   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:height,textStyleName:styleName,textFontFile:textStyle.fontFile,textBigFontFile:textStyle.bigFontFile,textFontFamily:cadFontFamilyFromFile(textStyle.fontFile),textFontBold:/(?:bd|bold)/i.test(textStyle.fontFile),textFontItalic:/(?:italic|oblique)/i.test(textStyle.fontFile),textWidthFactor:type==='MTEXT'?textStyle.widthFactor:(get(r,41,textStyle.widthFactor)||textStyle.widthFactor),textObliqueAngle:type==='MTEXT'?textStyle.obliqueAngle:get(r,51,textStyle.obliqueAngle),textGenerationFlags:type==='MTEXT'?textStyle.generationFlags:get(r,71,textStyle.generationFlags),textStyleGenerationFlags:textStyle.generationFlags,textStyleFixedHeight:textStyle.fixedHeight,textStyleWidthFactor:textStyle.widthFactor,textStyleObliqueAngle:textStyle.obliqueAngle,...st};
    if(type!=='MTEXT'){
     item.textHorizontalAlignment=get(r,72,0);item.textVerticalAlignment=get(r,73,0);
     if(r.pairs.some(p=>p[0]===11)&&r.pairs.some(p=>p[0]===21)){item.textAlignmentPoint={x:get(r,11),y:get(r,21)};item.textFitWidthWorld=distance(item.a,item.textAlignmentPoint)}
    }else{
-    item.mtextRaw=raw;item.mtextPlain=value;item.mtextWidthWorld=Math.max(0,get(r,41,0));item.mtextAttachment=Math.max(1,Math.min(9,Math.round(get(r,71,1))));item.mtextLineSpacingFactor=get(r,44,1);item.mtextLineSpacingStyle=get(r,73,1);
+    item.isMText=true;item.mtextRaw=raw;item.mtextPlain=value;item.mtextWidthWorld=Math.max(0,get(r,41,0));item.mtextAttachment=Math.max(1,Math.min(9,Math.round(get(r,71,1))));item.mtextLineSpacingFactor=get(r,44,1);item.mtextLineSpacingStyle=get(r,73,1);
    }
    if(type==='ATTRIB'&&activeAttributeGroup)item.groupId=activeAttributeGroup;
    out.push(item);
@@ -1468,7 +1470,7 @@ function buildDxf(){
   add(0,'ENDTAB');
   const dxfTextStyleName=o=>String(o.textStyleName||'STANDARD').replace(/[\x00-\x1f<>/\\":;?*|=]/g,'_').slice(0,255)||'STANDARD';
   const textStyleMap=new Map();
-  for(const o of objects.filter(item=>item.type==='text')){const name=dxfTextStyleName(o);if(!textStyleMap.has(name))textStyleMap.set(name,{fontFile:o.textFontFile||'txt.shx',bigFontFile:o.textBigFontFile||'',fixedHeight:Number(o.textStyleFixedHeight)||0,widthFactor:Number(o.textStyleWidthFactor)||1,obliqueAngle:Number(o.textStyleObliqueAngle)||0,generationFlags:Number(o.textGenerationFlags)||0,lastHeight:Number(o.textHeightWorld)||.2})}
+  for(const o of objects.filter(item=>item.type==='text')){const name=dxfTextStyleName(o);if(!textStyleMap.has(name))textStyleMap.set(name,{fontFile:o.textFontFile||'txt.shx',bigFontFile:o.textBigFontFile||'',fixedHeight:Number(o.textStyleFixedHeight)||0,widthFactor:Number(o.textStyleWidthFactor)||1,obliqueAngle:Number(o.textStyleObliqueAngle)||0,generationFlags:Number(o.textStyleGenerationFlags??o.textGenerationFlags)||0,lastHeight:Number(o.textHeightWorld)||.2})}
   if(!textStyleMap.has('STANDARD'))textStyleMap.set('STANDARD',{fontFile:'txt.shx',bigFontFile:'',fixedHeight:0,widthFactor:1,obliqueAngle:0,generationFlags:0,lastHeight:.2});
   add(0,'TABLE',2,'STYLE',5,'ABCF',100,'AcDbSymbolTable',70,textStyleMap.size);
   for(const [name,style] of textStyleMap)add(0,'STYLE',100,'AcDbSymbolTableRecord',100,'AcDbTextStyleTableRecord',2,name,70,0,40,style.fixedHeight,41,style.widthFactor,50,style.obliqueAngle,71,style.generationFlags,42,style.lastHeight,3,style.fontFile,4,style.bigFontFile);
