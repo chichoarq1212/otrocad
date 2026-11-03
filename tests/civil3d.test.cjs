@@ -27,5 +27,11 @@ assert.ok(Math.abs(volume.cut-1/6)<1e-6,'cut volume below the datum should be in
 assert.ok(Math.abs(volume.fill-1/6)<1e-6,'fill volume above the datum should be integrated');
 assert.ok(Math.abs(volume.net)<1e-6,'balanced planar terrain should have zero net volume');
 assert.ok(Math.abs(volume.area-1)<1e-8);
+const utmTin=math.triangulate([
+ {x:500000,y:9970000,z:2800},{x:500010,y:9970000,z:2801},
+ {x:500010,y:9970010,z:2802},{x:500000,y:9970010,z:2801}
+]);
+assert.equal(utmTin.triangles.length,2,'UTM coordinates must not destabilize circumcircle calculations');
+assert.ok(Math.abs(math.sampleSurface(utmTin.triangles,500002.5,9970005)-2800.75)<1e-6);
 assert.throws(()=>math.triangulate([{x:0,y:0,z:1},{x:1,y:1,z:2}]),/al menos tres puntos/);
 console.log('Civil 3D geometry checks passed: Delaunay TIN, contours, slope, interpolation and cut/fill');
