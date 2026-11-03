@@ -237,6 +237,8 @@ addButton(surfaceGroup,'Mapa de pendientes','∠',slopeAnalysis,'Clasificar pend
 addButton(surfaceGroup,'Visor 3D','◈',openSurface3D,'Visualizar la superficie en perspectiva 3D interactiva');
 const designGroup=addGroup('DISEÑO LINEAL');
 addButton(designGroup,'Definir alineamiento','╱',markAlignment,'Marcar una línea o polilínea seleccionada como alineamiento');
+addButton(designGroup,'Progresivas','PK',createStations,'Generar estacado y etiquetas de progresivas sobre el alineamiento');
+addButton(designGroup,'Pendiente del eje','∠',alignmentGrade,'Calcular la pendiente entre los extremos del alineamiento');
 addButton(designGroup,'Perfil longitudinal','⌁',longitudinalProfile,'Extraer perfil de terreno sobre el alineamiento');
 addButton(designGroup,'Sección transversal','⊥',crossSection,'Extraer una sección transversal en una abscisa');
 const analysisGroup=addGroup('CÁLCULO Y CONTROL');
@@ -400,6 +402,33 @@ function markAlignment(){
 function requireAlignment(){
  const alignment=alignmentPoints();if(!alignment)throw Error('Selecciona una línea o polilínea, o marca un alineamiento previamente.');
  return alignment;
+}
+function drawingToMeters(){return ({m:1,cm:.01,mm:.001})[api.getUnits()]||1}
+function stationLabel(value){
+ const meters=value*drawingToMeters(),km=Math.floor(meters/1000),rest=(meters-km*1000).toFixed(2).padStart(6,'0');
+ return km+'+'+rest;
+}
+function createStations(){
+ const alignment=requireAlignment(),length=pathLength(alignment.pts),factor=drawingToMeters();
+ const intervalMeters=numberValue(prompt('Intervalo de progresivas (metros)', '10'));if(!(intervalMeters>0))return;
+ const interval=intervalMeters/factor,extent=Math.max(1,...alignment.pts.map(p=>Math.max(Math.abs(p.x),Math.abs(p.y))));
+ const size=Math.max(interval*.035,extent*.0008),height=Math.max(.05,size*.62),items=[];
+ const stations=[];for(let station=0;station<length;station+=interval)stations.push(station);stations.push(length);
+ stations.forEach(station=>{
+  const at=pointAtStation(alignment.pts,station),normal={x:-at.tangent.y,y:at.tangent.x};
+  items.push({type:'line',a:{x:at.point.x-normal.x*size,y:at.point.y-normal.y*size},b:{x:at.point.x+normal.x*size,y:at.point.y+normal.y*size},layer:'Progresivas',color:'#e4b94c',lineweight:.18,civilStation:true,civilAlignmentName:alignment.item.civilAlignmentName||''});
+  items.push({type:'text',a:{x:at.point.x+normal.x*size*1.35,y:at.point.y+normal.y*size*1.35},text:stationLabel(station),textHeightWorld:height,textRotation:Math.atan2(at.tangent.y,at.tangent.x)*180/Math.PI,layer:'Progresivas',color:'#e4b94c',civilStation:true,civilAlignmentName:alignment.item.civilAlignmentName||''});
+ });
+ api.ensureLayer('Progresivas','#e4b94c');api.addObjects(items,'Estacado generado · '+stations.length+' progresivas cada '+intervalMeters+' m');
+}
+function alignmentGrade(){
+ const alignment=requireAlignment(),surface=surfaceData();if(!surface)throw Error('Primero crea una superficie TIN.');
+ const start=alignment.pts[0],end=alignment.pts[alignment.pts.length-1],z1=math.sampleSurface(surface.triangles,start.x,start.y),z2=math.sampleSurface(surface.triangles,end.x,end.y),length=pathLength(alignment.pts);
+ if(z1===null||z2===null)throw Error('Los extremos del alineamiento deben estar dentro de la superficie.');
+ if(length<=0)throw Error('El alineamiento no tiene longitud.');
+ const slope=(z2-z1)/length*100,angle=Math.atan2(z2-z1,length)*180/Math.PI;
+ alert('PENDIENTE LONGITUDINAL\\nLongitud: '+length.toFixed(3)+' '+api.getUnits()+'\\nCota inicial: '+z1.toFixed(3)+'\\nCota final: '+z2.toFixed(3)+'\\nPendiente: '+slope.toFixed(3)+' %\\nÁngulo: '+angle.toFixed(3)+'°');
+ api.setStatus('Pendiente del alineamiento · '+slope.toFixed(3)+' %');
 }
 function openProfileChart(title,samples,xLabel){
  const valid=samples.filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.z));
