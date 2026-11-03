@@ -1024,6 +1024,75 @@ function parseDxfEntities(source){
   const vertices=[];for(let j=i+1;j<records.length&&records[j].type!=='SEQEND';j++)if(records[j].type==='VERTEX')vertices.push({x:get(records[j],10),y:get(records[j],20),bulge:get(records[j],42)});
   polylineVertices.set(records[i],vertices);
  }
+ // HATCH can reference source boundary entities by handles (DXF groups 97/330).
+ // Recover their real closed geometry; never invent a hatch rectangle.
+ const entitiesByHandle=new Map(records.filter(r=>str(r,5)).map(r=>[str(r,5).toUpperCase(),r]));
+ const hatchSourceHandles=r=>{
+  const refs=[],p=r.pairs,start=p.findIndex(x=>x[0]===91);
+  if(start<0)return refs;
+  for(let i=start+1;i<p.length;i++)if(p[i][0]===97){
+   const count=Math.max(0,Math.min(1024,Number(p[i][1])||0));
+   for(let j=0;j<count&&p[i+j+1]?.[0]===330;j++)refs.push(p[i+j+1][1].toUpperCase());
+   i+=count;
+  }
+  return [...new Set(refs)];
+ };
+ const hatchAssociatedContours=r=>{
+  const refs=hatchSourceHandles(r),closed=[],open=[],types={};
+  const clean=pts=>pts.filter(p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y)).filter((p,i,all)=>i===0||distance(p,all[i-1])>1e-8);
+  const closedLoop=pts=>{
+   const ps=clean(pts);
+   if(ps.length>3&&distance(ps[0],ps.at(-1))<1e-6)ps.pop();
+   if(ps.length<3)return null;
+   const xs=ps.map(p=>p.x),ys=ps.map(p=>p.y),extent=Math.max(...xs)-Math.min(...xs)+Math.max(...ys)-Math.min(...ys);
+   const twiceArea=ps.reduce((a,p,i)=>{const q=ps[(i+1)%ps.length];return a+p.x*q.y-q.x*p.y},0);
+   return Math.abs(twiceArea)>1e-12*Math.max(1,extent*extent)?ps:null;
+  };
+  for(const handle of refs){
+   const src=entitiesByHandle.get(handle);
+   if(!src)continue;
+   types[src.type]=(types[src.type]||0)+1;
+   let pts=[],isClosed=false;
+   if(src.type==='LWPOLYLINE'||src.type==='POLYLINE'){
+    const verts=src.type==='LWPOLYLINE'?lightPolylineVertices(src):(polylineVertices.get(src)||[]);
+    isClosed=Boolean(get(src,70)&1);pts=buildPolylinePoints(verts,isClosed);
+   }else if(src.type==='LINE'){
+    pts=[{x:get(src,10),y:get(src,20)},{x:get(src,11),y:get(src,21)}];
+   }else if(src.type==='CIRCLE'){
+    const c={x:get(src,10),y:get(src,20)},rad=get(src,40);
+    if(rad>0){isClosed=true;pts=Array.from({length:96},(_,i)=>{const t=i*Math.PI*2/96;return{x:c.x+rad*Math.cos(t),y:c.y+rad*Math.sin(t)}})}
+   }else if(src.type==='ARC'){
+    const c={x:get(src,10),y:get(src,20)},rad=get(src,40),begin=get(src,50)*Math.PI/180,end=get(src,51)*Math.PI/180;
+    const sweep=(end-begin+Math.PI*2)%(Math.PI*2);
+    if(rad>0&&sweep>1e-9){const n=Math.max(8,Math.ceil(sweep/(Math.PI/36)));pts=Array.from({length:n+1},(_,i)=>{const t=begin+sweep*i/n;return{x:c.x+rad*Math.cos(t),y:c.y+rad*Math.sin(t)}})}
+   }else if(src.type==='ELLIPSE'){
+    const c={x:get(src,10),y:get(src,20)},vx=get(src,11),vy=get(src,21),ratio=get(src,40),begin=get(src,41),end=get(src,42,Math.PI*2);
+    if(Math.hypot(vx,vy)>0&&ratio>0&&end>begin){isClosed=Math.abs(end-begin-2*Math.PI)<1e-5;const n=Math.max(24,Math.ceil((end-begin)/(Math.PI/36))),steps=Math.min(n,360);pts=Array.from({length:steps+(isClosed?0:1)},(_,i)=>{const t=begin+(end-begin)*i/steps;return{x:c.x+vx*Math.cos(t)-vy*ratio*Math.sin(t),y:c.y+vy*Math.cos(t)+vx*ratio*Math.sin(t)}})}
+   }
+   pts=clean(pts);
+   if(isClosed){const loop=closedLoop(pts);if(loop)closed.push(loop)}
+   else if(pts.length>=2)open.push(pts);
+  }
+  // Join separate LINE/ARC edges only if endpoints match, preserving their contour.
+  while(open.length){
+   const chain=open.shift().slice();let extended=true;
+   while(extended){extended=false;
+    for(let i=0;i<open.length;i++){
+     const next=open[i],first=chain[0],last=chain.at(-1),a=next[0],b=next.at(-1);
+     if(distance(last,a)<1e-6)chain.push(...next.slice(1));
+     else if(distance(last,b)<1e-6)chain.push(...next.slice(0,-1).reverse());
+     else if(distance(first,b)<1e-6)chain.unshift(...next.slice(0,-1));
+     else if(distance(first,a)<1e-6)chain.unshift(...next.slice(1).reverse());
+     else continue;
+     open.splice(i,1);extended=true;break;
+    }
+   }
+   if(chain.length>=3&&distance(chain[0],chain.at(-1))<1e-6){
+    const loop=closedLoop(chain);if(loop)closed.push(loop);
+   }
+  }
+  return {loops:closed,refs,types};
+ };
  const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId,insertStyle)=>{
   const item={...sourceItem,groupId},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
   if(sourceItem.layer==='0'&&insertStyle){item.layer=insertStyle.layer;item.color=insertStyle.color}
@@ -1125,8 +1194,18 @@ function parseDxfEntities(source){
     const area=vertices.reduce((sum,p,i)=>{const q=vertices[(i+1)%vertices.length];return sum+p.x*q.y-q.x*p.y},0);
     if(vertices.length>=3&&Math.abs(area)>1e-8){loops.push(vertices);note('HATCH con borde reconstruido desde vértices DXF')}
    }
+   let association={loops:[],refs:[],types:{}};
+   if(!loops.length){
+    association=hatchAssociatedContours(r);
+    if(association.loops.length){loops.push(...association.loops);note('HATCH recuperado desde contornos asociativos del plano')}
+   }
    const pts=loops[0];
-   if(!pts?.length){warn('HATCH sin contorno compatible omitido');const paths=get(r,91,-1),vertices=r.pairs.filter(p=>p[0]===10).length;diagnose('HATCH',{['rutas de borde='+paths+', pares X/Y='+vertices]:1});continue}
+   if(!pts?.length){
+    warn('HATCH sin contorno compatible omitido');
+    const paths=get(r,91,-1),vertices=r.pairs.filter(p=>p[0]===10).length;
+    diagnose('HATCH',{['rutas='+paths+', vértices='+vertices+', referencias='+association.refs.length+', entidades asociadas='+(Object.keys(association.types).join('/')||'ninguna')]:1});
+    continue;
+   }
    const minx=Math.min(...pts.map(p=>p.x)),maxx=Math.max(...pts.map(p=>p.x)),miny=Math.min(...pts.map(p=>p.y)),maxy=Math.max(...pts.map(p=>p.y));
    const corners=new Set(pts.map(p=>p.x+','+p.y));
    const rectangular=loops.length===1&&pts.length===4&&minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(x+','+y));
