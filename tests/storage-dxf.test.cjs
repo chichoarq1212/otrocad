@@ -65,6 +65,7 @@ assert.equal(roundtrip[0].type,'arc');assert.equal(roundtrip[1].type,'ellipse');
 assert.ok(Math.abs(roundtrip[1].b.x-5)<1e-9);assert.ok(Math.abs(roundtrip[1].b.y-5)<1e-9);
 console.log('DXF round-trip checks passed: native arcs and aligned ellipses');
 const selectionScope = {objects:[],zoom:100,hiddenLayers:new Set(),lockedLayers:new Set(),screen:p=>({x:p.x*100,y:-p.y*100}),world:p=>({x:p.x/100,y:-p.y/100}),ctx:{save(){},restore(){},measureText:value=>({width:String(value).length*8})},pointInPolygon:(p,pts)=>{let inside=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];if(((a.y>p.y)!==(b.y>p.y))&&(p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y||1e-12)+a.x))inside=!inside}return inside},distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
+selectionScope.isVisibleModelEntity=s=>(s.cadLayout||'Model')==='Model'&&!selectionScope.hiddenLayers.has(s.layer);
 vm.createContext(selectionScope);
 vm.runInContext(source.slice(source.indexOf('const CAD_TEXT_FONT_CATALOG='),source.indexOf('\nfunction drawEntity(')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function arcParams('),source.indexOf('\nconst CAD_THEMES=')),selectionScope);
