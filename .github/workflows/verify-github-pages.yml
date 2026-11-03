@@ -1,0 +1,56 @@
+name: Verify GitHub Pages iOS editor is live
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - 'editor/**'
+      - 'apple-touch-icon.png'
+      - 'icon-192.png'
+      - 'icon-512.png'
+      - 'manifest.webmanifest'
+      - 'sw.js'
+      - '.github/workflows/verify-github-pages.yml'
+  pull_request:
+    paths: ['.github/workflows/verify-github-pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-ios-public:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the expected static website
+        run: |
+          node scripts/build-pages.cjs
+          node scripts/verify-pages.cjs
+      - name: Verify live iOS editor and icons on GitHub Pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://chichoarq1212.github.io/otrocad"
+          result=0
+          for i in $(seq 1 18); do
+            echo "Checking iOS website, attempt $i"
+            result=1
+            for file in build-info.json ios/index.html editor/editor.js editor/index.html apple-touch-icon.png icon-192.png manifest.webmanifest; do
+              if ! curl --fail --silent --show-error --location --max-time 20 \
+                -H "Cache-Control: no-cache" "$BASE/$file?probe=$GITHUB_SHA-$i" \
+                -o /tmp/otrocad-live-check || ! cmp -s "dist/$file" /tmp/otrocad-live-check; then
+                echo "Missing or old public asset: $file"
+                result=0
+                break
+              fi
+            done
+            if [ "$result" = 1 ]; then break; fi
+            if [ "$i" -lt 18 ]; then sleep 15; fi
+          done
+          if [ "$result" != 1 ]; then
+            echo "::error::GitHub Pages is not serving the current iOS website. Check Settings > Pages > Deploy from a branch > gh-pages / (root)."
+            exit 1
+          fi
+          echo "Published iOS and CAD editor match the exact GitHub Pages source build."
