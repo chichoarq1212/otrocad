@@ -2,6 +2,7 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const dwg_to_dxf: (a: number, b: number) => [number, number, number, number];
+export const dwg_to_dxf_failsafe: (a: number, b: number) => [number, number, number, number];
 export const dxf_to_dwg: (a: number, b: number) => [number, number, number, number];
 export const __externref_table_alloc: () => number;
 export const __wbindgen_externrefs: WebAssembly.Table;

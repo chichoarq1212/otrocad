@@ -3,6 +3,8 @@
 
 export function dwg_to_dxf(input: Uint8Array | number[]): Uint8Array;
 
+export function dwg_to_dxf_failsafe(input: Uint8Array | number[]): Uint8Array;
+
 export function dxf_to_dwg(input: Uint8Array | number[]): Uint8Array;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -10,6 +12,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly dwg_to_dxf: (a: number, b: number) => [number, number, number, number];
+    readonly dwg_to_dxf_failsafe: (a: number, b: number) => [number, number, number, number];
     readonly dxf_to_dwg: (a: number, b: number) => [number, number, number, number];
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
