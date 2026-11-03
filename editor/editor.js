@@ -1104,7 +1104,7 @@ function parseDxfEntities(source){
    if(!loops.length){
     // Some DWG->DXF writers retain vertex pairs but omit the HATCH path markers.
     // Recover only a real non-collinear contour; never fabricate one from a bounding box.
-    const vertices=[];for(let i=0;i<r.pairs.length-1;i++){
+    const vertices=[],boundaryStart=r.pairs.findIndex(p=>p[0]===91);for(let i=boundaryStart<0?r.pairs.length:boundaryStart+1;i<r.pairs.length-1;i++){
      if(r.pairs[i][0]===10&&r.pairs[i+1][0]===20){
       const x=Number(r.pairs[i][1]),y=Number(r.pairs[i+1][1]);
       if(Number.isFinite(x)&&Number.isFinite(y)&&(!vertices.length||Math.hypot(x-vertices.at(-1).x,y-vertices.at(-1).y)>1e-9))vertices.push({x,y});
