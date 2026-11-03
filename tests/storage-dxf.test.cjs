@@ -448,3 +448,19 @@ assert.equal(gradientHatch[0].hatchGradientColors[0],'#808080');
 assert.equal(gradientHatch[0].hatchGradientColors[1],'#ffffff');
 assert.ok(Math.abs(gradientHatch[0].hatchGradientAngle-90)<1e-6);
 console.log('CAD color and hatch fidelity checks passed: gray ACI, layer styles, transparency, pattern lines and gradient');
+
+
+// AutoCAD SOLID/TRACE are filled regions, and four SOLID vertices use 1-2-4-3 order.
+const solidTraceFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','SOLID','62','253','10','0','20','0','11','4','21','0','12','0','22','2','13','4','23','2',
+ '0','TRACE','10','5','20','0','11','7','21','0','12','5','22','2','13','7','23','2',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const solidTrace=context.parseDxfEntities(solidTraceFixture);
+assert.equal(solidTrace.length,2);
+assert.ok(solidTrace.every(x=>x.solidFill===true&&x.importedHatch===true),'2D SOLID and TRACE should be filled');
+assert.equal(solidTrace[0].color,'#999999');
+assert.equal(solidTrace[0].pts[2].x,4,'Third rendered SOLID corner must use DXF vertex 13');
+assert.equal(solidTrace[0].pts[3].x,0,'Fourth rendered SOLID corner must use DXF vertex 12');
+console.log('SOLID and TRACE gray fills and non-crossing vertices passed');
