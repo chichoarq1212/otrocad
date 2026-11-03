@@ -867,3 +867,19 @@ textRenderScope.layoutRenderTransform={tx:55,ty:500,scale:2};
 vm.runInContext("drawEntity({type:'text',a:{x:10,y:20},text:'CAJETIN',isMText:true,textHeightWorld:3})",textRenderScope);
 assert.deepEqual(textCanvasTranslations.pop(),[75,460],'Paper-space MTEXT must follow layout sheet transform rather than raw millimeter coords');
 console.log('CAD text projection checks passed: Model TEXT, aligned TEXT and Paper MTEXT anchors');
+
+
+// Regression: the import report and the intermediate DWG->DXF conversion must
+// survive a page reload, and their controls must be visible next to the status toggles.
+const editorHtml=fs.readFileSync('editor/index.html','utf8');
+assert.match(source,/indexedDB\.open\('otrocad-import-cache',1\)/,'Persist import cache in IndexedDB, not transient page variables');
+assert.match(source,/function persistImportCache\(\)/);
+assert.match(source,/function restoreImportCache\(\)/);
+assert.match(source,/void restoreImportCache\(\)/,'Restore the cached report and DXF when the editor starts');
+assert.match(source,/void persistImportCache\(\)/,'Save the report and converted DXF after import');
+assert.match(editorHtml,/id="importReport"[^>]*hidden/);
+assert.match(editorHtml,/id="copyImportReport"[^>]*hidden/);
+assert.match(editorHtml,/id="convertedDxf"[^>]*hidden/);
+assert.ok(editorHtml.indexOf('id="convertedDxf"')<editorHtml.indexOf('id="status"'),'Put import actions before the flexible status text so they do not disappear off-screen');
+assert.match(editorHtml,/#statusbar #convertedDxf/,'Give the DXF action a visible status-bar style');
+console.log('Import diagnostics persistence/UI checks passed: IndexedDB restore and visible toolbar controls');
