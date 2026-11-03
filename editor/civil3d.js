@@ -222,7 +222,7 @@ math.exportTinLandXml=function(triangles,unit='m'){
   '<Surfaces><Surface name="OtroCAD_TIN" state="existing"><Definition surfType="TIN">',
   '<Pnts>',...points,'</Pnts><Faces>',...faces,'</Faces>',
   '</Definition></Surface></Surfaces></LandXML>'
- ].join('\\n');
+ ].join(String.fromCharCode(10));
 };
 window.OtroCadCivilMath=math;
 const api=window.OtroCadCivilAPI;
