@@ -466,7 +466,7 @@ function cancelGripDrag(){
 }
 
 function openTextEditor(index){
- const s=objects[index];if(!s||s.type!=='text'){status.textContent='Selecciona primero un objeto de texto';return false}
+ const targets=(Array.isArray(index)?index:[index]).filter(i=>objects[i]?.type==='text'),batchMode=targets.length>1,s=objects[targets[0]];if(!s){status.textContent='Selecciona primero uno o varios textos';return false}
  const dlg=document.createElement('dialog');dlg.className='cad-utility-dialog cad-text-editor';
  const fontOptions=CAD_TEXT_FONT_CATALOG.map(font=>'<option value="'+font.id+'">'+font.label+'</option>').join('');
  dlg.innerHTML='<form method="dialog"><h3>Editor de texto CAD</h3><p>Modifica el contenido, la altura real del dibujo, la tipografía y la composición. Los cambios se guardan en el objeto seleccionado.</p>'+
@@ -489,7 +489,7 @@ function openTextEditor(index){
  '<div class="cad-utility-error" id="cadTextError" role="alert"></div><div class="cad-utility-actions"><button type="button" id="cadTextCancel">Cancelar</button><button type="button" id="cadTextApply">Aplicar cambios</button></div></form>';
  document.body.append(dlg);
  const $d=id=>dlg.querySelector('#'+id),font=cadFontEntryForFile(s.textFontFile)||CAD_TEXT_FONT_CATALOG[0],value=String(s.text||'');
- $d('cadTextValue').value=value;$d('cadTextFont').value=font.id;
+ $d('cadTextValue').value=batchMode?'':value;$d('cadTextFont').value=font.id;if(batchMode){$d('cadTextValue').disabled=true;$d('cadTextValue').placeholder='Se conservará el contenido individual de los '+targets.length+' textos seleccionados.';}
  $d('cadTextHeight').value=Number(s.textHeightWorld||Number(s.textHeight||14)/Math.max(zoom,.001));
  $d('cadTextWidthFactor').value=Number(s.textWidthFactor||s.textStyleWidthFactor||1);
  $d('cadTextRotation').value=Number(s.textRotation||0);$d('cadTextOblique').value=Number(s.textObliqueAngle||s.textStyleObliqueAngle||0);
@@ -504,32 +504,43 @@ function openTextEditor(index){
   const selectedFont=CAD_TEXT_FONT_CATALOG.find(item=>item.id===$d('cadTextFont').value)||CAD_TEXT_FONT_CATALOG[0];
   preview.style.fontFamily=selectedFont.family;preview.style.fontWeight=$d('cadTextBold').checked?'700':'400';preview.style.fontStyle=$d('cadTextItalic').checked?'italic':'normal';
   preview.style.fontSize=Math.max(12,Math.min(30,Number($d('cadTextHeight').value)*20||16))+'px';
-  preview.textContent=$d('cadTextValue').value||'Vista previa del texto';
+  preview.textContent=batchMode?'Vista previa del formato para '+targets.length+' textos':($d('cadTextValue').value||'Vista previa del texto');
  };
  ['cadTextFont','cadTextBold','cadTextItalic','cadTextHeight','cadTextValue'].forEach(id=>$d(id).addEventListener('input',previewUpdate));
  dlg.querySelectorAll('[data-height-m]').forEach(button=>button.onclick=()=>{$d('cadTextHeight').value=(Number(button.dataset.heightM)*(units==='mm'?1000:units==='cm'?100:1)).toFixed(3);previewUpdate()});
  $d('cadTextCancel').onclick=()=>dlg.close();
  $d('cadTextApply').onclick=()=>{
   const newText=$d('cadTextValue').value,height=Number($d('cadTextHeight').value),widthFactor=Number($d('cadTextWidthFactor').value),rotation=Number($d('cadTextRotation').value),oblique=Number($d('cadTextOblique').value),mtextWidth=Number($d('cadTextMTextWidth').value),lineSpacing=Number($d('cadTextLineSpacing').value),fitWidth=Number($d('cadTextFitWidth').value),error=$d('cadTextError');
-  if(!newText.trim()){error.textContent='El contenido no puede quedar vacío.';return}
+  if(!batchMode&&!newText.trim()){error.textContent='El contenido no puede quedar vacío.';return}
   if(!Number.isFinite(height)||height<=0||!Number.isFinite(widthFactor)||widthFactor<.05||widthFactor>20||!Number.isFinite(rotation)||!Number.isFinite(oblique)||oblique< -80||oblique>80||!Number.isFinite(mtextWidth)||mtextWidth<0||!Number.isFinite(lineSpacing)||lineSpacing<.5||lineSpacing>4||!Number.isFinite(fitWidth)||fitWidth<0){error.textContent='Revisa altura, ancho, rotación, inclinación e interlineado.';return}
   const selectedFont=CAD_TEXT_FONT_CATALOG.find(item=>item.id===$d('cadTextFont').value)||CAD_TEXT_FONT_CATALOG[0],bold=$d('cadTextBold').checked,italic=$d('cadTextItalic').checked,fontFile=cadFontVariantFile(selectedFont,bold,italic),isMText=$d('cadTextIsMText').checked||newText.includes('\n'),horizontal=Number($d('cadTextAlign').value),vertical=Number($d('cadTextVertical').value);
-  checkpoint();s.text=newText;s.textHeightWorld=height;delete s.textHeight;s.textWidthFactor=widthFactor;s.textRotation=rotation;s.textObliqueAngle=oblique;s.textFontFile=fontFile;s.textFontFamily=selectedFont.family;s.textFontBold=bold;s.textFontItalic=italic;s.textStyleFixedHeight=0;s.textStyleWidthFactor=widthFactor;s.textStyleObliqueAngle=oblique;s.textStyleName='OTROCAD_'+selectedFont.id.replace(/[^a-z0-9]+/gi,'_').toUpperCase()+(bold?'_B':'')+(italic?'_I':'');s.color=$d('cadTextColor').value;
-  delete s.mtextRaw;delete s.mtextPlain;
-  if(isMText){s.isMText=true;s.mtextWidthWorld=mtextWidth;s.mtextAttachment=Number($d('cadTextAttachment').value);s.mtextLineSpacingFactor=lineSpacing;s.mtextPlain=newText;delete s.textAlignmentPoint;delete s.textFitWidthWorld}
-  else{delete s.isMText;delete s.mtextWidthWorld;delete s.mtextAttachment;delete s.mtextLineSpacingFactor;s.textHorizontalAlignment=horizontal;s.textVerticalAlignment=vertical;if((horizontal===3||horizontal===5)&&fitWidth>0){s.textFitWidthWorld=fitWidth;const angle=rotation*Math.PI/180;s.textAlignmentPoint={x:s.a.x+fitWidth*Math.cos(angle),y:s.a.y+fitWidth*Math.sin(angle)}}else{delete s.textFitWidthWorld;delete s.textAlignmentPoint}}
-  save();render();showProperties();status.textContent='Texto actualizado · '+selectedFont.label+' · altura '+height+' '+units;dlg.close();
+  checkpoint();
+  for(const targetIndex of targets){
+   const target=objects[targetIndex];if(!target||target.type!=='text')continue;
+   if(!batchMode)target.text=newText;
+   target.textHeightWorld=height;delete target.textHeight;target.textWidthFactor=widthFactor;
+   if(!batchMode)target.textRotation=rotation;
+   target.textObliqueAngle=oblique;target.textFontFile=fontFile;target.textFontFamily=selectedFont.family;target.textFontBold=bold;target.textFontItalic=italic;
+   target.textStyleFixedHeight=0;target.textStyleWidthFactor=widthFactor;target.textStyleObliqueAngle=oblique;
+   target.textStyleName='OTROCAD_'+selectedFont.id.replace(/[^a-z0-9]+/gi,'_').toUpperCase()+(bold?'_B':'')+(italic?'_I');target.color=$d('cadTextColor').value;
+   if(!batchMode){
+    delete target.mtextRaw;delete target.mtextPlain;
+    if(isMText){target.isMText=true;target.mtextWidthWorld=mtextWidth;target.mtextAttachment=Number($d('cadTextAttachment').value);target.mtextLineSpacingFactor=lineSpacing;target.mtextPlain=newText;delete target.textAlignmentPoint;delete target.textFitWidthWorld}
+    else{delete target.isMText;delete target.mtextWidthWorld;delete target.mtextAttachment;delete target.mtextLineSpacingFactor;target.textHorizontalAlignment=horizontal;target.textVerticalAlignment=vertical;if((horizontal===3||horizontal===5)&&fitWidth>0){target.textFitWidthWorld=fitWidth;const angle=rotation*Math.PI/180;target.textAlignmentPoint={x:target.a.x+fitWidth*Math.cos(angle),y:target.a.y+fitWidth*Math.sin(angle)}}else{delete target.textFitWidthWorld;delete target.textAlignmentPoint}}
+   }
+  }
+  save();render();showProperties();status.textContent=(batchMode?'Formato aplicado a '+targets.length+' textos':'Texto actualizado')+' · '+selectedFont.label+' · altura '+height+' '+units;dlg.close();
  };
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();previewUpdate();$d('cadTextValue').focus();return true;
 }
 function editSelectedText(){
  const ids=selectedItems().filter(i=>objects[i]?.type==='text');
- if(ids.length!==1){status.textContent=ids.length?'Edita un texto a la vez para conservar su contenido individual':'Selecciona un texto o haz doble clic sobre él';return false}
- return openTextEditor(ids[0]);
+ if(!ids.length){status.textContent='Selecciona un texto o haz doble clic sobre él';return false}
+ return openTextEditor(ids.length===1?ids[0]:ids);
 }
 function showProperties(){
  const box=$('#properties'),content=$('#propContent'),ids=selectedItems();
- if(ids.length>1){box.classList.add('open');content.textContent=ids.length+' objetos seleccionados. Puedes moverlos, copiarlos o eliminarlos como conjunto.';return}
+ if(ids.length>1){box.classList.add('open');content.innerHTML=ids.length+' objetos seleccionados. Puedes moverlos, copiarlos o eliminarlos como conjunto.';const textIds=ids.filter(i=>objects[i]?.type==='text');if(textIds.length){const edit=document.createElement('button');edit.type='button';edit.textContent='Editar formato de '+textIds.length+' textos…';edit.style.width='100%';edit.style.marginTop='10px';edit.onclick=()=>openTextEditor(textIds);content.append(edit)}return}
  if(selected<0){content.textContent='Selecciona una entidad para editar sus propiedades.';return}
  const s=objects[selected];box.classList.add('open');content.innerHTML='';
  const addLabel=(txt,node)=>{const l=document.createElement('label');l.textContent=txt;content.append(l,node)};
@@ -1108,6 +1119,7 @@ function runCommand(raw){
  if(c==='HATCHPATTERN'){const p=parts[1];if(['ANSI31','CROSS','GRID','SOLID'].includes(p)){$('#hatchPattern').value=p;status.textContent='HATCHPATTERN '+p}else status.textContent='HATCHPATTERN ANSI31 | CROSS | GRID | SOLID';return}
  if(c==='PR'||c==='PROPERTIES'||c==='CTRL+1'){$('#properties').classList.toggle('open');showProperties();return}
  if(['ED','TEXTEDIT','DDEDIT','EDITTEXT','STYLE','TEXTSTYLE'].includes(c)){editSelectedText();return}
+ if(c==='SELECTTEXT'||c==='QSELECTTEXT'){const ids=objects.map((o,i)=>o.type==='text'&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer)?i:-1).filter(i=>i>=0);applySelection(ids);showProperties();status.textContent=ids.length+' textos seleccionados · ejecuta ED para cambiar formato en conjunto';return}
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
