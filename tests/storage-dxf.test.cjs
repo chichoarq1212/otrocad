@@ -590,6 +590,7 @@ assert.equal(roundtripSpaces[1].cadLayout,'PLANTA BAJA');
 assert.equal(roundtripSpaces[2].cadLayout,'DETALLES');
 const anonymousPaper=context.parseDxfEntities(['0','SECTION','2','ENTITIES','0','TEXT','67','1','10','0','20','0','40','2','1','NOTA','0','ENDSEC','0','EOF'].join('\n'));
 assert.equal(anonymousPaper[0].cadLayout,'Layout1','67 paperspace requires a fallback layout name');
+assert.equal(anonymousPaper.activeCadLayout,'Model','DXF without $CTAB defaults to Model');
 assert.equal(anonymousPaper.layoutDefinitions[0].name,'Layout1');
 console.log('CAD layout checks passed: native layouts, paper entity separation, viewports, 67 fallback and DXF space roundtrip');
 
@@ -597,6 +598,7 @@ console.log('CAD layout checks passed: native layouts, paper entity separation, 
 // In AutoCAD, the inactive layouts are stored as *Paper_SpaceN BLOCKs.
 // Their geometry must be mapped to the LAYOUT's associated block-table handle.
 const nativePaperFixture=[
+ '0','SECTION','2','HEADER','9','$CTAB','1','P-01','0','ENDSEC',
  '0','SECTION','2','TABLES',
  '0','TABLE','2','BLOCK_RECORD',
  '0','BLOCK_RECORD','5','A2','2','*Paper_Space',
@@ -622,6 +624,7 @@ const nativePaperFixture=[
 ].join('\n');
 const nativePaper=context.parseDxfEntities(nativePaperFixture);
 assert.equal(nativePaper.length,4,'Do not duplicate an active paper entity with the same CAD handle');
+assert.equal(nativePaper.activeCadLayout,'P-01','The original AutoCAD layout must be restored from $CTAB');
 assert.equal(nativePaper.filter(x=>x.cadLayout==='Model').length,1);
 assert.equal(nativePaper.filter(x=>x.cadLayout==='P-01').length,1);
 assert.equal(nativePaper.filter(x=>x.cadLayout==='P-03').length,2);
@@ -640,3 +643,5 @@ const nativeAfter=context.parseDxfEntities(nativeRoundtrip);
 assert.equal(nativeAfter.filter(x=>x.cadLayout==='Model').length,1);
 assert.equal(nativeAfter.filter(x=>x.cadLayout==='P-03').length,2);
 console.log('DXF native paper space checks passed: BLOCK_RECORD/LAYOUT handles, inactive paper blocks, viewport restoration, duplicate protection');
+
+assert.match(source,/showPaperLayoutNotice\(layout,vps\)/,'Layout must explain missing viewports instead of rendering a blank sheet');
