@@ -1906,6 +1906,20 @@ function parseDxfEntities(source){
    if(type==='ATTRIB'){item.cadAttributeTag=str(r,2,'');if(activeAttributeGroup)item.groupId=activeAttributeGroup;}
    out.push(item);
   }
+  else if(type==='MULTILEADER'||type==='MLEADER'){
+   const fragments=r.pairs.filter(([code])=>code===304).map(([,value])=>value);
+   const raw=fragments.join('');
+   const value=cleanMText(raw);
+   const positionCode=r.pairs.some(p=>p[0]===12)&&r.pairs.some(p=>p[0]===22)?12:10;
+   const loc={x:get(r,positionCode),y:get(r,positionCode+10)};
+   const height=get(r,44,0)>1e-8?get(r,44):get(r,41,0);
+   if(value.trim()&&Number.isFinite(loc.x)&&Number.isFinite(loc.y)){
+    out.push({type:'text',a:loc,text:value,isMText:true,cadSourceEntity:'MLEADER',textHeightWorld:height>1e-8?height:.25,mtextWidthWorld:Math.max(0,get(r,43,0)),mtextAttachment:get(r,171,1),mtextRaw:raw,textWidthFactor:1,textRotation:0,...st});
+    note('Texto de MULTILEADER recuperado; geometría de flecha no asociativa');
+   }else{
+    warn('MULTILEADER sin contenido MText utilizable');
+   }
+  }
   else if(type==='SOLID'||type==='TRACE'||type==='3DFACE'){
    // AutoCAD SOLID/TRACE vertex order is 1-2-4-3 (not 1-2-3-4).
    // The previous outline-only import lost the opaque gray areas of many floor plans.
