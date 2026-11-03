@@ -124,7 +124,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 
 /* Modo de dibujo compacto para teléfonos en horizontal. */
 #ribbonToggle{display:none}
-@media (orientation:landscape) and (max-height:500px){
+@media (orientation:landscape) and (max-height:500px) and (max-width:950px) and (pointer:coarse){
  header{height:40px!important;min-height:40px!important;padding:3px 8px!important;gap:6px!important}
  #brand{font-size:16px!important} #brand .brandmark{width:27px!important;height:27px!important}
  #filebar button{min-height:30px!important;padding:4px 7px!important;font-size:11px!important}
@@ -198,6 +198,31 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 #cadLayoutNotice[hidden]{display:none!important}
 @media print{#cadLayoutNotice{display:none!important}}
 #status{margin-left:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#offlineState{flex:0 0 auto;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#statusbar #importReport,#statusbar #copyImportReport,#statusbar #convertedDxf{flex:0 0 auto;border:1px solid #9ebbe3;background:#fff;color:#174a91;border-radius:5px;font-weight:700}#statusbar #convertedDxf{background:#e8f3ff;border-color:#6da4e8;color:#124b91}#statusbar button[hidden]{display:none!important}
+/* Mobile-only landscape dock: one 30px strip instead of stacked command/status bars.
+   Desktop, iPad and tablets retain their usual layout. */
+#mobileBottomToggle{display:none}
+@media (orientation:landscape) and (max-height:500px) and (max-width:950px) and (pointer:coarse){
+  #workspace{height:calc(100dvh - 40px - 126px)!important;min-height:0!important}
+  body.cad-ribbon-collapsed #workspace{height:calc(100dvh - 40px)!important}
+  #stage{min-height:0!important}
+  #commandbar,#statusbar{display:none!important}
+  body.cad-mobile-bottom-open #statusbar,
+  body.cad-mobile-bottom-open #commandbar{display:flex!important;position:fixed!important;left:0;right:0;z-index:60;box-shadow:0 -5px 15px #0b1f4333}
+  body.cad-mobile-bottom-open #statusbar{bottom:30px;height:36px!important;min-height:36px;padding:2px 6px!important}
+  body.cad-mobile-bottom-open #commandbar{bottom:66px;height:40px!important;min-height:40px;padding:3px 6px!important}
+  #layoutBar{min-height:30px!important;height:30px!important;padding:2px 5px!important;gap:5px!important;z-index:70}
+  #layoutBar button{min-height:24px!important;height:24px;padding:2px 7px!important;font-size:10px!important}
+  #layoutTabs{flex:1;min-width:0;scrollbar-width:none}
+  #layoutTabs::-webkit-scrollbar{display:none}
+  #mobileBottomToggle{display:inline-flex!important;align-items:center;justify-content:center;flex:0 0 auto;min-width:92px!important;background:#185be8!important;border-color:#185be8!important;color:#fff!important;font-weight:800}
+  #mobileBottomToggle[aria-expanded="true"]{background:#ffcf23!important;border-color:#d1a622!important;color:#173665!important}
+  #layoutBar #paperCreate,#layoutBar #paperSetup,#layoutBar #toggleAnnotations{display:none!important}
+  body.cad-mobile-bottom-open #layoutBar #paperCreate,
+  body.cad-mobile-bottom-open #layoutBar #paperSetup:not([hidden]),
+  body.cad-mobile-bottom-open #layoutBar #toggleAnnotations:not([hidden]){display:inline-flex!important}
+  #statusbar{overscroll-behavior-x:contain}
+  #statusbar #offlineState{display:none}
+}
 </style></head><body>
 <header><span id="brand"><svg class="brandmark" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="104" fill="#185BE8"/><circle cx="256" cy="256" r="158" fill="none" stroke="#FFFFFF" stroke-width="42" stroke-dasharray="720 275" stroke-linecap="round" transform="rotate(48 256 256)"/><path d="M256 98a158 158 0 0 1 158 158" fill="none" stroke="#FFCF23" stroke-width="42" stroke-linecap="round"/><path d="M256 177v158M177 256h158" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/><circle cx="256" cy="256" r="22" fill="#FFCF23"/></svg><span><span class="o">O</span><span class="cad">troCAD</span></span></span><div id="filebar"><button onclick="location.href='../index.html'">Inicio</button><button onclick="location.href='../tutorial/'">Tutorial</button><button id="undo" title="Deshacer · Ctrl+Z">↶ Deshacer</button><button id="redo" title="Rehacer · Ctrl+Y">↷ Rehacer</button></div><button id="ribbonToggle" type="button" aria-controls="ribbon" aria-expanded="true">⌃ Ocultar</button></header>
 <section id="ribbon"><nav id="tabs" aria-label="Herramientas CAD"><button data-tab="file">ARCHIVO</button><button class="active" data-tab="draw" aria-selected="true">DIBUJO</button><button data-tab="modify">MODIFICAR</button><button data-tab="annotate">ANOTAR</button><button data-tab="blocks">BLOQUES</button><button data-tab="layers">CAPAS</button><button data-tab="view">VISTA</button><button data-tab="settings">CONFIGURACIÓN</button></nav><div id="groups">
@@ -230,13 +255,26 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 <div class="toolgroup" data-panel="view" hidden><label class="cad-option">FONDO <select id="canvasTheme"><option value="white">Blanco</option><option value="black">Black</option><option value="dark">Dark</option><option value="graphite">Graphite</option><option value="slate">Slate</option><option value="bluegray">Blue Gray</option></select></label><button id="zoomIn"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L21 21M7 10h6M10 7v6"/></svg></span>＋ Zoom</button><button id="zoomOut"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L21 21M7 10h6"/></svg></span>－ Zoom</button><button id="fit"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/><rect x="8" y="8" width="8" height="8"/></svg></span>Extensión</button><button data-tool="pan"><span class="ico"><svg class="cad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20M2 12h20m-10-10-3 3m3-3 3 3m-3 17-3-3m3 3 3-3M2 12l3-3m-3 3 3 3m17-3-3-3m3 3-3 3"/></svg></span>Encuadre</button></div>
 <div class="toolgroup" data-panel="settings" hidden><button id="settingsBtn">⚙ Drafting Settings · HP</button><button id="unitsBtn">Unidades</button><button id="snapBtn">OSNAP · Referencias</button></div>
 </div></section>
-<main id="workspace"><div id="stage"><canvas id="cad"></canvas><div id="crossinfo">X 0.000 · Y 0.000 · Z 0.000</div><div id="dynamic"><label>LONGITUD</label><input id="dynLen" inputmode="decimal" placeholder="0.00"><label>ÁNGULO</label><input id="dynAngle" inputmode="decimal" placeholder="0°"><button id="acceptPoint">✓</button></div><div id="layoutBar" role="toolbar" aria-label="Espacios Modelo y Presentación"><div id="layoutTabs" aria-label="Pestañas de dibujo"></div><button id="paperCreate" type="button" title="Crear presentación de impresión">+ Layout</button><button id="paperSetup" type="button" hidden title="Configurar hoja de impresión">⚙ Hoja</button><button id="toggleAnnotations" type="button" aria-pressed="false" title="Ocultar o mostrar textos de Modelo sin eliminarlos">Textos: visibles</button></div></div><aside id="properties"><h3>PROPIEDADES DEL OBJETO</h3><div id="propContent">Selecciona una entidad para editar sus propiedades.</div></aside></main>
+<main id="workspace"><div id="stage"><canvas id="cad"></canvas><div id="crossinfo">X 0.000 · Y 0.000 · Z 0.000</div><div id="dynamic"><label>LONGITUD</label><input id="dynLen" inputmode="decimal" placeholder="0.00"><label>ÁNGULO</label><input id="dynAngle" inputmode="decimal" placeholder="0°"><button id="acceptPoint">✓</button></div><div id="layoutBar" role="toolbar" aria-label="Espacios Modelo y Presentación"><div id="layoutTabs" aria-label="Pestañas de dibujo"></div><button id="mobileBottomToggle" type="button" aria-controls="commandbar statusbar" aria-expanded="false" aria-label="Mostrar comandos y opciones de dibujo">☰ Opciones</button><button id="paperCreate" type="button" title="Crear presentación de impresión">+ Layout</button><button id="paperSetup" type="button" hidden title="Configurar hoja de impresión">⚙ Hoja</button><button id="toggleAnnotations" type="button" aria-pressed="false" title="Ocultar o mostrar textos de Modelo sin eliminarlos">Textos: visibles</button></div></div><aside id="properties"><h3>PROPIEDADES DEL OBJETO</h3><div id="propContent">Selecciona una entidad para editar sus propiedades.</div></aside></main>
 <div id="commandbar"><strong>CMD</strong><input id="cmd" enterkeyhint="go" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe un comando (LINE, PLINE, OFFSET, MOVE...) y pulsa Enter"><button id="cmdRun" type="button" title="Ejecutar comando · Enter / Espacio">↵ RUN</button><span id="prompt">Comando listo</span></div>
 <footer id="statusbar"><button id="gridToggle">GRID F7</button><button id="orthoToggle">ORTHO F8</button><button id="snapToggle">SNAP F9</button><button id="polarToggle">POLAR F10</button><button id="osnapToggle">OSNAP F3</button><button id="draftQuick" title="Configurar ORTHO, OSNAP, POLAR y SNAP">⚙ DRAFTING</button><button id="crossToggle">CRUZ</button><button id="importReport" type="button" hidden title="Ver elementos importados con ajustes de compatibilidad">Informe CAD</button><button id="copyImportReport" type="button" hidden title="Copiar el diagnóstico de importación">Copiar diagnóstico</button><button id="convertedDxf" type="button" hidden title="Descargar en este dispositivo el DXF intermedio del DWG">DXF convertido</button><span id="status">OtroCAD · Motor geométrico alfa</span><span id="offlineState" role="status" style="font-size:11px;margin-left:auto;opacity:.8">Preparando modo sin conexión…</span></footer><input id="file" type="file" accept=".json,.dxf,.dwg" hidden><script src="demo/vivienda.js"></script><script src="library/furnishings.js"></script><script src="editor.js"></script><script src="civil3d.js"></script><script>
 (()=>{
- const media=window.matchMedia('(orientation: landscape) and (max-height: 500px)');
+ const media=window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 950px) and (pointer: coarse)');
  const button=document.getElementById('ribbonToggle');
  const groups=document.getElementById('groups');
+ const bottomToggle=document.getElementById('mobileBottomToggle');
+ function setBottomOpen(value){
+  const open=media.matches && !!value;
+  document.body.classList.toggle('cad-mobile-bottom-open',open);
+  bottomToggle.setAttribute('aria-expanded',String(open));
+  bottomToggle.setAttribute('aria-label',open?'Ocultar comandos y opciones de dibujo':'Mostrar comandos y opciones de dibujo');
+  bottomToggle.textContent=open?'✕ Cerrar':'☰ Opciones';
+ }
+ bottomToggle.addEventListener('click',()=>setBottomOpen(!document.body.classList.contains('cad-mobile-bottom-open')));
+ document.getElementById('stage').addEventListener('pointerdown',event=>{
+  if(!event.target.closest('#layoutBar'))setBottomOpen(false);
+ });
+ document.addEventListener('keydown',event=>{if(event.key==='Escape')setBottomOpen(false)});
  function setCollapsed(value){
   const collapsed=media.matches && value;
   document.body.classList.toggle('cad-ribbon-collapsed',collapsed);
@@ -245,8 +283,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   button.setAttribute('aria-label',collapsed?'Mostrar herramientas CAD':'Ocultar herramientas CAD');
  }
  button.addEventListener('click',()=>setCollapsed(!document.body.classList.contains('cad-ribbon-collapsed')));
- groups.addEventListener('click',event=>{if(media.matches && event.target.closest('button[data-tool]')) setCollapsed(true)});
- function onModeChange(){setCollapsed(media.matches)}
+ groups.addEventListener('click',event=>{if(media.matches && event.target.closest('button')) setCollapsed(true)});
+ function onModeChange(){setCollapsed(media.matches);setBottomOpen(false)}
  if(media.addEventListener) media.addEventListener('change',onModeChange); else media.addListener(onModeChange);
  onModeChange();
 })();
