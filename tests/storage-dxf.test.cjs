@@ -65,6 +65,7 @@ assert.equal(roundtrip[0].type,'arc');assert.equal(roundtrip[1].type,'ellipse');
 assert.ok(Math.abs(roundtrip[1].b.x-5)<1e-9);assert.ok(Math.abs(roundtrip[1].b.y-5)<1e-9);
 console.log('DXF round-trip checks passed: native arcs and aligned ellipses');
 const selectionScope = {objects:[],zoom:100,hiddenLayers:new Set(),lockedLayers:new Set(),screen:p=>({x:p.x*100,y:-p.y*100}),world:p=>({x:p.x/100,y:-p.y/100}),ctx:{save(){},restore(){},measureText:value=>({width:String(value).length*8})},pointInPolygon:(p,pts)=>{let inside=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];if(((a.y>p.y)!==(b.y>p.y))&&(p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y||1e-12)+a.x))inside=!inside}return inside},distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
+selectionScope.isVisibleModelEntity=s=>(s.cadLayout||'Model')==='Model'&&!selectionScope.hiddenLayers.has(s.layer);
 vm.createContext(selectionScope);
 vm.runInContext(source.slice(source.indexOf('const CAD_TEXT_FONT_CATALOG='),source.indexOf('\nfunction drawEntity(')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function arcParams('),source.indexOf('\nconst CAD_THEMES=')),selectionScope);
@@ -145,6 +146,7 @@ vm.runInContext('handleTap({x:2,y:3})',tapScope);assert.equal(tapScope.objects[0
 tapScope.tool='dimaligned';tapScope.start={x:0,y:0};vm.runInContext('handleTap({x:3,y:4})',tapScope);assert.equal(tapScope.committed.x,3);assert.equal(tapScope.committed.y,4);
 console.log('Text and aligned dimension creation checks passed');
 const snapScope={osnapOn:true,osEnd:false,osMid:false,osCenter:false,osQuadrant:true,osIntersection:false,snapRadius:12,zoom:100,objects:[{type:'circle',a:{x:0,y:0},b:{x:2,y:0}}],hiddenLayers:new Set(),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),pointLineDistance:(p,a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)},entitySegments:s=>[[s.a,s.b]]};
+snapScope.isVisibleModelEntity=s=>(s.cadLayout||'Model')==='Model'&&!snapScope.hiddenLayers.has(s.layer);
 vm.createContext(snapScope);vm.runInContext(source.slice(source.indexOf('function lineIntersection('),source.indexOf('function trimOrExtend(')),snapScope);vm.runInContext(source.slice(source.indexOf('function snapCandidate('),source.indexOf('function snapPoint(')),snapScope);
 let snap=vm.runInContext('snapCandidate({x:0.03,y:2.02})',snapScope);assert.equal(snap.type,'CUADRANTE');assert.equal(snap.point.y,2);
 snapScope.osQuadrant=false;snapScope.osIntersection=true;snapScope.objects=[{type:'line',a:{x:-1,y:0},b:{x:1,y:0}},{type:'line',a:{x:0,y:-1},b:{x:0,y:1}}];
@@ -550,3 +552,43 @@ assert.equal(editedMtextRoundtrip[0].isMText,true);
 assert.equal(editedMtextRoundtrip[0].textFontFile,'arialbd.ttf');
 assert.equal(editedMtextRoundtrip[0].text,'MTEXT EDITADO');
 console.log('Edited MTEXT export checks passed: MTEXT identity and selected font survive DXF round-trip');
+
+
+// Paper space must remain separate from model space and recover native layout tabs and VIEWPORTs.
+const paperLayoutDxf=[
+ '0','SECTION','2','HEADER','9','$INSUNITS','70','4','0','ENDSEC',
+ '0','SECTION','2','OBJECTS',
+ '0','LAYOUT','100','AcDbPlotSettings','40','10','44','420','45','297','100','AcDbLayout','1','PLANTA BAJA','71','1',
+ '0','LAYOUT','100','AcDbPlotSettings','40','5','44','297','45','210','100','AcDbLayout','1','DETALLES','71','2',
+ '0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','LINE','8','Muros','410','Model','10','0','20','0','11','9','21','0',
+ '0','TEXT','8','Rotulos','67','1','410','PLANTA BAJA','10','10','20','15','40','3','1','PLANTA BAJA',
+ '0','VIEWPORT','67','1','410','PLANTA BAJA','10','210','20','148.5','40','390','41','270','12','4.5','22','3','45','8','68','2','69','2',
+ '0','TEXT','8','Notas','67','1','410','DETALLES','10','30','20','20','40','2.5','1','CUADRO DE ACABADOS',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const paperParsed=context.parseDxfEntities(paperLayoutDxf);
+assert.equal(paperParsed.length,3,'A viewport is metadata, not a free geometry primitive');
+assert.equal(paperParsed[0].cadLayout,'Model');
+assert.equal(paperParsed[1].cadLayout,'PLANTA BAJA');
+assert.equal(paperParsed[2].cadLayout,'DETALLES');
+assert.deepEqual(Array.from(paperParsed.layoutDefinitions.map(l=>l.name)),['PLANTA BAJA','DETALLES']);
+assert.equal(paperParsed.layoutDefinitions[0].paperWidth,420);
+assert.equal(paperParsed.layoutDefinitions[0].paperHeight,297);
+assert.equal(paperParsed.layoutDefinitions[1].paperWidth,297);
+assert.equal(paperParsed.layoutViewports.length,1);
+assert.equal(paperParsed.layoutViewports[0].layout,'PLANTA BAJA');
+assert.equal(paperParsed.layoutViewports[0].viewHeight,8);
+assert.equal(paperParsed.layoutViewports[0].viewCenter.x,4.5);
+context.objects=paperParsed;
+const paperRoundtrip=vm.runInContext('buildDxf()',context);
+assert.match(paperRoundtrip,/410\r\nPLANTA BAJA\r\n/);
+const roundtripSpaces=context.parseDxfEntities(paperRoundtrip);
+assert.equal(roundtripSpaces[0].cadLayout,'Model');
+assert.equal(roundtripSpaces[1].cadLayout,'PLANTA BAJA');
+assert.equal(roundtripSpaces[2].cadLayout,'DETALLES');
+const anonymousPaper=context.parseDxfEntities(['0','SECTION','2','ENTITIES','0','TEXT','67','1','10','0','20','0','40','2','1','NOTA','0','ENDSEC','0','EOF'].join('\n'));
+assert.equal(anonymousPaper[0].cadLayout,'Layout1','67 paperspace requires a fallback layout name');
+assert.equal(anonymousPaper.layoutDefinitions[0].name,'Layout1');
+console.log('CAD layout checks passed: native layouts, paper entity separation, viewports, 67 fallback and DXF space roundtrip');

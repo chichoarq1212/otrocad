@@ -2,6 +2,7 @@
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,selectedSet=new Set(),modifyTargets=[],poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
 let lastCommand='',cursorCommandEl=null,contextMenuEl=null,activeFurniture=null;
+let activeLayout='Model',layouts=[],layoutViewportRecords=[],hideModelAnnotations=false,layoutRenderTransform=null;
 function newGroupId(){return 'bloque-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}
 let rightClickMode='context',rightClickDuringCommand='enter';
 try{const prefs=JSON.parse(localStorage.getItem('otrocad-mouse-preferences')||'{}');if(['context','repeat'].includes(prefs.mode))rightClickMode=prefs.mode;if(['enter','context'].includes(prefs.active))rightClickDuringCommand=prefs.active}catch(e){}
@@ -16,7 +17,7 @@ function resolveCadColor(s,lightBackground=false){
  return base;
 }
 function canvasIsLight(){
- if(printing)return true;
+ if(printing||activeLayout!=='Model')return true;
  const bg=getComputedStyle($('#stage')).backgroundColor;
  const values=bg.match(/[0-9.]+/g);
  if(!values||values.length<3)return false;
@@ -26,7 +27,7 @@ function canvasIsLight(){
 const clone=x=>JSON.parse(JSON.stringify(x));
 let storageWarningShown=false;
 function storageWarning(){if(!storageWarningShown){storageWarningShown=true;alert('No se pudo guardar la copia local. Descarga una copia del proyecto y comprueba el espacio o los permisos del navegador.')}}
-function backupPrevious(){try{localStorage.setItem('otrocad-drawing-previous',JSON.stringify({shapes:objects,units}));return true}catch(e){storageWarning();return false}}
+function backupPrevious(){try{localStorage.setItem('otrocad-drawing-previous',JSON.stringify({shapes:objects,units,layouts:typeof layouts==='undefined'?[]:layouts,viewports:typeof layoutViewportRecords==='undefined'?[]:layoutViewportRecords,activeLayout:typeof activeLayout==='undefined'?'Model':activeLayout}));return true}catch(e){storageWarning();return false}}
 function checkpoint(){const backedUp=backupPrevious();undo.push(clone(objects));if(undo.length>100)undo.shift();redo=[];return backedUp}
 function selectedItems(){const out=new Set(selectedSet);if(selected>=0)out.add(selected);return [...out].filter(i=>i>=0&&i<objects.length).sort((a,b)=>a-b)}
 function applySelection(indices,additive=false){const next=additive?new Set(selectedItems()):new Set(),groups=new Set();for(const i of indices)if(i>=0&&i<objects.length){next.add(i);if(objects[i]?.groupId)groups.add(objects[i].groupId)}if(groups.size)objects.forEach((o,j)=>{if(groups.has(o.groupId)&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer))next.add(j)});selectedSet=next;selected=next.size?[...next].sort((a,b)=>a-b).at(-1):-1}
@@ -34,7 +35,7 @@ function clearSelection(){selected=-1;selectedSet.clear()}
 function deleteSelection(){const ids=selectedItems();if(!ids.length)return;checkpoint();ids.sort((a,b)=>b-a).forEach(i=>objects.splice(i,1));clearSelection();save();render();status.textContent=ids.length===1?'Objeto eliminado':ids.length+' objetos eliminados'}
 function save(){try{localStorage.setItem('otrocad-drawing',JSON.stringify(objects));localStorage.setItem('otrocad-units',units);return true}catch(e){storageWarning();return false}}
 function world(p){return{x:(p.x-canvas.clientWidth/2-offset.x)/zoom,y:(canvas.clientHeight/2+offset.y-p.y)/zoom}}
-function screen(p){return{x:canvas.clientWidth/2+offset.x+p.x*zoom,y:canvas.clientHeight/2+offset.y-p.y*zoom}}
+function screen(p){if(layoutRenderTransform)return{x:layoutRenderTransform.tx+p.x*layoutRenderTransform.scale,y:layoutRenderTransform.ty-p.y*layoutRenderTransform.scale};return{x:canvas.clientWidth/2+offset.x+p.x*zoom,y:canvas.clientHeight/2+offset.y-p.y*zoom}}
 function pointer(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
 function round(p){return{x:Math.round(p.x*1000)/1000,y:Math.round(p.y*1000)/1000}}
 function distance(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
@@ -45,7 +46,7 @@ function snapCandidate(p){
  if(!osnapOn)return null;
  let best=null,limit=snapRadius/zoom;
  for(const s of objects){
-  if(hiddenLayers.has(s.layer))continue;
+  if(!isVisibleModelEntity(s))continue;
   const pts=[];
   if(osEnd){
    if(s.a&&!['circle','ellipse','text'].includes(s.type))pts.push({point:s.a,type:'PUNTO FINAL'});
@@ -63,7 +64,7 @@ function snapCandidate(p){
  }
  if(osIntersection){
   const near=[],radius=snapRadius/zoom;
-  for(const s of objects){if(hiddenLayers.has(s.layer)||!['line','poly','polygon','rect'].includes(s.type))continue;for(const [a,b] of entitySegments(s)){if(pointLineDistance(p,a,b)<=radius){near.push([a,b]);if(near.length>=256)break}}if(near.length>=256)break}
+  for(const s of objects){if(!isVisibleModelEntity(s)||!['line','poly','polygon','rect'].includes(s.type))continue;for(const [a,b] of entitySegments(s)){if(pointLineDistance(p,a,b)<=radius){near.push([a,b]);if(near.length>=256)break}}if(near.length>=256)break}
   for(let i=0;i<near.length;i++)for(let j=i+1;j<near.length;j++){const hit=lineIntersection(near[i][0],near[i][1],near[j][0],near[j][1],true);if(hit){const d=distance(p,hit);if(d<limit){limit=d;best={point:{x:hit.x,y:hit.y},type:'INTERSECCIÓN'}}}}
  }
 
@@ -268,7 +269,7 @@ function cadTextBoundsWorld(s){
 }
 
 function drawEntity(s,sel=false,preview=false){
- ctx.save();const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
+ ctx.save();const drawZoom=layoutRenderTransform?.scale||zoom;const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
  const a=s.a&&screen(s.a),b=s.b&&screen(s.b);
  if(s.type==='point'){ctx.beginPath();ctx.moveTo(a.x-4,a.y);ctx.lineTo(a.x+4,a.y);ctx.moveTo(a.x,a.y-4);ctx.lineTo(a.x,a.y+4);ctx.stroke()}
  else if(s.type==='line'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
@@ -290,7 +291,7 @@ function drawEntity(s,sel=false,preview=false){
    if(!strokeCadHatchPattern(s,allPoints)){
     const xs=allPoints.map(p=>p.x),ys=allPoints.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
     const radius=Math.min(30000,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))+20);
-    const spacing=Math.max(5,Math.min(100,Math.abs(Number(s.hatchSpacingWorld)||.2)*zoom));
+    const spacing=Math.max(5,Math.min(100,Math.abs(Number(s.hatchSpacingWorld)||.2)*drawZoom));
     ctx.translate(cx,cy);ctx.rotate(-Number(s.hatchAngle||45)*Math.PI/180);ctx.lineWidth=.8;
     let lines=0;for(let x=-radius;x<=radius&&lines<800;x+=spacing,lines++){ctx.beginPath();ctx.moveTo(x,-radius);ctx.lineTo(x,radius);ctx.stroke()}
    }
@@ -300,20 +301,20 @@ function drawEntity(s,sel=false,preview=false){
  }
  else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
  else if(s.type==='text'){
-  const size=Math.max(.5,s.textHeightWorld?Number(s.textHeightWorld)*zoom:Number(s.textHeight||14));
+  const size=Math.max(.5,s.textHeightWorld?Number(s.textHeightWorld)*drawZoom:Number(s.textHeight||14));
   const fontFile=String(s.textFontFile||'txt.shx'),fontFamily=s.textFontFamily||cadFontFamilyFromFile(fontFile);
   const fontBold=Boolean(s.textFontBold)||/(?:bd|bold)/i.test(fontFile),fontItalic=Boolean(s.textFontItalic)||/(?:italic|oblique)/i.test(fontFile);
   ctx.font=(fontBold?'bold ':'')+(fontItalic?'italic ':'')+size+'px '+fontFamily;
   const value=String(s.text||'Texto'),mtext=Boolean(s.isMText)||Number(s.mtextWidthWorld||0)>0,widthFactor=Math.max(.05,Math.min(20,Number(s.textWidthFactor)||1));
   const oblique=Math.max(-80,Math.min(80,Number(s.textObliqueAngle||0)))*Math.PI/180,flags=Number(s.textGenerationFlags||0);
   const horizontal=Number(s.textHorizontalAlignment||0),vertical=Number(s.textVerticalAlignment||0);let renderWidthFactor=widthFactor;
-  if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=ctx.measureText(value).width*renderWidthFactor,target=Number(s.textFitWidthWorld)*zoom;if(natural>0)renderWidthFactor*=target/natural}
+  if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=ctx.measureText(value).width*renderWidthFactor,target=Number(s.textFitWidthWorld)*drawZoom;if(natural>0)renderWidthFactor*=target/natural}
   const anchor=(!mtext&&(horizontal||vertical)&&horizontal!==3&&horizontal!==5&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
   ctx.translate(anchor.x,anchor.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);
   ctx.transform(renderWidthFactor*(flags&2?-1:1),0,Math.tan(oblique),flags&4?-1:1,0,0);
   const lineHeight=size*1.2*(Number(s.mtextLineSpacingFactor)>0?Math.max(.5,Math.min(4,Number(s.mtextLineSpacingFactor))):1);
   if(mtext){
-   const requestedWidth=Number(s.mtextWidthWorld||0)*zoom/widthFactor;
+   const requestedWidth=Number(s.mtextWidthWorld||0)*drawZoom/widthFactor;
    const lines=requestedWidth>0?wrapCadTextLines(value,requestedWidth,t=>ctx.measureText(t).width):value.split('\n');
    const boxWidth=requestedWidth>0?requestedWidth:Math.max(0,...lines.map(line=>ctx.measureText(line).width));
    const attachment=Math.max(1,Math.min(9,Math.round(Number(s.mtextAttachment||1)))),column=(attachment-1)%3,row=Math.floor((attachment-1)/3);
@@ -376,13 +377,130 @@ function showDraftSettings(){
  };
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
 }
-function updatePrompt(){promptEl.textContent=tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
+function updatePrompt(){if(activeLayout!=='Model'){promptEl.textContent='PRESENTACIÓN · hoja de impresión · vuelve a Modelo para editar';return}promptEl.textContent=tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
+
+function isVisibleModelEntity(s){
+ return (s.cadLayout||'Model')==='Model'&&!hiddenLayers.has(s.layer)&&!(hideModelAnnotations&&s.type==='text');
+}
+function paperLayoutsSafe(){
+ return Array.isArray(layouts)?layouts.filter(x=>x&&typeof x.name==='string'&&x.name&&x.name!=='Model'):[];
+}
+function saveLayoutState(){
+ try{localStorage.setItem('otrocad-layout-state',JSON.stringify({layouts:paperLayoutsSafe(),viewports:layoutViewportRecords,activeLayout,hideModelAnnotations}))}catch(e){console.warn('No se pudieron guardar los layouts:',e)}
+}
+function refreshLayoutTabs(){
+ const tabs=$('#layoutTabs');if(!tabs)return;tabs.textContent='';
+ const add=(name,label)=>{
+  const button=document.createElement('button');button.type='button';button.textContent=label;button.className='cad-layout-tab'+(activeLayout===name?' active':'');button.setAttribute('aria-current',activeLayout===name?'page':'false');
+  button.onclick=()=>switchCadLayout(name);tabs.append(button)
+ };
+ add('Model','▦ Modelo');
+ paperLayoutsSafe().forEach(x=>add(x.name,'▤ '+x.name));
+ const settings=$('#paperSetup');if(settings){settings.hidden=activeLayout==='Model';settings.title='Configurar tamaño de hoja y encuadre de '+activeLayout}
+ const annotations=$('#toggleAnnotations');if(annotations){annotations.hidden=activeLayout!=='Model';annotations.textContent=hideModelAnnotations?'Textos: ocultos':'Textos: visibles';annotations.setAttribute('aria-pressed',String(hideModelAnnotations))}
+ document.body.classList.toggle('cad-paper-active',activeLayout!=='Model');
+}
+function switchCadLayout(name){
+ if(name!=='Model'&&!paperLayoutsSafe().some(x=>x.name===name))return false;
+ activeLayout=name;clearSelection();tool='select';start=null;temp=null;poly=[];arcPoints=[];modifyTarget=-1;modifyTargets=[];drag=null;selectionStart=null;selectionBox=null;selectionClickAnchor=null;gripDrag=null;activeSnap=null;
+ document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool==='select'));
+ if($('#properties'))$('#properties').classList.remove('open');
+ refreshLayoutTabs();saveLayoutState();updatePrompt();render();
+ status.textContent=name==='Model'?'Modelo · geometría a escala real':'Presentación '+name+' · hoja de impresión; para editar la geometría regresa a Modelo';
+ return true;
+}
+function createCadLayout(){
+ const suggested='Layout'+(paperLayoutsSafe().length+1);
+ const name=prompt('Nombre de la presentación',suggested);if(name===null)return;
+ const clean=name.trim().slice(0,48);
+ if(!clean||clean.toLowerCase()==='model'||paperLayoutsSafe().some(l=>l.name.toLowerCase()===clean.toLowerCase())){alert('Escribe un nombre de presentación distinto de los existentes.');return}
+ layouts.push({name:clean,paperWidth:420,paperHeight:297,margin:10,source:'new',viewportFit:'all'});
+ switchCadLayout(clean);
+}
+function modelExtentsForPaper(){
+ const modelObjects=objects.filter(o=>(o.cadLayout||'Model')==='Model'),geometry=modelObjects.filter(o=>o.type!=='text');const p=(geometry.length?geometry:modelObjects).flatMap(boundsPoints);
+ if(!p.length)return {center:{x:0,y:0},width:10,height:10};
+ const xs=p.map(v=>v.x),ys=p.map(v=>v.y),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
+ return{center:{x:(minx+maxx)/2,y:(miny+maxy)/2},width:Math.max(maxx-minx,.001),height:Math.max(maxy-miny,.001)};
+}
+function effectivePaperViewports(layout){
+ const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
+ if(imported.length)return imported.slice(0,20);
+ const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
+ const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
+ return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
+}
+function renderPaperLayout(){
+ const layout=paperLayoutsSafe().find(x=>x.name===activeLayout);if(!layout){activeLayout='Model';render();return}
+ const w=canvas.clientWidth,h=canvas.clientHeight;
+ const pw=Math.max(30,Number(layout.paperWidth)||420),ph=Math.max(30,Number(layout.paperHeight)||297);
+ const pad=printing?0:Math.max(22,Math.min(50,w*.06));
+ const scale=Math.max(.00001,Math.min((w-pad*2)/pw,(h-pad*2)/ph)),paperW=pw*scale,paperH=ph*scale,x0=(w-paperW)/2,y0=(h-paperH)/2;
+ const paperPoint=p=>({x:x0+Number(p.x)*scale,y:y0+(ph-Number(p.y))*scale});
+ ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':'#dfe6f1';ctx.fillRect(0,0,w,h);
+ ctx.save();if(!printing){ctx.shadowColor='#24354c55';ctx.shadowBlur=18;ctx.shadowOffsetY=5}
+ ctx.fillStyle='#fff';ctx.fillRect(x0,y0,paperW,paperH);ctx.restore();
+ ctx.save();ctx.beginPath();ctx.rect(x0,y0,paperW,paperH);ctx.clip();
+ const vps=effectivePaperViewports(layout);
+ for(const vp of vps){
+  const center=paperPoint(vp.center),vw=Number(vp.width)*scale,vh=Number(vp.height)*scale;
+  if(!Number.isFinite(vw)||!Number.isFinite(vh)||vw<=0||vh<=0)continue;
+  ctx.save();ctx.beginPath();ctx.rect(center.x-vw/2,center.y-vh/2,vw,vh);ctx.clip();
+  const drawingScale=vh/Math.max(1e-9,Number(vp.viewHeight)||1),viewCenter=vp.viewCenter||{x:0,y:0};
+  layoutRenderTransform={tx:center.x-Number(viewCenter.x||0)*drawingScale,ty:center.y+Number(viewCenter.y||0)*drawingScale,scale:drawingScale};
+  if(Number(vp.twist)){ctx.translate(center.x,center.y);ctx.rotate(-Number(vp.twist)*Math.PI/180);ctx.translate(-center.x,-center.y)}
+  for(const o of objects)if((o.cadLayout||'Model')==='Model'&&o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
+  for(const o of objects)if((o.cadLayout||'Model')==='Model'&&!o.importedHatch&&!hiddenLayers.has(o.layer)&&!(layout.hideModelText&&o.type==='text'))drawEntity(o);
+  layoutRenderTransform=null;ctx.restore();
+  if(!printing){ctx.save();ctx.strokeStyle='#3b8be1';ctx.lineWidth=1;ctx.setLineDash([5,4]);ctx.strokeRect(center.x-vw/2,center.y-vh/2,vw,vh);ctx.restore()}
+ }
+ layoutRenderTransform={tx:x0,ty:y0+paperH,scale};
+ for(const o of objects)if(o.cadLayout===activeLayout&&o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
+ for(const o of objects)if(o.cadLayout===activeLayout&&!o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
+ layoutRenderTransform=null;ctx.restore();
+ if(!printing){
+  ctx.save();const margin=Math.max(0,Math.min(Number(layout.margin)||0,Math.min(pw,ph)/4))*scale;
+  ctx.strokeStyle='#9eacbe';ctx.setLineDash([4,4]);ctx.strokeRect(x0+margin,y0+margin,Math.max(0,paperW-2*margin),Math.max(0,paperH-2*margin));ctx.setLineDash([]);
+  ctx.fillStyle='#193f77';ctx.font='bold 12px system-ui';ctx.fillText(layout.name+' · '+Math.round(pw)+' × '+Math.round(ph)+' mm',x0+5,Math.max(14,y0-8));ctx.restore();
+ }
+ $('#dynamic').style.display='none';
+}
+function showCadPaperSettings(){
+ const layout=paperLayoutsSafe().find(l=>l.name===activeLayout);if(!layout)return;
+ const sizes=[['A4',297,210],['A3',420,297],['A2',594,420],['A1',841,594],['A0',1189,841],['Carta',279.4,215.9],['Oficio',355.6,215.9]];
+ const dialog=document.createElement('dialog');dialog.className='cad-utility-dialog cad-paper-settings';
+ dialog.innerHTML='<form method="dialog"><h3>Configuración de presentación</h3><p>Define el formato de hoja y la ventana del modelo. Las entidades originales no se desplazan ni se eliminan.</p>'+
+ '<label>Formato de papel<select id="paperSize">'+sizes.map(x=>'<option value="'+x[0]+'">'+x[0]+'</option>').join('')+'<option value="custom">Personalizado</option></select></label>'+
+ '<label>Orientación<select id="paperOrientation"><option value="landscape">Horizontal</option><option value="portrait">Vertical</option></select></label>'+
+ '<label>Ancho (mm)<input id="paperWidth" type="number" min="30" max="2000" step="0.1"></label>'+
+ '<label>Alto (mm)<input id="paperHeight" type="number" min="30" max="2000" step="0.1"></label>'+
+ '<label>Margen guía (mm)<input id="paperMargin" type="number" min="0" max="100" step="1"></label>'+
+ '<label>Ventana de dibujo<select id="paperFit"><option value="imported">Conservar VIEWPORT importados</option><option value="all">Encuadrar todo el modelo</option></select></label>'+'<label>Escala de la vista (si se encuadra el modelo)<select id="paperScale"><option value="fit">Ajustar a la hoja</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option></select></label>'+'<label class="paper-check"><input type="checkbox" id="paperModelText"> Mostrar anotaciones de Modelo dentro de la ventana</label>'+
+ '<p id="paperWarning" role="status"></p><div class="cad-utility-actions"><button type="button" id="paperCancel">Cancelar</button><button type="button" id="paperApply">Aplicar</button></div></form>';
+ document.body.append(dialog);
+ const byId=id=>dialog.querySelector('#'+id);
+ byId('paperWidth').value=layout.paperWidth||420;byId('paperHeight').value=layout.paperHeight||297;byId('paperMargin').value=layout.margin??10;
+ byId('paperFit').value=layout.viewportFit==='all'?'all':'imported';byId('paperScale').value=String(layout.plotScale||'fit');byId('paperModelText').checked=!layout.hideModelText;
+ const found=sizes.find(p=>Math.abs(Math.max(layout.paperWidth,layout.paperHeight)-p[1])<1&&Math.abs(Math.min(layout.paperWidth,layout.paperHeight)-p[2])<1);
+ byId('paperSize').value=found?found[0]:'custom';byId('paperOrientation').value=layout.paperWidth>=layout.paperHeight?'landscape':'portrait';
+ const resizeFromPreset=()=>{const preset=sizes.find(p=>p[0]===byId('paperSize').value);if(!preset)return;const vertical=byId('paperOrientation').value==='portrait';byId('paperWidth').value=vertical?preset[2]:preset[1];byId('paperHeight').value=vertical?preset[1]:preset[2]};
+ byId('paperSize').onchange=resizeFromPreset;byId('paperOrientation').onchange=resizeFromPreset;
+ byId('paperCancel').onclick=()=>dialog.close();
+ byId('paperApply').onclick=()=>{
+  const pw=Number(byId('paperWidth').value),ph=Number(byId('paperHeight').value),margin=Number(byId('paperMargin').value);
+  if(!Number.isFinite(pw)||!Number.isFinite(ph)||pw<30||ph<30||pw>2000||ph>2000||!Number.isFinite(margin)||margin<0||margin>=Math.min(pw,ph)/3){byId('paperWarning').textContent='Revisa las medidas y los márgenes de impresión.';return}
+  layout.paperWidth=pw;layout.paperHeight=ph;layout.margin=margin;layout.viewportFit=byId('paperFit').value;layout.plotScale=byId('paperScale').value;layout.hideModelText=!byId('paperModelText').checked;
+  saveLayoutState();render();status.textContent='Hoja '+layout.name+' · '+pw+' × '+ph+' mm';dialog.close();
+ };
+ dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+}
 function render(){
+ if(activeLayout!=='Model'){renderPaperLayout();return}
  const finish=$('#finish-poly');finish.hidden=tool!=='poly'||poly.length===0;finish.disabled=poly.length<2;
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':(getComputedStyle($('#stage')).backgroundColor||'#101820');ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
  // Imported CAD hatches are background fills; keep dimensions, walls and labels visible on top.
- objects.forEach((s,i)=>{if(s.importedHatch&&!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
- objects.forEach((s,i)=>{if(!s.importedHatch&&!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
+ objects.forEach((s,i)=>{if(s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
+ objects.forEach((s,i)=>{if(!s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
  drawSelectionGrips();if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
  if(!printing&&temp)drawEntity(temp,false,true);
@@ -393,10 +511,10 @@ function render(){
  if(printing)$('#dynamic').style.display='none';else updateDynamic();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
-function setTool(t){parallelDirection=null;$('#offsetInline')?.remove();if(t==='offset')clearSelection();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
+function setTool(t){if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;$('#offsetInline')?.remove();if(t==='offset')clearSelection();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
 function selectAt(q){
  let found=-1,best=14/zoom;
- for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;let d=1e9;
+ for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(!isVisibleModelEntity(s)||lockedLayers.has(s.layer))continue;let d=1e9;
   if(s.type==='poly'||s.type==='polygon'){const loops=s.hatchLoops?.length?s.hatchLoops:[s.pts];for(const loop of loops){const count=loop.length-1+(s.type==='polygon'?1:0);for(let j=0;j<count;j++)d=Math.min(d,pointLineDistance(q,loop[j],loop[(j+1)%loop.length]))}}
   else if(s.type==='rect'||s.type==='hatch'){if(q.x>=Math.min(s.a.x,s.b.x)-best&&q.x<=Math.max(s.a.x,s.b.x)+best&&q.y>=Math.min(s.a.y,s.b.y)-best&&q.y<=Math.max(s.a.y,s.b.y)+best)d=0}
   else if(s.type==='ellipse'){const rx=Math.abs(s.b.x-s.a.x),ry=Math.abs(s.b.y-s.a.y);if(rx&&ry){const normalized=Math.hypot((q.x-s.a.x)/rx,(q.y-s.a.y)/ry);d=Math.abs(normalized-1)*Math.min(rx,ry)}}
@@ -423,10 +541,10 @@ function gripDescriptors(s){
  return out;
 }
 function drawSelectionGrips(){
- if(printing||tool!=='select')return;
+ if(printing||activeLayout!=='Model'||tool!=='select')return;
  ctx.save();
  for(const idx of selectedItems()){
-  const s=objects[idx];if(!s||hiddenLayers.has(s.layer))continue;
+  const s=objects[idx];if(!s||!isVisibleModelEntity(s))continue;
   for(const g of gripDescriptors(s)){
    const p=screen(g.p);ctx.fillStyle='#f7fbff';ctx.strokeStyle='#1675c9';ctx.lineWidth=1.4;ctx.fillRect(p.x-4,p.y-4,8,8);ctx.strokeRect(p.x-4,p.y-4,8,8);
   }
@@ -436,7 +554,7 @@ function drawSelectionGrips(){
 function findGripAt(p){
  let found=null,best=12;
  for(const idx of selectedItems()){
-  const s=objects[idx];if(!s||hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;
+  const s=objects[idx];if(!s||!isVisibleModelEntity(s)||lockedLayers.has(s.layer))continue;
   for(const g of gripDescriptors(s)){const q=screen(g.p),d=Math.hypot(p.x-q.x,p.y-q.y);if(d<best){best=d;found={index:idx,key:g.key}}}
  }
  return found;
@@ -795,7 +913,7 @@ function objectContainsPoint(s,p){
 function selectByWindow(rect,windowMode){
  const hits=[];
  for(let i=0;i<objects.length;i++){
-  const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;
+  const s=objects[i];if(!isVisibleModelEntity(s)||lockedLayers.has(s.layer))continue;
   const segs=entitySegments(s),pts=[];
   if(s.type==='text')pts.push(...cadTextBoundsWorld(s));
   else if(segs.length){for(const [a,b] of segs)pts.push(a,b)}
@@ -995,6 +1113,7 @@ document.addEventListener('pointerdown',e=>{if(contextMenuEl&&!contextMenuEl.con
 contextMenuEl.addEventListener('contextmenu',e=>e.preventDefault());
 
 canvas.addEventListener('pointerdown',e=>{
+ if(activeLayout!=='Model'){e.preventDefault();return}
  if(e.button===1){e.preventDefault();hideCadContextMenu();middlePan={pointerId:e.pointerId,point:pointer(e),offset:clone(offset)};canvas.setPointerCapture(e.pointerId);canvas.style.cursor='grabbing';status.textContent='PAN temporal · arrastra con la rueda presionada';return}
  if(e.button===2){e.preventDefault();return}
  stage.focus({preventScroll:true});hideCadContextMenu();
@@ -1007,6 +1126,7 @@ canvas.addEventListener('pointerdown',e=>{
  p.shiftForTrim=e.shiftKey;handleTap(p);
 });
 canvas.addEventListener('pointermove',e=>{
+ if(activeLayout!=='Model')return;
  const p=pointer(e);
  if(middlePan&&middlePan.pointerId===e.pointerId){offset.x=middlePan.offset.x+p.x-middlePan.point.x;offset.y=middlePan.offset.y+p.y-middlePan.point.y;render();return}cursor=p;updateCursorCommand();$('#crossinfo').textContent='X '+world(p).x.toFixed(3)+' '+units+' · Y '+world(p).y.toFixed(3)+' '+units+' · Z 0.000';
  if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);activeSnap=snapCandidate(world(p));if(activeSnap)status.textContent='OSNAP · '+activeSnap.type+' · clic para conectar';
@@ -1043,7 +1163,7 @@ function pointerEnd(e){
  render();
 }
 canvas.addEventListener('pointerup',pointerEnd);canvas.addEventListener('pointercancel',pointerEnd);
-canvas.addEventListener('dblclick',e=>{const p=pointer(e),hit=selectAt(world(p));if(hit>=0&&objects[hit]?.type==='text'){e.preventDefault();applySelection([hit]);showProperties();openTextEditor(hit)}});
+canvas.addEventListener('dblclick',e=>{if(activeLayout!=='Model')return;const p=pointer(e),hit=selectAt(world(p));if(hit>=0&&objects[hit]?.type==='text'){e.preventDefault();applySelection([hit]);showProperties();openTextEditor(hit)}});
 canvas.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('contextmenu',e=>{
@@ -1056,7 +1176,7 @@ canvas.addEventListener('contextmenu',e=>{
  if(!hasActiveCommand&&rightClickMode==='repeat'){hideCadContextMenu();repeatLastCommand();return}
  showCadContextMenu(e);
 });
-canvas.addEventListener('wheel',e=>{e.preventDefault();const p=pointer(e),before=world(p);zoom=Math.max(2,Math.min(500,zoom*(e.deltaY<0?1.12:.89)));const after=screen(before);offset.x+=p.x-after.x;offset.y+=p.y-after.y;render()},{passive:false});
+canvas.addEventListener('wheel',e=>{e.preventDefault();if(activeLayout!=='Model')return;const p=pointer(e),before=world(p);zoom=Math.max(2,Math.min(500,zoom*(e.deltaY<0?1.12:.89)));const after=screen(before);offset.x+=p.x-after.x;offset.y+=p.y-after.y;render()},{passive:false});
 function updateToggle(id,on){$(id).classList.toggle('active',on)}
 function toggle(id){const map={gridToggle:'gridOn',orthoToggle:'orthoOn',snapToggle:'snapOn',polarToggle:'polarOn',osnapToggle:'osnapOn',crossToggle:'crossOn'};const k=map[id];if(k==='gridOn')gridOn=!gridOn;if(k==='orthoOn')orthoOn=!orthoOn;if(k==='snapOn')snapOn=!snapOn;if(k==='polarOn')polarOn=!polarOn;if(k==='osnapOn')osnapOn=!osnapOn;if(k==='crossOn')crossOn=!crossOn;const values={gridOn,orthoOn,snapOn,polarOn,osnapOn,crossOn};updateToggle('#'+id,values[k]);saveDraftPreferences();render()}
 [['gridToggle',gridOn],['orthoToggle',orthoOn],['snapToggle',snapOn],['polarToggle',polarOn],['osnapToggle',osnapOn],['crossToggle',crossOn]].forEach(([id,on])=>updateToggle('#'+id,on));
@@ -1118,6 +1238,9 @@ function runCommand(raw){
  if(c==='BG'||c==='BACKGROUND'||c==='CANVASCOLOR'){const name=(parts[1]||'').toLowerCase();if(CAD_THEMES[name])applyCanvasTheme(name);else status.textContent='BACKGROUND WHITE | BLACK | DARK | GRAPHITE | SLATE | BLUEGRAY';return}
  if(c==='HATCHPATTERN'){const p=parts[1];if(['ANSI31','CROSS','GRID','SOLID'].includes(p)){$('#hatchPattern').value=p;status.textContent='HATCHPATTERN '+p}else status.textContent='HATCHPATTERN ANSI31 | CROSS | GRID | SOLID';return}
  if(c==='PR'||c==='PROPERTIES'||c==='CTRL+1'){$('#properties').classList.toggle('open');showProperties();return}
+ if(c==='MODEL'||c==='MODELO'){switchCadLayout('Model');return}
+ if(c==='LAYOUT'||c==='PAPERSPACE'||c==='PAPEL'){if(paperLayoutsSafe().length)switchCadLayout(paperLayoutsSafe()[0].name);else createCadLayout();return}
+ if(c==='LAYOUTNEW'||c==='NEWLAYOUT'){createCadLayout();return}
  if(['ED','TEXTEDIT','DDEDIT','EDITTEXT','STYLE','TEXTSTYLE'].includes(c)){editSelectedText();return}
  if(c==='SELECTTEXT'||c==='QSELECTTEXT'){const ids=objects.map((o,i)=>o.type==='text'&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer)?i:-1).filter(i=>i>=0);applySelection(ids);showProperties();status.textContent=ids.length+' textos seleccionados · ejecuta ED para cambiar formato en conjunto';return}
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
@@ -1154,10 +1277,10 @@ $('#finish-poly').onclick=finishPoly;
 $('#acceptPoint').onclick=()=>{const q=pointFromInputs();if(!q)return;if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)};
 $('#undo').onclick=()=>{if(undo.length){backupPrevious();redo.push(clone(objects));objects=undo.pop();clearSelection();save();render()}};
 $('#redo').onclick=()=>{if(redo.length){backupPrevious();undo.push(clone(objects));objects=redo.pop();clearSelection();save();render()}};
-$('#newDrawing').onclick=()=>{if(objects.length&&!confirm('¿Crear un dibujo nuevo? El dibujo actual será reemplazado. Descarga una copia antes si deseas conservarlo.'))return;if(!checkpoint()&&objects.length){alert('No se creó el dibujo nuevo porque no se pudo conservar la copia anterior.');return}objects=[];clearSelection();save();render();status.textContent='Nuevo dibujo creado'};
+$('#newDrawing').onclick=()=>{if(objects.length&&!confirm('¿Crear un dibujo nuevo? El dibujo actual será reemplazado. Descarga una copia antes si deseas conservarlo.'))return;if(!checkpoint()&&objects.length){alert('No se creó el dibujo nuevo porque no se pudo conservar la copia anterior.');return}objects=[];layouts=[];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;clearSelection();saveLayoutState();refreshLayoutTabs();save();render();status.textContent='Nuevo dibujo creado'};
 $('#save').onclick=()=>{if(save())status.textContent='Copia local guardada en este navegador'};
-$('#recover').onclick=()=>{let previous;try{previous=JSON.parse(localStorage.getItem('otrocad-drawing-previous')||'null')}catch(e){alert('No se puede leer la copia anterior.');return}const shapes=Array.isArray(previous)?previous:previous?.shapes;if(!Array.isArray(shapes)){alert('No hay una copia anterior disponible en este navegador.');return}if(!confirm('¿Recuperar la copia anterior? El dibujo actual pasará a ser la copia anterior.'))return;if(!checkpoint()&&objects.length){alert('No se recuperó la copia porque no se pudo conservar el dibujo actual.');return}objects=shapes;if(['m','cm','mm'].includes(previous?.units))units=previous.units;clearSelection();if(save())status.textContent='Copia anterior recuperada';render()};
-$('#demoHouse').onclick=async()=>{if(objects.length&&!confirm('¿Abrir la vivienda de demostración? Se conservará una copia anterior en este navegador.'))return;try{const demo=clone(window.otroCadDemo);if(!Array.isArray(demo.shapes)||!demo.shapes.length)throw Error('La demostración está vacía.');if(!checkpoint()&&objects.length)throw Error('No se abrió el ejemplo porque no se pudo conservar el dibujo anterior.');objects=demo.shapes;units='m';clearSelection();save();$('#fit').click();status.textContent='Vivienda de demostración · '+objects.length+' entidades editables'}catch(e){alert('No se pudo abrir la demostración: '+e.message)}};
+$('#recover').onclick=()=>{let previous;try{previous=JSON.parse(localStorage.getItem('otrocad-drawing-previous')||'null')}catch(e){alert('No se puede leer la copia anterior.');return}const shapes=Array.isArray(previous)?previous:previous?.shapes;if(!Array.isArray(shapes)){alert('No hay una copia anterior disponible en este navegador.');return}if(!confirm('¿Recuperar la copia anterior? El dibujo actual pasará a ser la copia anterior.'))return;if(!checkpoint()&&objects.length){alert('No se recuperó la copia porque no se pudo conservar el dibujo actual.');return}objects=shapes;if(['m','cm','mm'].includes(previous?.units))units=previous.units;layouts=Array.isArray(previous?.layouts)?previous.layouts:[];layoutViewportRecords=Array.isArray(previous?.viewports)?previous.viewports:[];activeLayout=typeof previous?.activeLayout==='string'&&layouts.some(l=>l.name===previous.activeLayout)?previous.activeLayout:'Model';clearSelection();saveLayoutState();refreshLayoutTabs();if(save())status.textContent='Copia anterior recuperada';render()};
+$('#demoHouse').onclick=async()=>{if(objects.length&&!confirm('¿Abrir la vivienda de demostración? Se conservará una copia anterior en este navegador.'))return;try{const demo=clone(window.otroCadDemo);if(!Array.isArray(demo.shapes)||!demo.shapes.length)throw Error('La demostración está vacía.');if(!checkpoint()&&objects.length)throw Error('No se abrió el ejemplo porque no se pudo conservar el dibujo anterior.');objects=demo.shapes;units='m';layouts=[];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();clearSelection();save();$('#fit').click();status.textContent='Vivienda de demostración · '+objects.length+' entidades editables'}catch(e){alert('No se pudo abrir la demostración: '+e.message)}};
 $('#open').onclick=()=>$('#file').click();
 let dwgRuntimePromise=null;
 async function getDwgRuntime(){
@@ -1178,8 +1301,8 @@ copyImportReportButton.onclick=async()=>{
  try{await navigator.clipboard.writeText(report);status.textContent='Diagnóstico CAD copiado. Puedes pegarlo en el chat.'}
  catch(error){console.warn('No se pudo copiar el diagnóstico:',error);alert(report)}
 };
-$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
- 'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,
+$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas');arr.layoutDefinitions=Array.isArray(v.layouts)?v.layouts:[];arr.layoutViewports=Array.isArray(v.viewports)?v.viewports:[]}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;layouts=clone(arr.layoutDefinitions||[]);layoutViewportRecords=clone(arr.layoutViewports||[]);activeLayout='Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
+ 'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,'Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model').length+' entidades','Presentaciones: '+(arr.layoutDefinitions||[]).map(l=>l.name+' ('+arr.filter(s=>s.cadLayout===l.name).length+' entidades)').join(', '),'Ventanas gráficas importadas: '+(arr.layoutViewports||[]).length,
  'Pérdidas o incompatibilidades:',...(arr.importWarnings?.length?arr.importWarnings:['Ninguna detectada']),
  'Ajustes visuales:',...(arr.importNotes?.length?arr.importNotes:['Ninguno']),
  'Causas dentro de bloques, cotas y sombreados (sin coordenadas):',
@@ -1231,6 +1354,31 @@ function parseDxfEntities(source){
  };
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
+ const importedLayouts=[];
+ for(const record of records){
+  if(record.type!=='LAYOUT')continue;
+  let part='',name='',width=0,height=0,margin=8,tabOrder=1;
+  for(const [code,value] of record.pairs){
+   if(code===100){part=value;continue}
+   if(part==='AcDbPlotSettings'){
+    if(code===44)width=Number(value);
+    if(code===45)height=Number(value);
+    if(code===40&&Number(value)>=0)margin=Math.max(0,Number(value));
+   }
+   if(part==='AcDbLayout'){
+    if(code===1)name=String(value).trim();
+    if(code===71)tabOrder=Number(value);
+   }
+  }
+  if(name&&name.toLowerCase()!=='model'){
+   importedLayouts.push({name,paperWidth:Number.isFinite(width)&&width>0?width:420,paperHeight:Number.isFinite(height)&&height>0?height:297,margin:Number.isFinite(margin)?margin:8,tabOrder:Number.isFinite(tabOrder)?tabOrder:1,source:'imported'});
+  }
+ }
+ const entitySpace=r=>{
+  const name=str(r,410,'').trim();
+  if(name)return name.toLowerCase()==='model'?'Model':name;
+  return get(r,67,0)===1?'Layout1':'Model';
+ };
  const out=[],warnings={},notes={},diagnostics={};let inEntities=false,activeAttributeGroup=null;
  const diagnose=(scope,counts)=>{for(const [name,count] of Object.entries(counts||{})){const key=scope+' → '+name;diagnostics[key]=(diagnostics[key]||0)+count}};
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
@@ -1425,7 +1573,7 @@ function parseDxfEntities(source){
   return {loops:closed,refs,types};
  };
  const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId,insertStyle)=>{
-  const item={...sourceItem,groupId},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
+  const item={...sourceItem,groupId,cadLayout:insertStyle?.cadLayout||sourceItem.cadLayout||'Model'},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
   if(insertStyle&&(sourceItem.layer==='0'||sourceItem.cadByBlock)){if(sourceItem.layer==='0')item.layer=insertStyle.layer;if(sourceItem.layer==='0'||sourceItem.cadByBlock)item.color=insertStyle.color;item.cadByBlock=false}
   let points=null;
   if(sourceItem.type==='circle'&&nonUniform&&sourceItem.a&&sourceItem.b){
@@ -1471,7 +1619,7 @@ function parseDxfEntities(source){
   if(r.type==='SECTION'){inEntities=str(r,2).toUpperCase()==='ENTITIES';continue}
   if(r.type==='ENDSEC'){inEntities=false;continue}
   if(!inEntities)continue;
-  const st=style(r),type=r.type;
+  const st={...style(r),cadLayout:entitySpace(r)},type=r.type;
   if(type==='SEQEND'&&activeAttributeGroup){activeAttributeGroup=null;continue}
   if(type==='POINT'){
    // DEFPOINTS is AutoCAD's non-printing dimension construction layer.
@@ -1513,7 +1661,7 @@ function parseDxfEntities(source){
    const pieces=parseBlockItems(geometry,Number(arguments[1]||0));
    if(!pieces.length){warn('DIMENSION sin entidades compatibles omitida');continue}
    const groupId='dxf-dimension-'+out.length;
-   for(const item of pieces)out.push({...item,groupId,layer:item.layer==='0'?st.layer:item.layer,color:item.layer==='0'?st.color:item.color});
+   for(const item of pieces)out.push({...item,groupId,cadLayout:st.cadLayout,layer:item.layer==='0'?st.layer:item.layer,color:item.layer==='0'?st.color:item.color});
    note('DIMENSION dibujada como geometría no asociativa');
    if(pieces.importWarnings?.length){warn('DIMENSION con elementos gráficos no compatibles');diagnose('DIMENSION',pieces.importWarningCounts);diagnose('DIMENSION',pieces.importDiagnostics)}
   }
@@ -1599,17 +1747,31 @@ function parseDxfEntities(source){
    const xs=all(r,10),ys=all(r,20),pts=xs.map((x,i)=>({x,y:ys[i]??0}));
    if(pts.length>=2)out.push({type:'poly',pts,...st});else warn('LEADER sin vértices omitida');
   }
-  else if(type==='VIEWPORT'){(out.layoutViewports??=[]).push({x:get(r,10),y:get(r,20),width:get(r,40),height:get(r,41),id:get(r,69)});note('VIEWPORT de presentación no editable')}
+  else if(type==='VIEWPORT'){
+    const vp={layout:st.cadLayout,center:{x:get(r,10),y:get(r,20)},width:get(r,40),height:get(r,41),viewCenter:{x:get(r,12)+get(r,17),y:get(r,22)+get(r,27)},viewHeight:get(r,45),twist:get(r,51),status:get(r,68,1),id:get(r,69)};
+    if(vp.width>0&&vp.height>0&&(vp.id!==1||vp.viewHeight>0)){(out.layoutViewports??=[]).push(vp);note('VIEWPORT de presentación preservado para vista en papel')}
+   }
   else if(type==='VERTEX'||type==='SEQEND'){}
   else warn(type+' omitido');
  }
+ const layoutMap=new Map(importedLayouts.map(info=>[info.name.toLowerCase(),info]));
+ for(const obj of out){
+  if(!obj.cadLayout||obj.cadLayout==='Model')continue;
+  if(!layoutMap.has(obj.cadLayout.toLowerCase()))layoutMap.set(obj.cadLayout.toLowerCase(),{name:obj.cadLayout,paperWidth:420,paperHeight:297,margin:8,tabOrder:layoutMap.size+1,source:'entity'});
+ }
+ for(const vp of out.layoutViewports||[]){
+  if(vp.layout==='Model')continue;
+  if(!layoutMap.has(vp.layout.toLowerCase()))layoutMap.set(vp.layout.toLowerCase(),{name:vp.layout,paperWidth:420,paperHeight:297,margin:8,tabOrder:layoutMap.size+1,source:'viewport'});
+ }
+ out.layoutDefinitions=[...layoutMap.values()].sort((a,b)=>a.tabOrder-b.tabOrder);
+ if(out.layoutDefinitions.length)note('Modelo y '+out.layoutDefinitions.length+' presentaciones diferenciados');
  out.importWarnings=Object.entries(warnings).map(([name,count])=>count+' '+name);
  out.importNotes=Object.entries(notes).map(([name,count])=>count+' '+name);
  out.importWarningCounts={...warnings};out.importDiagnostics=diagnostics;
  return out;
 }
 async function download(name,content,type){const blob=content instanceof Blob?content:new Blob([content],{type:type||'application/octet-stream'});if(window.OtroCadAndroid&&typeof window.OtroCadAndroid.saveFile==='function'){try{const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));window.OtroCadAndroid.saveFile(name,type||'application/octet-stream',btoa(binary));return}catch(err){console.error(err)}}const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1200)}
-$('#project').onclick=()=>download('otrocad.json',JSON.stringify({version:2,shapes:objects},null,2),'application/json');
+$('#project').onclick=()=>download('otrocad.json',JSON.stringify({version:3,shapes:objects,layouts,viewports:layoutViewportRecords},null,2),'application/json');
 $('#export').onclick=()=>{let s='<svg xmlns="http://www.w3.org/2000/svg"><g fill="none">';const attrs=o=>' stroke="'+(o.color||colors[o.layer]||colors.General)+'" stroke-width="'+(o.lineweight||.25)+'"'+(o.linetype==='DASHED'?' stroke-dasharray="6 4"':'');objects.forEach(o=>{const a=o.a,b=o.b,at=attrs(o);if(o.type==='line'||o.type==='dim')s+='<line'+at+' x1="'+a.x+'" y1="'+(-a.y)+'" x2="'+b.x+'" y2="'+(-b.y)+'"/>';else if(o.type==='point')s+='<circle'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" r="0.05"/>';else if(o.type==='circle')s+='<circle'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" r="'+distance(a,b)+'"/>';else if(o.type==='rect'||o.type==='hatch')s+='<rect'+at+' x="'+Math.min(a.x,b.x)+'" y="'+(-Math.max(a.y,b.y))+'" width="'+Math.abs(b.x-a.x)+'" height="'+Math.abs(b.y-a.y)+'"/>';else if(o.type==='ellipse')s+='<ellipse'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" rx="'+Math.abs(b.x-a.x)+'" ry="'+Math.abs(b.y-a.y)+'"/>';else if(o.pts)s+='<polyline'+at+' points="'+o.pts.map(p=>p.x+','+(-p.y)).join(' ')+'"/>';else if(o.type==='text')s+='<text'+at+' x="'+a.x+'" y="'+(-a.y)+'">'+String(o.text||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</text>'});download('otrocad.svg',s+'</g></svg>','image/svg+xml')};
 function buildDxf(){
  const arcGeometry=points=>{
@@ -1625,7 +1787,8 @@ function buildDxf(){
  const groups=new Set(objects.map(o=>o.groupId).filter(Boolean));
  const approximated=objects.filter(o=>['dim','dimaligned','leader'].includes(o.type)||(o.type==='hatch'&&(o.hatchPattern!=='SOLID'||Number(o.hatchOpacity??.18)!==1))||(o.type==='polygon'&&o.hatchPattern&&o.hatchPattern!=='SOLID')||(o.type==='arc'&&!arcGeometry(o.pts)));
  const unsupported=objects.filter(o=>!['line','dim','dimaligned','leader','circle','rect','hatch','poly','polygon','arc','ellipse','text','point'].includes(o.type)||(o.type==='ellipse'&&(!o.a||!o.b||o.a.x===o.b.x||o.a.y===o.b.y)));
- if((approximated.length||unsupported.length||renamedLayers||groups.size)&&!confirm('Este DXF aún no conserva todos los elementos con fidelidad: '+approximated.length+' se exportarán simplificados, '+unsupported.length+' se omitirán, '+renamedLayers+' tendrán nombres de capa ajustados y '+groups.size+' bloques se desagruparán. Conserva también una copia del proyecto. ¿Exportar de todos modos?'))return null;
+ const paperLayoutsForExport=typeof layouts!=='undefined'&&Array.isArray(layouts)?layouts:[];const paperViewportsForExport=typeof layoutViewportRecords!=='undefined'&&Array.isArray(layoutViewportRecords)?layoutViewportRecords:[];
+ if((approximated.length||unsupported.length||renamedLayers||groups.size||paperLayoutsForExport.length||paperViewportsForExport.length)&&!confirm('Este DXF aún no conserva todos los elementos con fidelidad: '+approximated.length+' simplificados, '+unsupported.length+' omitidos, '+renamedLayers+' capas renombradas, '+groups.size+' bloques desagrupados. '+(paperLayoutsForExport.length?'Hay '+paperLayoutsForExport.length+' hoja(s) cuya configuración de impresión o ventanas gráficas no se guardarán íntegramente en DXF; se conservarán las etiquetas de espacio de las entidades. ':'')+'Descarga también una copia de respaldo OtroCAD para conservar tus layouts. ¿Exportar?'))return null;
  const rows=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1021','9','$INSUNITS','70',String(({mm:4,cm:5,m:6})[units]||0),'0','ENDSEC'];
  const add=(...v)=>rows.push(...v.map(String));
  add(0,'SECTION',2,'TABLES',0,'TABLE',2,'LTYPE',5,'ABCD',100,'AcDbSymbolTable',70,2);
@@ -1645,7 +1808,7 @@ function buildDxf(){
   add(0,'ENDTAB',0,'ENDSEC',0,'SECTION',2,'ENTITIES');
  objects.forEach(o=>{
   const a=o.a,b=o.b,layer=dxfLayer(o),color=String(o.color||colors[layer]||colors.General),rgb=/^#[0-9a-f]{6}$/i.test(color)?parseInt(color.slice(1),16):0xffffff;
-  const common=[100,'AcDbEntity',8,layer,370,Math.round(Number(o.lineweight||.25)*100),6,o.linetype==='DASHED'?'DASHED':'CONTINUOUS',420,rgb];
+  const space=String(o.cadLayout||'Model');const common=[100,'AcDbEntity',8,layer,67,space==='Model'?0:1,410,space,370,Math.round(Number(o.lineweight||.25)*100),6,o.linetype==='DASHED'?'DASHED':'CONTINUOUS',420,rgb];
   const line=(p,q)=>add(0,'LINE',...common,100,'AcDbLine',10,p.x,20,p.y,30,0,11,q.x,21,q.y,31,0);
   const textEntity=(p,value,height,rotation=0,source={})=>{
     const valueText=String(value||'').replace(/\r/g,''),styleName=dxfTextStyleName(source),widthFactor=Number(source.textWidthFactor||1),oblique=Number(source.textObliqueAngle||0);
@@ -1701,7 +1864,16 @@ $('#saveAsDxf').onclick=async()=>{
  const safe=name.trim().replace(/[\\/:*?"<>|]/g,'_');if(!safe){alert('Escribe un nombre para el archivo.');return}
  const filename=/\.dxf$/i.test(safe)?safe:safe+'.dxf';await download(filename,data,'application/dxf');status.textContent='Descarga DXF iniciada';
 };
-$('#pdf').onclick=()=>window.print();
+$('#pdf').onclick=()=>{
+ if(activeLayout==='Model'){
+  if(!paperLayoutsSafe().length){layouts.push({name:'Layout1',paperWidth:420,paperHeight:297,margin:10,viewportFit:'all',source:'new'})}
+  switchCadLayout(paperLayoutsSafe()[0].name);
+ }
+ const layout=paperLayoutsSafe().find(l=>l.name===activeLayout),styleId='cadDynamicPageSize';
+ let css=document.getElementById(styleId);if(!css){css=document.createElement('style');css.id=styleId;document.head.append(css)}
+ css.textContent='@page {size: '+(layout?.paperWidth||420)+'mm '+(layout?.paperHeight||297)+'mm; margin:0}';
+ window.print();
+};
 $('#propertiesBtn').onclick=()=>{$('#properties').classList.toggle('open');showProperties()};
 $('#zoomIn').onclick=()=>{zoom*=1.2;render()};$('#zoomOut').onclick=()=>{zoom/=1.2;render()};
 function boundsPoints(o){
@@ -1711,7 +1883,7 @@ function boundsPoints(o){
  if(o.type==='arc'&&o.pts?.length>=3){const g=arcParams(o.pts);if(g){const span=v=>(v+2*Math.PI)%(2*Math.PI);for(const t of [0,Math.PI/2,Math.PI,3*Math.PI/2]){const onArc=g.anticlockwise?span(g.a1-t)<=span(g.a1-g.a3):span(t-g.a1)<=span(g.a3-g.a1);if(onArc)pts.push(world({x:g.x+g.r*Math.cos(t),y:g.y+g.r*Math.sin(t)}))}}}
  return pts.filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));
 }
-$('#fit').onclick=()=>{const ps=objects.flatMap(boundsPoints);if(!ps.length){offset={x:0,y:0};zoom=35;render();return}const xs=ps.map(p=>p.x),ys=ps.map(p=>p.y),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);const availableWidth=Math.max(20,canvas.clientWidth-80),availableHeight=Math.max(20,canvas.clientHeight-80);zoom=Math.min(10000,Math.max(.001,Math.min(availableWidth/(maxx-minx||1),availableHeight/(maxy-miny||1))));offset.x=-(minx+maxx)/2*zoom;offset.y=(miny+maxy)/2*zoom;render()};
+$('#fit').onclick=()=>{const ps=objects.filter(isVisibleModelEntity).flatMap(boundsPoints);if(!ps.length){offset={x:0,y:0};zoom=35;render();return}const xs=ps.map(p=>p.x),ys=ps.map(p=>p.y),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);const availableWidth=Math.max(20,canvas.clientWidth-80),availableHeight=Math.max(20,canvas.clientHeight-80);zoom=Math.min(10000,Math.max(.001,Math.min(availableWidth/(maxx-minx||1),availableHeight/(maxy-miny||1))));offset.x=-(minx+maxx)/2*zoom;offset.y=(miny+maxy)/2*zoom;render()};
 $('#settingsBtn').onclick=showDraftSettings;$('#draftQuick').onclick=showDraftSettings;$('#snapBtn').onclick=showDraftSettings;$('#unitsBtn').onclick=showDraftSettings;
 $('#layer').onchange=()=>{$('#drawColor').value=colors[$('#layer').value]||colors.General};
 $('#newLayer').onclick=()=>{const name=prompt('Nombre de la nueva capa');if(name){const op=document.createElement('option');op.textContent=name;$('#layer').append(op);$('#layer').value=name;colors[name]='#62b8e8'}};
@@ -1720,6 +1892,15 @@ $('#layerVisibility').onclick=()=>{const l=$('#layer').value;if(hiddenLayers.has
 $('#layerLock').onclick=()=>{const l=$('#layer').value;if(lockedLayers.has(l)){lockedLayers.delete(l);$('#layerLock').textContent='Bloquear capa';status.textContent='Capa '+l+' desbloqueada'}else{lockedLayers.add(l);$('#layerLock').textContent='Desbloquear capa';status.textContent='Capa '+l+' bloqueada';applySelection(selectedItems().filter(i=>objects[i]?.layer!==l))}render()};
 $('#erase').onclick=()=>{if(selectedItems().length)deleteSelection();else if(confirm('¿Borrar todo el dibujo?')){checkpoint();objects=[];clearSelection();save();render()}};
 try{const saved=JSON.parse(localStorage.getItem('otrocad-drawing')||'[]');if(Array.isArray(saved))objects=saved}catch(e){}
+try{const sheet=JSON.parse(localStorage.getItem('otrocad-layout-state')||'{}');
+ if(Array.isArray(sheet.layouts))layouts=sheet.layouts;if(Array.isArray(sheet.viewports))layoutViewportRecords=sheet.viewports;
+ if(typeof sheet.activeLayout==='string'&&layouts.some(l=>l.name===sheet.activeLayout))activeLayout=sheet.activeLayout;
+ hideModelAnnotations=Boolean(sheet.hideModelAnnotations);
+}catch(e){console.warn('Configuración de papel omitida:',e)}
+refreshLayoutTabs();
+$('#paperCreate').onclick=createCadLayout;
+$('#paperSetup').onclick=showCadPaperSettings;
+$('#toggleAnnotations').onclick=()=>{hideModelAnnotations=!hideModelAnnotations;refreshLayoutTabs();saveLayoutState();render();status.textContent=hideModelAnnotations?'Textos de Modelo ocultos (no borrados)':'Textos de Modelo visibles'};
 window.addEventListener('beforeprint',()=>{printing=true;render()});window.addEventListener('afterprint',()=>{printing=false;render()});
 new ResizeObserver(resize).observe(stage);setTool('line');resize();
 })();
