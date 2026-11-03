@@ -359,7 +359,7 @@ function slopeAnalysis(){
  const colors=['#54b7a4','#b6bd58','#e5a34d','#d45c57'];
  const items=surface.triangles.map(tri=>{
   const slope=math.slopePercent(tri),index=slope<5?0:slope<15?1:slope<30?2:3;
-  return{type:'polygon',pts:tri.pts.map(p=>({x:p.x,y:p.y,z:p.z})),layer:'Análisis pendientes',color:colors[index],lineweight:.1,solidFill:true,hatchOpacity:.20,importedHatch:true,civilSlope:true,civilSurfaceId:surface.id,slopePercent:slope};
+  return{type:'polygon',pts:tri.pts.map(p=>({x:p.x,y:p.y,z:p.z})),layer:'Análisis pendientes',color:colors[index],lineweight:.1,solidFill:true,hatchOpacity:1,cadOpacity:.20,importedHatch:true,civilSlope:true,civilSurfaceId:surface.id,slopePercent:slope};
  });
  api.ensureLayer('Análisis pendientes','#d45c57');
  api.replaceObjects(o=>o.civilSlope&&o.civilSurfaceId===surface.id,items,'Mapa de pendientes · '+items.length+' triángulos · verde <5%, amarillo 5–15%, naranja 15–30%, rojo >30%');
