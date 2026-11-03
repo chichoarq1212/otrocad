@@ -773,3 +773,33 @@ assert.equal(leaderLabels[0].textHeightWorld,.2);
 assert.equal(leaderLabels[0].a.x,6);
 assert.match(leaderLabels[0].text,/COCINA/);
 console.log('CAD annotation recovery checks passed: room ATTDEF, ATTRIB de-duplication and MLEADER text');
+
+
+// Critical regression: TEXT/MTEXT use drawing-space anchor coordinates converted
+// by screen(), not raw world coordinates treated as canvas pixels.
+const textCanvasTranslations=[];
+const textRenderScope={
+ ctx:{
+  save(){},restore(){},setLineDash(){},translate(x,y){textCanvasTranslations.push([x,y])},
+  rotate(){},transform(){},fillText(){},measureText(value){return {width:String(value).length*8}}
+ },
+ zoom:100,layoutRenderTransform:null,
+ resolveCadColor:()=>'#222222',canvasIsLight:()=>true,cadLineDash:()=>[],
+ cadFontFamilyFromFile:()=>'"Arial", sans-serif',
+ wrapCadTextLines:(value)=>String(value).split('\n'),
+ screen(p){const q=this.layoutRenderTransform;return q?{x:q.tx+p.x*q.scale,y:q.ty-p.y*q.scale}:{x:500+p.x*this.zoom,y:400-p.y*this.zoom}}
+};
+textRenderScope.screen=p=>{
+ const transform=textRenderScope.layoutRenderTransform;
+ return transform?{x:transform.tx+p.x*transform.scale,y:transform.ty-p.y*transform.scale}:{x:500+p.x*textRenderScope.zoom,y:400-p.y*textRenderScope.zoom};
+};
+vm.createContext(textRenderScope);
+vm.runInContext(source.slice(source.indexOf('function drawEntity('),source.indexOf('\nfunction drawGrid(')),textRenderScope);
+vm.runInContext("drawEntity({type:'text',a:{x:2,y:3},text:'SALA',textHeightWorld:.2})",textRenderScope);
+assert.deepEqual(textCanvasTranslations.pop(),[700,100],'Model-space label must render at screen-projected position');
+vm.runInContext("drawEntity({type:'text',a:{x:2,y:3},text:'ALINEADO',textHeightWorld:.2,textAlignmentPoint:{x:4,y:5},textHorizontalAlignment:1})",textRenderScope);
+assert.deepEqual(textCanvasTranslations.pop(),[900,-100],'TEXT alignment point also requires world-to-screen projection');
+textRenderScope.layoutRenderTransform={tx:55,ty:500,scale:2};
+vm.runInContext("drawEntity({type:'text',a:{x:10,y:20},text:'CAJETIN',isMText:true,textHeightWorld:3})",textRenderScope);
+assert.deepEqual(textCanvasTranslations.pop(),[75,460],'Paper-space MTEXT must follow layout sheet transform rather than raw millimeter coords');
+console.log('CAD text projection checks passed: Model TEXT, aligned TEXT and Paper MTEXT anchors');
