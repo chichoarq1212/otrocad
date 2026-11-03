@@ -348,3 +348,50 @@ const curvedPolylineNote=context.parseDxfEntities([
 assert.ok(curvedPolylineNote.importNotes.some(w=>w.includes('polilíneas curvas aproximadas')));
 assert.ok(!curvedPolylineNote.importWarnings.length,'Tessellated curves should be a nonblocking compatibility note');
 console.log('HATCH fallback and nonblocking curve diagnostics checks passed');
+
+
+// DWG-to-DXF converters sometimes emit HATCH with only associative source handles.
+// Recover actual source contours rather than suppressing the omission warning.
+const associativeHatchFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','LWPOLYLINE','5','AA','8','Contornos','90','4','70','1',
+ '10','0','20','0','10','4','20','0','10','4','20','3','10','0','20','3',
+ '0','HATCH','5','BB','8','Relleno','2','SOLID','70','1','91','1',
+ '92','2','72','0','73','1','93','0','97','1','330','AA',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const associativeHatch=context.parseDxfEntities(associativeHatchFixture);
+assert.equal(associativeHatch.length,2,'Both the source polyline and associated HATCH should import');
+assert.equal(associativeHatch[1].type,'hatch','Associated closed rectangular boundary should recover a real hatch');
+assert.equal(associativeHatch[1].a.x,0);
+assert.equal(associativeHatch[1].b.x,4);
+assert.ok(associativeHatch.importNotes.some(x=>x.includes('HATCH recuperado desde contornos asociativos')));
+assert.ok(!associativeHatch.importWarnings.some(x=>x.includes('HATCH sin contorno')));
+
+const stitchedHatchFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','LINE','5','A1','10','0','20','0','11','3','21','0',
+ '0','LINE','5','A2','10','3','20','0','11','3','21','2',
+ '0','LINE','5','A3','10','3','20','2','11','0','21','2',
+ '0','LINE','5','A4','10','0','20','2','11','0','21','0',
+ '0','HATCH','2','SOLID','70','1','91','1','92','0','93','0','97','4',
+ '330','A3','330','A1','330','A4','330','A2',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const stitchedHatch=context.parseDxfEntities(stitchedHatchFixture);
+assert.equal(stitchedHatch.length,5,'Separate source LINE segments should reconstruct the closed hatch');
+assert.equal(stitchedHatch.at(-1).type,'hatch');
+assert.equal(stitchedHatch.at(-1).b.y,2);
+assert.ok(!stitchedHatch.importWarnings.length);
+
+const unclosedHatchFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','LINE','5','F1','10','0','20','0','11','3','21','0',
+ '0','HATCH','2','SOLID','70','1','91','1','92','0','93','0','97','1','330','F1',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const unclosedHatch=context.parseDxfEntities(unclosedHatchFixture);
+assert.equal(unclosedHatch.length,1,'An open boundary cannot be treated as a valid hatch');
+assert.ok(unclosedHatch.importWarnings.some(x=>x.includes('HATCH sin contorno')));
+assert.ok(Object.keys(unclosedHatch.importDiagnostics).some(x=>x.includes('referencias=1')));
+console.log('Associative HATCH checks passed: closed polylines, stitched edges and unclosed-boundary safety');
