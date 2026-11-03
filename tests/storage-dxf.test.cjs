@@ -550,3 +550,43 @@ assert.equal(editedMtextRoundtrip[0].isMText,true);
 assert.equal(editedMtextRoundtrip[0].textFontFile,'arialbd.ttf');
 assert.equal(editedMtextRoundtrip[0].text,'MTEXT EDITADO');
 console.log('Edited MTEXT export checks passed: MTEXT identity and selected font survive DXF round-trip');
+
+
+// Paper space must remain separate from model space and recover native layout tabs and VIEWPORTs.
+const paperLayoutDxf=[
+ '0','SECTION','2','HEADER','9','$INSUNITS','70','4','0','ENDSEC',
+ '0','SECTION','2','OBJECTS',
+ '0','LAYOUT','100','AcDbPlotSettings','40','10','44','420','45','297','100','AcDbLayout','1','PLANTA BAJA','71','1',
+ '0','LAYOUT','100','AcDbPlotSettings','40','5','44','297','45','210','100','AcDbLayout','1','DETALLES','71','2',
+ '0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','LINE','8','Muros','410','Model','10','0','20','0','11','9','21','0',
+ '0','TEXT','8','Rotulos','67','1','410','PLANTA BAJA','10','10','20','15','40','3','1','PLANTA BAJA',
+ '0','VIEWPORT','67','1','410','PLANTA BAJA','10','210','20','148.5','40','390','41','270','12','4.5','22','3','45','8','68','2','69','2',
+ '0','TEXT','8','Notas','67','1','410','DETALLES','10','30','20','20','40','2.5','1','CUADRO DE ACABADOS',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const paperParsed=context.parseDxfEntities(paperLayoutDxf);
+assert.equal(paperParsed.length,3,'A viewport is metadata, not a free geometry primitive');
+assert.equal(paperParsed[0].cadLayout,'Model');
+assert.equal(paperParsed[1].cadLayout,'PLANTA BAJA');
+assert.equal(paperParsed[2].cadLayout,'DETALLES');
+assert.deepEqual(Array.from(paperParsed.layoutDefinitions.map(l=>l.name)),['PLANTA BAJA','DETALLES']);
+assert.equal(paperParsed.layoutDefinitions[0].paperWidth,420);
+assert.equal(paperParsed.layoutDefinitions[0].paperHeight,297);
+assert.equal(paperParsed.layoutDefinitions[1].paperWidth,297);
+assert.equal(paperParsed.layoutViewports.length,1);
+assert.equal(paperParsed.layoutViewports[0].layout,'PLANTA BAJA');
+assert.equal(paperParsed.layoutViewports[0].viewHeight,8);
+assert.equal(paperParsed.layoutViewports[0].viewCenter.x,4.5);
+context.objects=paperParsed;
+const paperRoundtrip=vm.runInContext('buildDxf()',context);
+assert.match(paperRoundtrip,/410\r\nPLANTA BAJA\r\n/);
+const roundtripSpaces=context.parseDxfEntities(paperRoundtrip);
+assert.equal(roundtripSpaces[0].cadLayout,'Model');
+assert.equal(roundtripSpaces[1].cadLayout,'PLANTA BAJA');
+assert.equal(roundtripSpaces[2].cadLayout,'DETALLES');
+const anonymousPaper=context.parseDxfEntities(['0','SECTION','2','ENTITIES','0','TEXT','67','1','10','0','20','0','40','2','1','NOTA','0','ENDSEC','0','EOF'].join('\n'));
+assert.equal(anonymousPaper[0].cadLayout,'Layout1','67 paperspace requires a fallback layout name');
+assert.equal(anonymousPaper.layoutDefinitions[0].name,'Layout1');
+console.log('CAD layout checks passed: native layouts, paper entity separation, viewports, 67 fallback and DXF space roundtrip');
