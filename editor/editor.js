@@ -424,11 +424,35 @@ function modelExtentsForPaper(){
  return{center:{x:(minx+maxx)/2,y:(miny+maxy)/2},width:Math.max(maxx-minx,.001),height:Math.max(maxy-miny,.001)};
 }
 function effectivePaperViewports(layout){
- const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
+ const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&Number.isFinite(Number(v.viewHeight))&&Number(v.viewHeight)>1e-8&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
  if(imported.length)return imported.slice(0,20);
+ // Imported sheets without a recovered viewport must not display an invented model view.
+ // New sheets and the explicit "Encadrar todo el modelo" option can generate a view.
+ if(layout.source!=='new'&&layout.viewportFit!=='all')return [];
  const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
  const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
  return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
+}
+function describePaperLayoutState(layout,viewports){
+ const paperCount=objects.filter(x=>x.cadLayout===layout.name).length;
+ const importedCount=layoutViewportRecords.filter(x=>x.layout===layout.name&&x.id!==1).length;
+ const lines=[];
+ if(layout.source!=='new'&&!viewports.length&&layout.viewportFit!=='all')
+  lines.push(importedCount?'La ventana gráfica llegó sin una altura de vista válida; no se puede calcular su escala original.':'El archivo no proporcionó un VIEWPORT utilizable para esta hoja. Revisa ⚙ Hoja o el informe de importación.');
+ if(layout.source!=='new'&&paperCount===0)
+  lines.push('No se recuperaron entidades propias del espacio Papel para esta presentación.');
+ if(layout.source!=='new'&&viewports.length&&!objects.some(x=>(x.cadLayout||'Model')==='Model'))
+  lines.push('No se recuperó la geometría de Modelo necesaria para las ventanas gráficas.');
+ return {paperCount,importedCount,message:lines.join(' ')};
+}
+function showPaperLayoutNotice(layout,viewports){
+ let notice=document.getElementById('cadLayoutNotice');
+ if(!notice){notice=document.createElement('div');notice.id='cadLayoutNotice';notice.setAttribute('role','status');$('#stage').append(notice)}
+ const info=describePaperLayoutState(layout,viewports);
+ notice.hidden=!info.message;
+ if(info.message){
+  notice.textContent=layout.name+': '+info.message+' · Papel: '+info.paperCount+' entidades; VIEWPORT: '+info.importedCount;
+ }
 }
 function renderPaperLayout(){
  const layout=paperLayoutsSafe().find(x=>x.name===activeLayout);if(!layout){activeLayout='Model';render();return}
@@ -442,6 +466,7 @@ function renderPaperLayout(){
  ctx.fillStyle='#fff';ctx.fillRect(x0,y0,paperW,paperH);ctx.restore();
  ctx.save();ctx.beginPath();ctx.rect(x0,y0,paperW,paperH);ctx.clip();
  const vps=effectivePaperViewports(layout);
+ showPaperLayoutNotice(layout,vps);
  for(const vp of vps){
   const center=paperPoint(vp.center),vw=Number(vp.width)*scale,vh=Number(vp.height)*scale;
   if(!Number.isFinite(vw)||!Number.isFinite(vh)||vw<=0||vh<=0)continue;
@@ -496,6 +521,7 @@ function showCadPaperSettings(){
 }
 function render(){
  if(activeLayout!=='Model'){renderPaperLayout();return}
+ const oldPaperNotice=document.getElementById('cadLayoutNotice');if(oldPaperNotice)oldPaperNotice.hidden=true;
  const finish=$('#finish-poly');finish.hidden=tool!=='poly'||poly.length===0;finish.disabled=poly.length<2;
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':(getComputedStyle($('#stage')).backgroundColor||'#101820');ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
  // Imported CAD hatches are background fills; keep dimensions, walls and labels visible on top.
@@ -1301,8 +1327,8 @@ copyImportReportButton.onclick=async()=>{
  try{await navigator.clipboard.writeText(report);status.textContent='Diagnóstico CAD copiado. Puedes pegarlo en el chat.'}
  catch(error){console.warn('No se pudo copiar el diagnóstico:',error);alert(report)}
 };
-$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas');arr.layoutDefinitions=Array.isArray(v.layouts)?v.layouts:[];arr.layoutViewports=Array.isArray(v.viewports)?v.viewports:[]}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;layouts=clone(arr.layoutDefinitions||[]);layoutViewportRecords=clone(arr.layoutViewports||[]);activeLayout='Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
- 'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,'Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model').length+' entidades','Presentaciones: '+(arr.layoutDefinitions||[]).map(l=>l.name+' ('+arr.filter(s=>s.cadLayout===l.name).length+' entidades)').join(', '),'Ventanas gráficas importadas: '+(arr.layoutViewports||[]).length,
+$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas');arr.layoutDefinitions=Array.isArray(v.layouts)?v.layouts:[];arr.layoutViewports=Array.isArray(v.viewports)?v.viewports:[]}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;layouts=clone(arr.layoutDefinitions||[]);layoutViewportRecords=clone(arr.layoutViewports||[]);activeLayout=layouts.some(l=>l.name===arr.activeCadLayout)?arr.activeCadLayout:'Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
+ 'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,'Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model').length+' entidades','Presentaciones: '+(arr.layoutDefinitions||[]).map(l=>l.name+' ('+arr.filter(s=>s.cadLayout===l.name).length+' entidades)').join(', '),'Ventanas gráficas importadas: '+(arr.layoutViewports||[]).length,'Contenido de bloques Papel recuperado: '+(arr.paperBlockRecovery?.recovered||0)+' entidades', 'Pestaña original DWG: '+String(arr.activeCadLayout||'Model'),
  'Pérdidas o incompatibilidades:',...(arr.importWarnings?.length?arr.importWarnings:['Ninguna detectada']),
  'Ajustes visuales:',...(arr.importNotes?.length?arr.importNotes:['Ninguno']),
  'Causas dentro de bloques, cotas y sombreados (sin coordenadas):',
@@ -1354,10 +1380,22 @@ function parseDxfEntities(source){
  };
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
+ const blockNameToHandle=new Map(),handleToLayout=new Map();let inBtrTable=false,inTablesSection=false;
+ for(const record of records){
+  if(record.type==='SECTION'){inTablesSection=str(record,2).toUpperCase()==='TABLES';continue}
+  if(record.type==='ENDSEC'){inTablesSection=false;inBtrTable=false;continue}
+  if(!inTablesSection)continue;
+  if(record.type==='TABLE'){inBtrTable=str(record,2).toUpperCase()==='BLOCK_RECORD';continue}
+  if(record.type==='ENDTAB'){inBtrTable=false;continue}
+  if(inBtrTable&&record.type==='BLOCK_RECORD'){
+   const h=str(record,5,'').trim().toUpperCase(),name=str(record,2,'').toUpperCase();
+   if(h&&name)blockNameToHandle.set(name,h);
+  }
+ }
  const importedLayouts=[];
  for(const record of records){
   if(record.type!=='LAYOUT')continue;
-  let part='',name='',width=0,height=0,margin=8,tabOrder=1;
+  let part='',name='',width=0,height=0,margin=8,tabOrder=1,blockHandle='';
   for(const [code,value] of record.pairs){
    if(code===100){part=value;continue}
    if(part==='AcDbPlotSettings'){
@@ -1368,17 +1406,56 @@ function parseDxfEntities(source){
    if(part==='AcDbLayout'){
     if(code===1)name=String(value).trim();
     if(code===71)tabOrder=Number(value);
+    if(code===330)blockHandle=String(value).trim().toUpperCase();
    }
   }
   if(name&&name.toLowerCase()!=='model'){
-   importedLayouts.push({name,paperWidth:Number.isFinite(width)&&width>0?width:420,paperHeight:Number.isFinite(height)&&height>0?height:297,margin:Number.isFinite(margin)?margin:8,tabOrder:Number.isFinite(tabOrder)?tabOrder:1,source:'imported'});
+   if(blockHandle)handleToLayout.set(blockHandle,name);
+   importedLayouts.push({name,blockHandle,paperWidth:Number.isFinite(width)&&width>0?width:420,paperHeight:Number.isFinite(height)&&height>0?height:297,margin:Number.isFinite(margin)?margin:8,tabOrder:Number.isFinite(tabOrder)?tabOrder:1,source:'imported'});
   }
  }
+ const paperBlockToLayout=new Map(),unknownPaperBlocks=[];
+ for(const [blockName] of blockRecords){
+  if(!/^\*PAPER_SPACE(?:\d+)?$/i.test(blockName))continue;
+  const blockHandle=blockNameToHandle.get(blockName)||'',layoutName=handleToLayout.get(blockHandle);
+  if(layoutName)paperBlockToLayout.set(blockName,layoutName);else unknownPaperBlocks.push(blockName);
+ }
+ const unmatchedLayouts=importedLayouts.filter(l=>![...paperBlockToLayout.values()].includes(l.name));
+ for(const blockName of unknownPaperBlocks){
+  const suffix=blockName.replace(/^\*PAPER_SPACE/i,'');
+  const name=unknownPaperBlocks.length===1&&unmatchedLayouts.length===1?unmatchedLayouts[0].name:(suffix?'Papel recuperado '+suffix:'Papel recuperado');
+  paperBlockToLayout.set(blockName,name);
+ }
+ const activePaperLayout=paperBlockToLayout.get('*PAPER_SPACE')||(importedLayouts.length===1?importedLayouts[0].name:(importedLayouts.length?'Papel sin asociación':'Layout1'));
  const entitySpace=r=>{
   const name=str(r,410,'').trim();
   if(name)return name.toLowerCase()==='model'?'Model':name;
-  return get(r,67,0)===1?'Layout1':'Model';
+  const owner=str(r,330,'').toUpperCase();
+  if(handleToLayout.has(owner))return handleToLayout.get(owner);
+  return get(r,67,0)===1?activePaperLayout:'Model';
  };
+ const entitiesHandles=new Set();let originalEntities=false;
+ for(const rec of records){
+  if(rec.type==='SECTION'){originalEntities=str(rec,2).toUpperCase()==='ENTITIES';continue}
+  if(rec.type==='ENDSEC'){originalEntities=false;continue}
+  const h=str(rec,5,'').toUpperCase();if(originalEntities&&h)entitiesHandles.add(h);
+ }
+ const paperSpaceRecords=[],paperBlockBreakdown={},nestedBlockParse=Number(arguments[1]||0)>0;
+ for(const [blockName,geometry] of blockRecords){
+  if(nestedBlockParse)break;
+  if(!/^\*PAPER_SPACE(?:\d+)?$/i.test(blockName))continue;
+  const paperLayout=paperBlockToLayout.get(blockName)||'Papel sin asociación';let count=0;
+  for(const rec of geometry){
+   const handle=str(rec,5,'').toUpperCase();
+   if(handle&&entitiesHandles.has(handle))continue;
+   const pairs=rec.pairs.filter(([code])=>code!==67&&code!==410);
+   pairs.push([67,'1'],[410,paperLayout]);
+   paperSpaceRecords.push({type:rec.type,pairs,originalRecord:rec});count++;
+  }
+  paperBlockBreakdown[blockName+' → '+paperLayout]=count;
+ }
+ if(paperSpaceRecords.length>100000)throw Error('Presentaciones demasiado grandes (más de 100000 entidades en BLOCKS)');
+ const paperRecordsForImport=[...records,{type:'SECTION',pairs:[[2,'ENTITIES']]},...paperSpaceRecords,{type:'ENDSEC',pairs:[]}];
  const out=[],warnings={},notes={},diagnostics={};let inEntities=false,activeAttributeGroup=null;
  const diagnose=(scope,counts)=>{for(const [name,count] of Object.entries(counts||{})){const key=scope+' → '+name;diagnostics[key]=(diagnostics[key]||0)+count}};
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
@@ -1615,7 +1692,9 @@ function parseDxfEntities(source){
   styleTableSection.push('0','ENDTAB','0','ENDSEC');
   const parseBlockItems=(items,depth=0)=>parseDxfEntities([...styleTableSection,...blockSection,'0','SECTION','2','ENTITIES',...items.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n'),depth+1);
  const header=records.find(r=>r.type==='SECTION'&&str(r,2).toUpperCase()==='HEADER');const unitIndex=header?.pairs.findIndex(p=>p[0]===9&&p[1]==='$INSUNITS')??-1;const unitCode=unitIndex>=0?Number(header.pairs[unitIndex+1]?.[1]):0;const unitMap={4:'mm',5:'cm',6:'m'};if(unitCode&&!unitMap[unitCode])warn('unidades DXF no admitidas; valores sin convertir');out.drawingUnits=unitMap[unitCode]||null;
- for(const r of records){
+  const activeTabIndex=header?.pairs.findIndex(p=>p[0]===9&&p[1]==='$CTAB')??-1;
+  out.activeCadLayout=activeTabIndex>=0?String(header.pairs[activeTabIndex+1]?.[1]||'Model'):'Model';
+ for(const r of paperRecordsForImport){
   if(r.type==='SECTION'){inEntities=str(r,2).toUpperCase()==='ENTITIES';continue}
   if(r.type==='ENDSEC'){inEntities=false;continue}
   if(!inEntities)continue;
@@ -1630,7 +1709,7 @@ function parseDxfEntities(source){
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
   else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
   else if(type==='POLYLINE'){
-   const flags=get(r,70,0),vertices=polylineVertices.get(r)||[];
+   const flags=get(r,70,0),vertices=polylineVertices.get(r.originalRecord||r)||[];
    if(flags&(8|16|64)){warn('polilíneas 3D o malla no compatibles omitidas');continue}
    if(vertices.length<2){warn('POLYLINE sin vértices omitida');continue}
    const closed=Boolean(flags&1),pts=buildPolylinePoints(vertices,closed);
@@ -1765,6 +1844,8 @@ function parseDxfEntities(source){
  }
  out.layoutDefinitions=[...layoutMap.values()].sort((a,b)=>a.tabOrder-b.tabOrder);
  if(out.layoutDefinitions.length)note('Modelo y '+out.layoutDefinitions.length+' presentaciones diferenciados');
+ if(paperSpaceRecords.length)note(paperSpaceRecords.length+' entidades originales recuperadas desde BLOCKS de Layout');
+ out.paperBlockRecovery={recovered:paperSpaceRecords.length,breakdown:paperBlockBreakdown,unmatched:unknownPaperBlocks};
  out.importWarnings=Object.entries(warnings).map(([name,count])=>count+' '+name);
  out.importNotes=Object.entries(notes).map(([name,count])=>count+' '+name);
  out.importWarningCounts={...warnings};out.importDiagnostics=diagnostics;
