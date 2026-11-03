@@ -464,3 +464,47 @@ assert.equal(solidTrace[0].color,'#999999');
 assert.equal(solidTrace[0].pts[2].x,4,'Third rendered SOLID corner must use DXF vertex 13');
 assert.equal(solidTrace[0].pts[3].x,0,'Fourth rendered SOLID corner must use DXF vertex 12');
 console.log('SOLID and TRACE gray fills and non-crossing vertices passed');
+
+
+// Preserve AutoCAD STYLE tables, per-entity text height/width/oblique, and MTEXT layout.
+const textStyleFixture=[
+ '0','SECTION','2','TABLES',
+ '0','TABLE','2','STYLE',
+ '0','STYLE','2','ANOTACION','3','arial.ttf','4','','40','0','41','0.85','50','8','71','0','42','0.2',
+ '0','STYLE','2','TITULO','3','impact.ttf','4','','40','0.4','41','1.1','50','0','71','0','42','0.4',
+ '0','ENDTAB','0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','TEXT','8','Textos','7','ANOTACION','10','1','20','2','40','0.25','41','1.2','51','12','1','ANOTACIÓN',
+ '0','MTEXT','8','Textos','7','TITULO','10','3','20','4','40','0.4','41','2.5','44','1.1','71','5','1','ALCANCE DEL PROYECTO',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const styledTexts=context.parseDxfEntities(textStyleFixture);
+assert.equal(styledTexts.length,2);
+assert.equal(styledTexts[0].textStyleName,'ANOTACION');
+assert.equal(styledTexts[0].textFontFile,'arial.ttf');
+assert.equal(styledTexts[0].textHeightWorld,.25,'Entity height must override style fixed height');
+assert.equal(styledTexts[0].textWidthFactor,1.2);
+assert.equal(styledTexts[0].textObliqueAngle,12);
+assert.equal(styledTexts[1].textStyleName,'TITULO');
+assert.equal(styledTexts[1].textFontFile,'impact.ttf');
+assert.ok(styledTexts[1].textFontFamily.includes('Impact'));
+assert.equal(styledTexts[1].textHeightWorld,.4);
+assert.equal(styledTexts[1].mtextWidthWorld,2.5);
+assert.equal(styledTexts[1].mtextAttachment,5);
+assert.equal(styledTexts[1].mtextLineSpacingFactor,1.1);
+const wrappedCadText=JSON.parse(JSON.stringify(vm.runInContext("wrapCadTextLines('ALCANCE DE ESTA PROPUESTA',100,value=>value.length*10)",context)));
+assert.deepEqual(wrappedCadText,['ALCANCE DE','ESTA','PROPUESTA'],'MTEXT must wrap to its stored reference width');
+context.objects=styledTexts;accept=true;
+const styledDxf=vm.runInContext('buildDxf()',context);
+assert.match(styledDxf,/\nSTYLE\n/);
+assert.match(styledDxf,/impact\.ttf/);
+assert.match(styledDxf,/ANOTACION/);
+assert.match(styledDxf,/ALCANCE DEL PROYECTO/);
+context.styledDxf=styledDxf;
+const styledRoundtrip=vm.runInContext('parseDxfEntities(styledDxf)',context);
+assert.equal(styledRoundtrip.length,2);
+assert.equal(styledRoundtrip[0].textFontFile,'arial.ttf');
+assert.equal(styledRoundtrip[0].textWidthFactor,1.2);
+assert.equal(styledRoundtrip[1].mtextWidthWorld,2.5);
+assert.equal(styledRoundtrip[1].mtextAttachment,5);
+console.log('CAD text fidelity checks passed: STYLE table, font fallback, height, width factor, oblique, MTEXT wrapping and DXF round-trip');
