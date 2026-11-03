@@ -1,6 +1,6 @@
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
-use acadrust::{DwgReader, DwgWriter, DxfReader, DxfWriter, DxfVersion};
+use acadrust::{DwgReadOptions, DwgReader, DwgWriter, DxfReader, DxfWriter, DxfVersion};
 
 const MAX_INPUT_BYTES: usize = 100 * 1024 * 1024;
 
@@ -19,6 +19,24 @@ fn convert_dxf_to_dwg(input: &[u8]) -> Result<Vec<u8>, String> {
         return Err("El escritor no produjo una cabecera DWG AC1032 válida".into());
     }
     Ok(output)
+}
+
+fn convert_dwg_to_dxf_failsafe(input: &[u8]) -> Result<Vec<u8>, String> {
+    if input.len() < 6 { return Err("El archivo DWG es demasiado pequeño".into()); }
+    if input.len() > MAX_INPUT_BYTES { return Err("El DWG supera el límite de 100 MB".into()); }
+    if !input.starts_with(b"AC10") { return Err("El archivo no tiene una cabecera DWG compatible".into()); }
+    let mut reader = DwgReader::from_stream_with_options(
+        Cursor::new(input.to_vec()),
+        DwgReadOptions::failsafe(),
+    );
+    let outcome = reader.read_with_stats()
+        .map_err(|error| format!("La recuperación parcial del DWG falló: {error}"))?;
+    if outcome.stats.output_entities == 0 {
+        return Err("La recuperación no encontró entidades CAD editables; se conservó el dibujo original".into());
+    }
+    DxfWriter::new(&outcome.document)
+        .write_to_vec()
+        .map_err(|error| format!("No se pudo exportar el DWG recuperado a DXF: {error}"))
 }
 
 fn convert_dwg_to_dxf(input: &[u8]) -> Result<Vec<u8>, String> {
@@ -42,6 +60,11 @@ pub fn dwg_to_dxf(input: &[u8]) -> Result<Vec<u8>, JsValue> {
     convert_dwg_to_dxf(input).map_err(|message| JsValue::from_str(&message))
 }
 
+#[wasm_bindgen]
+pub fn dwg_to_dxf_failsafe(input: &[u8]) -> Result<Vec<u8>, JsValue> {
+    convert_dwg_to_dxf_failsafe(input).map_err(|message| JsValue::from_str(&message))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,6 +80,22 @@ mod tests {
             .and_then(|reader| reader.read())
             .expect("read round-trip DXF");
         assert_eq!(document.entities().count(), 3);
+    }
+
+    #[test]
+    fn failsafe_recovers_a_normal_ac1032_drawing() {
+        let dwg = convert_dxf_to_dwg(FIXTURE).expect("create DWG");
+        let dxf = convert_dwg_to_dxf_failsafe(&dwg).expect("recover valid DWG");
+        let document = DxfReader::from_reader(Cursor::new(dxf))
+            .and_then(|reader| reader.read())
+            .expect("read recovered DXF");
+        assert_eq!(document.entities().count(), 3);
+    }
+
+    #[test]
+    fn failsafe_rejects_unreadable_dwg_without_silent_empty_result() {
+        assert!(convert_dwg_to_dxf_failsafe(b"AC1032").is_err());
+        assert!(convert_dwg_to_dxf_failsafe(b"not a dwg").is_err());
     }
 
     #[test]
