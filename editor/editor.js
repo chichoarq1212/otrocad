@@ -1574,7 +1574,7 @@ $('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const
  'Ajustes visuales:',...(arr.importNotes?.length?arr.importNotes:['Ninguno']),
  'Causas dentro de bloques, cotas y sombreados (sin coordenadas):',
  ...((Object.entries(arr.importDiagnostics||{}).sort((a,b)=>b[1]-a[1]).map(([name,count])=>count+' '+name))||[])
-];importReportButton.hidden=false;copyImportReportButton.hidden=false;if(arr.drawingUnits)units=arr.drawingUnits;void persistImportCache();clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')+(arr.importNotes?.length?' · '+arr.importNotes.length+' avisos de compatibilidad':'');status.title=[...(arr.importWarnings||[]),...(arr.importNotes||[])].join('\n')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
+];importReportButton.hidden=false;copyImportReportButton.hidden=false;if(arr.drawingUnits)units=arr.drawingUnits;await persistImportCache();clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')+(arr.importNotes?.length?' · '+arr.importNotes.length+' avisos de compatibilidad':'');status.title=[...(arr.importWarnings||[]),...(arr.importNotes||[])].join('\n')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
 function parseDxfEntities(source){
  const lines=source.replace(/\r/g,'').split('\n'),pairs=[];
  for(let i=0;i+1<lines.length;i+=2){const code=Number(lines[i].trim());if(Number.isFinite(code))pairs.push([code,lines[i+1].trim()])}
