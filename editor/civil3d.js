@@ -431,7 +431,7 @@ function alignmentGrade(){
  if(z1===null||z2===null)throw Error('Los extremos del alineamiento deben estar dentro de la superficie.');
  if(length<=0)throw Error('El alineamiento no tiene longitud.');
  const slope=(z2-z1)/length*100,angle=Math.atan2(z2-z1,length)*180/Math.PI;
- alert('PENDIENTE LONGITUDINAL\\nLongitud: '+length.toFixed(3)+' '+api.getUnits()+'\\nCota inicial: '+z1.toFixed(3)+'\\nCota final: '+z2.toFixed(3)+'\\nPendiente: '+slope.toFixed(3)+' %\\nÁngulo: '+angle.toFixed(3)+'°');
+ alert('PENDIENTE LONGITUDINAL\nLongitud: '+length.toFixed(3)+' '+api.getUnits()+'\nCota inicial: '+z1.toFixed(3)+'\nCota final: '+z2.toFixed(3)+'\nPendiente: '+slope.toFixed(3)+' %\nÁngulo: '+angle.toFixed(3)+'°');
  api.setStatus('Pendiente del alineamiento · '+slope.toFixed(3)+' %');
 }
 function openProfileChart(title,samples,xLabel){
@@ -493,7 +493,7 @@ function volumeAnalysis(){
  const zs=surface.triangles.flatMap(t=>t.pts.map(p=>p.z)),mid=(Math.min(...zs)+Math.max(...zs))/2;
  const datum=numberValue(prompt('Cota del plano de comparación ('+api.getUnits()+')',mid.toFixed(3)));if(!Number.isFinite(datum))return;
  const v=math.volumes(surface.triangles,datum),units=api.getUnits()+'³';
- alert('VOLUMEN RESPECTO A LA COTA '+datum.toFixed(3)+'\\n\\nCorte: '+v.cut.toFixed(3)+' '+units+'\\nRelleno: '+v.fill.toFixed(3)+' '+units+'\\nBalance (relleno − corte): '+v.net.toFixed(3)+' '+units+'\\nÁrea TIN: '+v.area.toFixed(2)+' '+api.getUnits()+'²\\n\\nCálculo aproximado por integración de triángulos respecto a un plano horizontal.');
+ alert('VOLUMEN RESPECTO A LA COTA '+datum.toFixed(3)+'\n\nCorte: '+v.cut.toFixed(3)+' '+units+'\nRelleno: '+v.fill.toFixed(3)+' '+units+'\nBalance (relleno − corte): '+v.net.toFixed(3)+' '+units+'\nÁrea TIN: '+v.area.toFixed(2)+' '+api.getUnits()+'²\n\nCálculo aproximado por integración de triángulos respecto a un plano horizontal.');
 }
 function clearAnalysis(){
  if(!confirm('¿Eliminar las superficies TIN, curvas de nivel y análisis de pendientes generados? Los puntos XYZ y los alineamientos se conservarán.'))return;
