@@ -373,7 +373,7 @@ function doOffset(q){
  }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
  if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([objects.length-1]);render();status.textContent='OFFSET creado';
 }
-function handleTap(p,shiftForTrim=false){
+function handleTap(p){
  let q=snapPoint(world(p));q=constrain(q);
  if(!['select','pan','move','copy','offset','trim','extend','explode','measure'].includes(tool)&&lockedLayers.has($('#layer').value)){status.textContent='La capa '+$('#layer').value+' está bloqueada';return}
  if(tool==='arc'){
@@ -439,7 +439,7 @@ function handleTap(p,shiftForTrim=false){
  }
  if(tool==='trim'||tool==='extend'){
   const pick=world(p),idx=selectAt(pick);if(idx<0){status.textContent='Toca el tramo que deseas modificar';return}
-  const mode=tool==='trim'&&shiftForTrim?'extend':tool;
+  const mode=tool==='trim'&&p.shiftForTrim?'extend':tool;
   if(mode==='trim')quickTrim(idx,pick);else trimOrExtend(idx,pick,'extend');return;
  }
  if(['move','copy','rotate','mirror','scale'].includes(tool)){
@@ -711,7 +711,7 @@ canvas.addEventListener('pointerdown',e=>{
  if(tool==='select'){
   if(selectionClickAnchor){selectionStart=null;selectionBox={a:selectionClickAnchor,b:p};selectionAdditive=multiSelectOn||!!(e.shiftKey||e.ctrlKey||e.metaKey);finishSelectionWindow(selectionBox);selectionClickAnchor=null;selectionBox=null;render();return}
   const grip=findGripAt(p);if(grip){checkpoint();gripDrag={...grip,before:clone(objects[grip.index]),moved:false,historyAdded:true};return}selectionStart=p;selectionBox=null;selectionAdditive=multiSelectOn||!!(e.shiftKey||e.ctrlKey||e.metaKey);return}
- handleTap(p,e.shiftKey);
+ p.shiftForTrim=e.shiftKey;handleTap(p);
 });
 canvas.addEventListener('pointermove',e=>{
  const p=pointer(e);
