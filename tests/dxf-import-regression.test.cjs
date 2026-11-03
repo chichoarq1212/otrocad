@@ -23,6 +23,8 @@ const fixture=[
 '0','ENDSEC',
 '0','SECTION','2','ENTITIES',
 '0','INSERT','2','INTERV_PB','10','100','20','200','41','1','42','1','50','0',
+'0','LWPOLYLINE','8','PLANA','90','2','70','0','10','0','20','0','10','5','20','0',
+'0','LWPOLYLINE','8','CURVAS','90','2','70','0','38','125.5','10','0','20','0','10','5','20','0',
 '0','POINT','8','TOPO','10','1','20','2','30','125.75',
 '0','3DFACE','8','TIN','10','0','20','0','30','10','11','10','21','0','31','11','12','0','22','10','32','12','13','0','23','10','33','12','70','0',
 '0','ENDSEC','0','EOF'
@@ -35,6 +37,10 @@ assert.equal(recovered.type,'line');
 assert.ok(Math.abs(recovered.a.x-100)<1e-8&&Math.abs(recovered.a.y-200)<1e-8,'the recovered segment must respect the INSERT transform');
 assert.ok(Math.abs(recovered.b.y-200.1)<1e-8);
 assert.ok(result.importNotes.some(n=>n.includes('HATCH sólido degenerado recuperado como línea')),'the import report should explain the recovery');
+const flatPolyline=result.find(o=>o.layer==='PLANA');
+const elevatedPolyline=result.find(o=>o.layer==='CURVAS');
+assert.equal(flatPolyline.elevation,undefined,'flat 2D polylines must not be mistaken for zero-elevation contour data');
+assert.equal(elevatedPolyline.elevation,125.5,'LWPOLYLINE elevation must survive DXF import');
 const point=result.find(o=>o.type==='point');
 assert.equal(point.z,125.75,'POINT elevation must survive DXF import');
 const face=result.find(o=>o.civilTin);
