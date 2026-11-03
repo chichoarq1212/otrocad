@@ -479,10 +479,12 @@ const textStyleFixture=[
  '0','SECTION','2','ENTITIES',
  '0','TEXT','8','Textos','7','ANOTACION','10','1','20','2','40','0.25','41','1.2','51','12','71','2','1','ANOTACIÓN',
  '0','MTEXT','8','Textos','7','TITULO','10','3','20','4','40','0.4','41','2.5','44','1.1','71','5','1','ALCANCE DEL PROYECTO',
+ '0','MTEXT','8','Textos','7','TITULO','10','8','20','9','40','0.4','71','9','1','SIN ANCHO',
+ '0','TEXT','8','Textos','7','ANOTACION','10','5','20','6','11','7','21','6','40','0.25','72','3','73','0','1','AJUSTADO',
  '0','ENDSEC','0','EOF'
 ].join('\n');
 const styledTexts=context.parseDxfEntities(textStyleFixture);
-assert.equal(styledTexts.length,2);
+assert.equal(styledTexts.length,4);
 assert.equal(styledTexts[0].textStyleName,'ANOTACION');
 assert.equal(styledTexts[0].textFontFile,'arial.ttf');
 assert.equal(styledTexts[0].textHeightWorld,.25,'Entity height must override style fixed height');
@@ -497,6 +499,10 @@ assert.equal(styledTexts[1].textHeightWorld,.4);
 assert.equal(styledTexts[1].mtextWidthWorld,2.5);
 assert.equal(styledTexts[1].mtextAttachment,5);
 assert.equal(styledTexts[1].mtextLineSpacingFactor,1.1);
+assert.equal(styledTexts[2].isMText,true,'An MTEXT with no reference width must remain an MTEXT');
+assert.equal(styledTexts[2].mtextWidthWorld,0);
+assert.equal(styledTexts[3].textHorizontalAlignment,3);
+assert.equal(styledTexts[3].textFitWidthWorld,2);
 const wrappedCadText=JSON.parse(JSON.stringify(vm.runInContext("wrapCadTextLines('ALCANCE DE ESTA PROPUESTA',100,value=>value.length*10)",context)));
 assert.deepEqual(wrappedCadText,['ALCANCE DE','ESTA','PROPUESTA'],'MTEXT must wrap to its stored reference width');
 context.objects=styledTexts;accept=true;
@@ -507,9 +513,12 @@ assert.match(styledDxf,/ANOTACION/);
 assert.match(styledDxf,/ALCANCE DEL PROYECTO/);
 context.styledDxf=styledDxf;
 const styledRoundtrip=vm.runInContext('parseDxfEntities(styledDxf)',context);
-assert.equal(styledRoundtrip.length,2);
+assert.equal(styledRoundtrip.length,4);
 assert.equal(styledRoundtrip[0].textFontFile,'arial.ttf');
 assert.equal(styledRoundtrip[0].textWidthFactor,1.2);
 assert.equal(styledRoundtrip[1].mtextWidthWorld,2.5);
 assert.equal(styledRoundtrip[1].mtextAttachment,5);
+assert.equal(styledRoundtrip[2].isMText,true);
+assert.equal(styledRoundtrip[3].textHorizontalAlignment,3);
+assert.equal(styledRoundtrip[3].textAlignmentPoint.x,7);
 console.log('CAD text fidelity checks passed: STYLE table, font fallback, height, width factor, oblique, MTEXT wrapping and DXF round-trip');
