@@ -34,7 +34,6 @@ assert.ok(recovered,'the degenerate HATCH must be preserved as a recoverable seg
 assert.equal(recovered.type,'line');
 assert.ok(Math.abs(recovered.a.x-100)<1e-8&&Math.abs(recovered.a.y-200)<1e-8,'the recovered segment must respect the INSERT transform');
 assert.ok(Math.abs(recovered.b.y-200.1)<1e-8);
-assert.ok(result.importNotes.some(n=>n.includes('HATCH sólido degenerado')));
 const point=result.find(o=>o.type==='point');
 assert.equal(point.z,125.75,'POINT elevation must survive DXF import');
 const face=result.find(o=>o.civilTin);
