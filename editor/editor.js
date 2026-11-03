@@ -2,6 +2,7 @@
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,selectedSet=new Set(),modifyTargets=[],poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
 let lastCommand='',cursorCommandEl=null,contextMenuEl=null,activeFurniture=null;
+let activeLayout='Model',layouts=[],layoutViewportRecords=[],hideModelAnnotations=false,layoutRenderTransform=null;
 function newGroupId(){return 'bloque-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}
 let rightClickMode='context',rightClickDuringCommand='enter';
 try{const prefs=JSON.parse(localStorage.getItem('otrocad-mouse-preferences')||'{}');if(['context','repeat'].includes(prefs.mode))rightClickMode=prefs.mode;if(['enter','context'].includes(prefs.active))rightClickDuringCommand=prefs.active}catch(e){}
@@ -16,7 +17,7 @@ function resolveCadColor(s,lightBackground=false){
  return base;
 }
 function canvasIsLight(){
- if(printing)return true;
+ if(printing||activeLayout!=='Model')return true;
  const bg=getComputedStyle($('#stage')).backgroundColor;
  const values=bg.match(/[0-9.]+/g);
  if(!values||values.length<3)return false;
@@ -34,7 +35,7 @@ function clearSelection(){selected=-1;selectedSet.clear()}
 function deleteSelection(){const ids=selectedItems();if(!ids.length)return;checkpoint();ids.sort((a,b)=>b-a).forEach(i=>objects.splice(i,1));clearSelection();save();render();status.textContent=ids.length===1?'Objeto eliminado':ids.length+' objetos eliminados'}
 function save(){try{localStorage.setItem('otrocad-drawing',JSON.stringify(objects));localStorage.setItem('otrocad-units',units);return true}catch(e){storageWarning();return false}}
 function world(p){return{x:(p.x-canvas.clientWidth/2-offset.x)/zoom,y:(canvas.clientHeight/2+offset.y-p.y)/zoom}}
-function screen(p){return{x:canvas.clientWidth/2+offset.x+p.x*zoom,y:canvas.clientHeight/2+offset.y-p.y*zoom}}
+function screen(p){if(layoutRenderTransform)return{x:layoutRenderTransform.tx+p.x*layoutRenderTransform.scale,y:layoutRenderTransform.ty-p.y*layoutRenderTransform.scale};return{x:canvas.clientWidth/2+offset.x+p.x*zoom,y:canvas.clientHeight/2+offset.y-p.y*zoom}}
 function pointer(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
 function round(p){return{x:Math.round(p.x*1000)/1000,y:Math.round(p.y*1000)/1000}}
 function distance(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
@@ -268,7 +269,7 @@ function cadTextBoundsWorld(s){
 }
 
 function drawEntity(s,sel=false,preview=false){
- ctx.save();const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
+ ctx.save();const drawZoom=layoutRenderTransform?.scale||zoom;const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
  const a=s.a&&screen(s.a),b=s.b&&screen(s.b);
  if(s.type==='point'){ctx.beginPath();ctx.moveTo(a.x-4,a.y);ctx.lineTo(a.x+4,a.y);ctx.moveTo(a.x,a.y-4);ctx.lineTo(a.x,a.y+4);ctx.stroke()}
  else if(s.type==='line'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
@@ -290,7 +291,7 @@ function drawEntity(s,sel=false,preview=false){
    if(!strokeCadHatchPattern(s,allPoints)){
     const xs=allPoints.map(p=>p.x),ys=allPoints.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
     const radius=Math.min(30000,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))+20);
-    const spacing=Math.max(5,Math.min(100,Math.abs(Number(s.hatchSpacingWorld)||.2)*zoom));
+    const spacing=Math.max(5,Math.min(100,Math.abs(Number(s.hatchSpacingWorld)||.2)*drawZoom));
     ctx.translate(cx,cy);ctx.rotate(-Number(s.hatchAngle||45)*Math.PI/180);ctx.lineWidth=.8;
     let lines=0;for(let x=-radius;x<=radius&&lines<800;x+=spacing,lines++){ctx.beginPath();ctx.moveTo(x,-radius);ctx.lineTo(x,radius);ctx.stroke()}
    }
@@ -300,20 +301,20 @@ function drawEntity(s,sel=false,preview=false){
  }
  else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
  else if(s.type==='text'){
-  const size=Math.max(.5,s.textHeightWorld?Number(s.textHeightWorld)*zoom:Number(s.textHeight||14));
+  const size=Math.max(.5,s.textHeightWorld?Number(s.textHeightWorld)*drawZoom:Number(s.textHeight||14));
   const fontFile=String(s.textFontFile||'txt.shx'),fontFamily=s.textFontFamily||cadFontFamilyFromFile(fontFile);
   const fontBold=Boolean(s.textFontBold)||/(?:bd|bold)/i.test(fontFile),fontItalic=Boolean(s.textFontItalic)||/(?:italic|oblique)/i.test(fontFile);
   ctx.font=(fontBold?'bold ':'')+(fontItalic?'italic ':'')+size+'px '+fontFamily;
   const value=String(s.text||'Texto'),mtext=Boolean(s.isMText)||Number(s.mtextWidthWorld||0)>0,widthFactor=Math.max(.05,Math.min(20,Number(s.textWidthFactor)||1));
   const oblique=Math.max(-80,Math.min(80,Number(s.textObliqueAngle||0)))*Math.PI/180,flags=Number(s.textGenerationFlags||0);
   const horizontal=Number(s.textHorizontalAlignment||0),vertical=Number(s.textVerticalAlignment||0);let renderWidthFactor=widthFactor;
-  if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=ctx.measureText(value).width*renderWidthFactor,target=Number(s.textFitWidthWorld)*zoom;if(natural>0)renderWidthFactor*=target/natural}
+  if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=ctx.measureText(value).width*renderWidthFactor,target=Number(s.textFitWidthWorld)*drawZoom;if(natural>0)renderWidthFactor*=target/natural}
   const anchor=(!mtext&&(horizontal||vertical)&&horizontal!==3&&horizontal!==5&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
   ctx.translate(anchor.x,anchor.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);
   ctx.transform(renderWidthFactor*(flags&2?-1:1),0,Math.tan(oblique),flags&4?-1:1,0,0);
   const lineHeight=size*1.2*(Number(s.mtextLineSpacingFactor)>0?Math.max(.5,Math.min(4,Number(s.mtextLineSpacingFactor))):1);
   if(mtext){
-   const requestedWidth=Number(s.mtextWidthWorld||0)*zoom/widthFactor;
+   const requestedWidth=Number(s.mtextWidthWorld||0)*drawZoom/widthFactor;
    const lines=requestedWidth>0?wrapCadTextLines(value,requestedWidth,t=>ctx.measureText(t).width):value.split('\n');
    const boxWidth=requestedWidth>0?requestedWidth:Math.max(0,...lines.map(line=>ctx.measureText(line).width));
    const attachment=Math.max(1,Math.min(9,Math.round(Number(s.mtextAttachment||1)))),column=(attachment-1)%3,row=Math.floor((attachment-1)/3);
@@ -378,11 +379,12 @@ function showDraftSettings(){
 }
 function updatePrompt(){promptEl.textContent=tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
 function render(){
+ if(activeLayout!=='Model'){renderPaperLayout();return}
  const finish=$('#finish-poly');finish.hidden=tool!=='poly'||poly.length===0;finish.disabled=poly.length<2;
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':(getComputedStyle($('#stage')).backgroundColor||'#101820');ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
  // Imported CAD hatches are background fills; keep dimensions, walls and labels visible on top.
- objects.forEach((s,i)=>{if(s.importedHatch&&!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
- objects.forEach((s,i)=>{if(!s.importedHatch&&!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
+ objects.forEach((s,i)=>{if(s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
+ objects.forEach((s,i)=>{if(!s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
  drawSelectionGrips();if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
  if(!printing&&temp)drawEntity(temp,false,true);
@@ -393,7 +395,7 @@ function render(){
  if(printing)$('#dynamic').style.display='none';else updateDynamic();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
-function setTool(t){parallelDirection=null;$('#offsetInline')?.remove();if(t==='offset')clearSelection();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
+function setTool(t){if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;$('#offsetInline')?.remove();if(t==='offset')clearSelection();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;let d=1e9;
