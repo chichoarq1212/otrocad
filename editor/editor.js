@@ -166,7 +166,7 @@ function render(){
  if(printing)$('#dynamic').style.display='none';else updateDynamic();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
-function setTool(t){$('#offsetInline')?.remove();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
+function setTool(t){$('#offsetInline')?.remove();if(t==='offset')clearSelection();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;let d=1e9;
@@ -333,6 +333,7 @@ function showOffsetInput(){
  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopImmediatePropagation();accept()}else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();buttons[1].click()}});input.focus();input.select();status.textContent='OFFSET: ingresa la distancia';
 }
 function doOffset(q){
+ if($('#offsetInline'))return;
  if(selected<0){
   const hit=selectAt(q);applySelection(hit>=0?[hit]:[]);
   if(selected<0){status.textContent='Selecciona una entidad para OFFSET';return}
