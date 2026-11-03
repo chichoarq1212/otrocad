@@ -1961,7 +1961,7 @@ function parseDxfEntities(source){
   }
   else if(type==='LINE')out.push({type:'line',a:{x:get(r,10),y:get(r,20)},b:{x:get(r,11),y:get(r,21)},...st});
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
-  else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,elevation:get(r,38,0),...st})}
+  else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,elevation:r.pairs.some(pair=>pair[0]===38)?get(r,38,0):undefined,...st})}
   else if(type==='POLYLINE'){
    const flags=get(r,70,0),vertices=polylineVertices.get(r.originalRecord||r)||[];
    if(flags&(8|16|64)){warn('polilíneas 3D o malla no compatibles omitidas');continue}
@@ -2185,7 +2185,7 @@ function buildDxf(){
    }
    else if(o.type==='hatch'&&o.hatchPattern==='SOLID'&&Number(o.hatchOpacity??.18)===1&&a&&b){const ps=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];add(0,'HATCH',...common,100,'AcDbHatch',10,0,20,0,30,0,210,0,220,0,230,1,2,'SOLID',70,1,71,0,91,1,92,3,72,0,73,1,93,4);ps.forEach(p=>add(10,p.x,20,p.y));add(97,0,75,1,76,1,98,0)}
   else if((o.type==='rect'||o.type==='hatch')&&a&&b){const ps=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,4,70,1);ps.forEach(p=>add(10,p.x,20,p.y))}
-  else if(o.pts){add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,o.pts.length,70,o.type==='polygon'?1:0,38,Number(o.elevation)||0);o.pts.forEach(p=>add(10,p.x,20,p.y))}
+  else if(o.pts){add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,o.pts.length,70,o.type==='polygon'?1:0,...(Number.isFinite(Number(o.elevation))?[38,Number(o.elevation)]:[]));o.pts.forEach(p=>add(10,p.x,20,p.y))}
  });
  add(0,'ENDSEC',0,'EOF');return rows.join('\r\n')+'\r\n';
 }
