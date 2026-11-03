@@ -118,7 +118,22 @@ function drawEntity(s,sel=false,preview=false){
  else if(s.type==='circle'){ctx.beginPath();ctx.arc(a.x,a.y,distance(a,b),0,Math.PI*2);ctx.stroke()}
  else if(s.type==='rect'||s.type==='hatch'){const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y);ctx.strokeRect(x,y,w,h);if(s.type==='hatch'){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.lineWidth=.8;const spacing=Math.max(5,Math.min(60,Number(s.hatchSpacing||10)));const pattern=s.hatchPattern||'ANSI31';if(pattern==='SOLID'){ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??.18)));ctx.fillRect(x,y,w,h)}else{const lines=(reverse)=>{for(let k=-h-w;k<w+h*2;k+=spacing){ctx.beginPath();if(reverse){ctx.moveTo(x+k,y);ctx.lineTo(x+k-h,y+h)}else{ctx.moveTo(x+k,y);ctx.lineTo(x+k+h,y+h)}ctx.stroke()}};lines(false);if(pattern==='CROSS')lines(true);if(pattern==='GRID'){for(let k=0;k<w;k+=spacing){ctx.beginPath();ctx.moveTo(x+k,y);ctx.lineTo(x+k,y+h);ctx.stroke()}for(let k=0;k<h;k+=spacing){ctx.beginPath();ctx.moveTo(x,y+k);ctx.lineTo(x+w,y+k);ctx.stroke()}}}ctx.restore()}}
  else if(s.type==='ellipse'){ctx.beginPath();ctx.ellipse(a.x,a.y,Math.abs(b.x-a.x),Math.abs(b.y-a.y),0,0,Math.PI*2);ctx.stroke()}
- else if(s.type==='polygon'){ctx.beginPath();s.pts.forEach((p,i)=>{const v=screen(p);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath();if(s.solidFill&&!preview)ctx.fill();ctx.stroke()}
+ else if(s.type==='polygon'){
+  const loops=s.hatchLoops?.length?s.hatchLoops:[s.pts],allPoints=[];
+  ctx.beginPath();
+  for(const loop of loops){loop.forEach((p,i)=>{const v=screen(p);allPoints.push(v);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath()}
+  if(s.solidFill&&!preview)ctx.fill('evenodd');
+  else if(s.hatchPattern&&!preview&&allPoints.length){
+   ctx.save();ctx.clip('evenodd');ctx.globalAlpha=Math.max(.1,Math.min(1,Number(s.hatchOpacity??.65)));
+   const xs=allPoints.map(p=>p.x),ys=allPoints.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+   const radius=Math.min(30000,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))+20);
+   const spacing=Math.max(5,Math.min(100,Math.abs(Number(s.hatchSpacingWorld)||.2)*zoom));
+   ctx.translate(cx,cy);ctx.rotate(-Number(s.hatchAngle||45)*Math.PI/180);ctx.lineWidth=.8;
+   let lines=0;for(let x=-radius;x<=radius&&lines<800;x+=spacing,lines++){ctx.beginPath();ctx.moveTo(x,-radius);ctx.lineTo(x,radius);ctx.stroke()}
+   ctx.restore();
+  }
+  ctx.stroke();
+ }
  else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
  else if(s.type==='text'){const size=s.textHeightWorld?Math.max(1,Number(s.textHeightWorld)*zoom):Number(s.textHeight||14);ctx.font=size+'px system-ui';ctx.translate(a.x,a.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);String(s.text||'Texto').split('\n').forEach((line,i)=>ctx.fillText(line,0,i*size*1.2))}
  ctx.restore();
@@ -190,7 +205,7 @@ function setTool(t){parallelDirection=null;$('#offsetInline')?.remove();if(t==='
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;let d=1e9;
-  if(s.type==='poly'||s.type==='polygon'){const count=s.pts.length-1+(s.type==='polygon'?1:0);for(let j=0;j<count;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[(j+1)%s.pts.length]))}
+  if(s.type==='poly'||s.type==='polygon'){const loops=s.hatchLoops?.length?s.hatchLoops:[s.pts];for(const loop of loops){const count=loop.length-1+(s.type==='polygon'?1:0);for(let j=0;j<count;j++)d=Math.min(d,pointLineDistance(q,loop[j],loop[(j+1)%loop.length]))}}
   else if(s.type==='rect'||s.type==='hatch'){if(q.x>=Math.min(s.a.x,s.b.x)-best&&q.x<=Math.max(s.a.x,s.b.x)+best&&q.y>=Math.min(s.a.y,s.b.y)-best&&q.y<=Math.max(s.a.y,s.b.y)+best)d=0}
   else if(s.type==='ellipse'){const rx=Math.abs(s.b.x-s.a.x),ry=Math.abs(s.b.y-s.a.y);if(rx&&ry){const normalized=Math.hypot((q.x-s.a.x)/rx,(q.y-s.a.y)/ry);d=Math.abs(normalized-1)*Math.min(rx,ry)}}
   else if(s.type==='arc'&&s.pts?.length>=3){const g=arcParams(s.pts);if(g){const p=screen(q),theta=Math.atan2(p.y-g.y,p.x-g.x),span=v=>(v+2*Math.PI)%(2*Math.PI),onArc=g.anticlockwise?span(g.a1-theta)<=span(g.a1-g.a3):span(theta-g.a1)<=span(g.a3-g.a1);d=onArc?Math.abs(Math.hypot(p.x-g.x,p.y-g.y)-g.r)/zoom:Math.min(distance(q,s.pts[0]),distance(q,s.pts[2]))}else for(let j=0;j<s.pts.length-1;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[j+1]))}
@@ -467,7 +482,7 @@ function handleTap(p){
     transformEntityGeometry(src,mirror,axisAligned);
    }else if(tool==='scale'){
     const factor=Math.hypot(dx,dy),scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});
-    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);
+    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);if(src.hatchLoops)src.hatchLoops=src.hatchLoops.map(loop=>loop.map(scale));
    }
   }
   if(tool==='copy')applySelection(created);else applySelection(targets);
@@ -480,9 +495,9 @@ function handleTap(p){
 }
 function transformEntityGeometry(s,transform,axisAligned){
  if(s.type==='rect'&&!axisAligned&&s.a&&s.b){const a=s.a,b=s.b;s.pts=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}].map(transform);s.type='polygon';delete s.a;delete s.b;return}
- if(s.a)s.a=transform(s.a);if(s.b)s.b=transform(s.b);if(s.pts)s.pts=s.pts.map(transform);
+ if(s.a)s.a=transform(s.a);if(s.b)s.b=transform(s.b);if(s.pts)s.pts=s.pts.map(transform);if(s.hatchLoops)s.hatchLoops=s.hatchLoops.map(loop=>loop.map(transform));
 }
-function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy})}
+function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy});if(s.hatchLoops)s.hatchLoops.forEach(loop=>loop.forEach(p=>{p.x+=dx;p.y+=dy}))}
 function entitySegments(s){
  const pts=[];
  if(s.type==='line'||s.type==='dim'||s.type==='dimaligned'||s.type==='leader'){if(s.a&&s.b)pts.push([s.a,s.b]);return pts}
@@ -490,6 +505,7 @@ function entitySegments(s){
  if(s.type==='circle'){const r=distance(s.a,s.b);let prev=null;for(let i=0;i<=72;i++){const t=i*Math.PI*2/72,p={x:s.a.x+r*Math.cos(t),y:s.a.y+r*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
  if(s.type==='ellipse'){let prev=null;for(let i=0;i<=64;i++){const t=i*Math.PI*2/64,p={x:s.a.x+(s.b.x-s.a.x)*Math.cos(t),y:s.a.y+(s.b.y-s.a.y)*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
  if(s.type==='arc'&&s.pts?.length>=3){const g=arcParams(s.pts);let prev=null;for(let i=0;i<=48;i++){let p;if(g){const span=g.anticlockwise?-((g.a1-g.a3+Math.PI*2)%(Math.PI*2)):((g.a3-g.a1+Math.PI*2)%(Math.PI*2)),t=g.a1+span*i/48;p=world({x:g.x+g.r*Math.cos(t),y:g.y+g.r*Math.sin(t)})}else{const t=i/48,u=1-t,a=s.pts[0],b=s.pts[1],d=s.pts[2];p={x:u*u*a.x+2*u*t*b.x+t*t*d.x,y:u*u*a.y+2*u*t*b.y+t*t*d.y}}if(prev)pts.push([prev,p]);prev=p}return pts}
+ if(s.hatchLoops?.length){for(const loop of s.hatchLoops)for(let i=0;i<loop.length;i++)pts.push([loop[i],loop[(i+1)%loop.length]]);return pts}
  if(s.pts&&s.pts.length>1){for(let i=1;i<s.pts.length;i++)pts.push([s.pts[i-1],s.pts[i]]);if(s.type==='polygon')pts.push([s.pts[s.pts.length-1],s.pts[0]])}
  return pts
 }
@@ -1015,6 +1031,7 @@ function parseDxfEntities(source){
    if(sourceItem.b)item.b=transformPoint(sourceItem.b);
    if(sourceItem.pts)item.pts=sourceItem.pts.map(transformPoint);
   }
+  if(sourceItem.hatchLoops)item.hatchLoops=sourceItem.hatchLoops.map(loop=>loop.map(transformPoint));
   if(sourceItem.type==='text'){
    const angle=Number(sourceItem.textRotation||0)*Math.PI/180,dx=Math.cos(angle)*scaleX,dy=Math.sin(angle)*scaleY;
    item.textRotation=(Math.atan2(dy,dx)+rotation)*180/Math.PI;
@@ -1189,7 +1206,7 @@ $('#pdf').onclick=()=>window.print();
 $('#propertiesBtn').onclick=()=>{$('#properties').classList.toggle('open');showProperties()};
 $('#zoomIn').onclick=()=>{zoom*=1.2;render()};$('#zoomOut').onclick=()=>{zoom/=1.2;render()};
 function boundsPoints(o){
- const pts=[];if(o.a)pts.push(o.a);if(o.b)pts.push(o.b);if(o.pts)pts.push(...o.pts);
+ const pts=[];if(o.a)pts.push(o.a);if(o.b)pts.push(o.b);if(o.pts)pts.push(...o.pts);if(o.hatchLoops)for(const loop of o.hatchLoops)pts.push(...loop);
  if(o.type==='circle'&&o.a&&o.b){const r=distance(o.a,o.b);pts.push({x:o.a.x-r,y:o.a.y-r},{x:o.a.x+r,y:o.a.y+r})}
  if(o.type==='ellipse'&&o.a&&o.b){const rx=Math.abs(o.b.x-o.a.x),ry=Math.abs(o.b.y-o.a.y);pts.push({x:o.a.x-rx,y:o.a.y-ry},{x:o.a.x+rx,y:o.a.y+ry})}
  if(o.type==='arc'&&o.pts?.length>=3){const g=arcParams(o.pts);if(g){const span=v=>(v+2*Math.PI)%(2*Math.PI);for(const t of [0,Math.PI/2,Math.PI,3*Math.PI/2]){const onArc=g.anticlockwise?span(g.a1-t)<=span(g.a1-g.a3):span(t-g.a1)<=span(g.a3-g.a1);if(onArc)pts.push(world({x:g.x+g.r*Math.cos(t),y:g.y+g.r*Math.sin(t)}))}}}
