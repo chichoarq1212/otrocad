@@ -1,5 +1,5 @@
-const CACHE='otrocad-pc-offline-54';
-const ASSETS=['./','./index.html','./editor/','./editor/index.html','./editor/editor.js','./editor/demo/vivienda.js','./editor/library/furnishings.js','./editor/vendor/dwg/otrocad_dwg.js','./editor/vendor/dwg/otrocad_dwg_bg.wasm','./tutorial/','./tutorial/index.html','./descargas/','./descargas/index.html','./herramientas/','./herramientas/index.html','./manifest.webmanifest','./icon.svg','./editor-preview.svg','./editor-preview-real.jpg'];
+const CACHE='otrocad-pc-offline-55';
+const ASSETS=['./','./index.html','./editor/','./editor/index.html','./editor/editor.js','./editor/civil3d.js','./editor/demo/vivienda.js','./editor/library/furnishings.js','./editor/vendor/dwg/otrocad_dwg.js','./editor/vendor/dwg/otrocad_dwg_bg.wasm','./tutorial/','./tutorial/index.html','./descargas/','./descargas/index.html','./herramientas/','./herramientas/index.html','./manifest.webmanifest','./icon.svg','./editor-preview.svg','./editor-preview-real.jpg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS.map(asset=>new Request(new URL(asset,self.registration.scope),{cache:'reload'})))).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('otrocad-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
