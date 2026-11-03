@@ -424,7 +424,7 @@ function modelExtentsForPaper(){
  return{center:{x:(minx+maxx)/2,y:(miny+maxy)/2},width:Math.max(maxx-minx,.001),height:Math.max(maxy-miny,.001)};
 }
 function effectivePaperViewports(layout){
- const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
+ const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&Number.isFinite(Number(v.viewHeight))&&Number(v.viewHeight)>1e-8&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
  if(imported.length)return imported.slice(0,20);
  // Imported sheets without a recovered viewport must not display an invented model view.
  // New sheets and the explicit "Encadrar todo el modelo" option can generate a view.
@@ -437,8 +437,8 @@ function describePaperLayoutState(layout,viewports){
  const paperCount=objects.filter(x=>x.cadLayout===layout.name).length;
  const importedCount=layoutViewportRecords.filter(x=>x.layout===layout.name&&x.id!==1).length;
  const lines=[];
- if(layout.source!=='new'&&!importedCount&&layout.viewportFit!=='all')
-  lines.push('El archivo no proporcionó un VIEWPORT utilizable para esta hoja. Revisa ⚙ Hoja o el informe de importación.');
+ if(layout.source!=='new'&&!viewports.length&&layout.viewportFit!=='all')
+  lines.push(importedCount?'La ventana gráfica llegó sin una altura de vista válida; no se puede calcular su escala original.':'El archivo no proporcionó un VIEWPORT utilizable para esta hoja. Revisa ⚙ Hoja o el informe de importación.');
  if(layout.source!=='new'&&paperCount===0)
   lines.push('No se recuperaron entidades propias del espacio Papel para esta presentación.');
  if(layout.source!=='new'&&viewports.length&&!objects.some(x=>(x.cadLayout||'Model')==='Model'))
