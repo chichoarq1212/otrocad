@@ -50,7 +50,7 @@ assert.equal(parsed.length,3, 'No se deben importar las definiciones dentro de B
 assert.equal(parsed[1].type,'arc');
 assert.ok(Math.abs(parsed[1].pts[2].y-2)<1e-9);
 assert.ok(parsed.importWarnings.some(s=>s.includes('HATCH')));
-assert.ok(parsed.importWarnings.some(s=>s.includes('curvas')));
+assert.ok(parsed.importNotes.some(s=>s.includes('curvas')));
 assert.equal(parsed[0].color, '#56b6e8');
 console.log('DXF import checks passed: section boundaries, arc, colors and unsupported objects');
 context.objects=[{type:'arc',pts:[{x:1,y:0},{x:0,y:1},{x:-1,y:0}]}, {type:'ellipse',a:{x:3,y:4},b:{x:5,y:5}}];
