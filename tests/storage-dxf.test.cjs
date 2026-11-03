@@ -146,6 +146,7 @@ vm.runInContext('handleTap({x:2,y:3})',tapScope);assert.equal(tapScope.objects[0
 tapScope.tool='dimaligned';tapScope.start={x:0,y:0};vm.runInContext('handleTap({x:3,y:4})',tapScope);assert.equal(tapScope.committed.x,3);assert.equal(tapScope.committed.y,4);
 console.log('Text and aligned dimension creation checks passed');
 const snapScope={osnapOn:true,osEnd:false,osMid:false,osCenter:false,osQuadrant:true,osIntersection:false,snapRadius:12,zoom:100,objects:[{type:'circle',a:{x:0,y:0},b:{x:2,y:0}}],hiddenLayers:new Set(),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),pointLineDistance:(p,a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)},entitySegments:s=>[[s.a,s.b]]};
+snapScope.isVisibleModelEntity=s=>(s.cadLayout||'Model')==='Model'&&!snapScope.hiddenLayers.has(s.layer);
 vm.createContext(snapScope);vm.runInContext(source.slice(source.indexOf('function lineIntersection('),source.indexOf('function trimOrExtend(')),snapScope);vm.runInContext(source.slice(source.indexOf('function snapCandidate('),source.indexOf('function snapPoint(')),snapScope);
 let snap=vm.runInContext('snapCandidate({x:0.03,y:2.02})',snapScope);assert.equal(snap.type,'CUADRANTE');assert.equal(snap.point.y,2);
 snapScope.osQuadrant=false;snapScope.osIntersection=true;snapScope.objects=[{type:'line',a:{x:-1,y:0},b:{x:1,y:0}},{type:'line',a:{x:0,y:-1},b:{x:0,y:1}}];
