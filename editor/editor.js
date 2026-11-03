@@ -2,7 +2,7 @@
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,selectedSet=new Set(),modifyTargets=[],poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
 let lastCommand='',cursorCommandEl=null,contextMenuEl=null,activeFurniture=null;
-let activeLayout='Model',layouts=[],layoutViewportRecords=[],hideModelAnnotations=false,layoutRenderTransform=null;
+let activeLayout='Model',layouts=[],layoutViewportRecords=[],hideModelAnnotations=false,layoutRenderTransform=null,lastModelCamera=null;
 function newGroupId(){return 'bloque-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}
 let rightClickMode='context',rightClickDuringCommand='enter';
 try{const prefs=JSON.parse(localStorage.getItem('otrocad-mouse-preferences')||'{}');if(['context','repeat'].includes(prefs.mode))rightClickMode=prefs.mode;if(['enter','context'].includes(prefs.active))rightClickDuringCommand=prefs.active}catch(e){}
@@ -478,6 +478,7 @@ function refreshLayoutTabs(){
 }
 function switchCadLayout(name){
  if(name!=='Model'&&!paperLayoutsSafe().some(x=>x.name===name))return false;
+ if(activeLayout==='Model'&&name!=='Model'&&Number(zoom)>0){lastModelCamera={center:{x:-offset.x/zoom,y:offset.y/zoom},viewHeight:canvas.clientHeight/zoom};}
  activeLayout=name;clearSelection();tool='select';start=null;temp=null;poly=[];arcPoints=[];modifyTarget=-1;modifyTargets=[];drag=null;selectionStart=null;selectionBox=null;selectionClickAnchor=null;gripDrag=null;activeSnap=null;
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool==='select'));
  if($('#properties'))$('#properties').classList.remove('open');
@@ -507,6 +508,30 @@ function cadLayoutScaleHint(layout){
  }
  return null;
 }
+function cadPaperMissingViewportArea(layout){
+ const pw=Math.max(30,Number(layout.paperWidth)||420),ph=Math.max(30,Number(layout.paperHeight)||297);
+ const margin=Math.max(8,Math.min(22,Number(layout.margin)||10));
+ // Most architectural sheets reserve the right-hand column for notes and schedules.
+ // Use existing paper text coordinates to locate that area; never move those annotations.
+ const rightTexts=objects.filter(o=>o.cadLayout===layout.name&&o.type==='text'&&o.a&&Number.isFinite(o.a.x)&&
+    o.a.x>pw*.58&&o.a.x<pw*.96&&o.a.y>ph*.12&&o.a.y<ph*.89)
+  .map(o=>o.a.x).sort((a,b)=>a-b);
+ const divider=rightTexts.length?Math.max(pw*.53,Math.min(pw*.78,rightTexts[0]-margin)):pw*.69;
+ const left=Math.max(margin,pw*.035),right=Math.max(left+pw*.25,divider-margin*.4);
+ const bottom=Math.max(margin,ph*.135),top=Math.max(bottom+ph*.38,ph*.865);
+ return {center:{x:(left+right)/2,y:(bottom+top)/2},width:right-left,height:top-bottom,estimated:true};
+}
+function cadPaperViewportUsable(v,layout){
+ if(!(Number(v.width)>1e-8&&Number(v.height)>1e-8))return false;
+ const pw=Math.max(30,Number(layout.paperWidth)||420),ph=Math.max(30,Number(layout.paperHeight)||297);
+ const x=Number(v.center?.x),y=Number(v.center?.y);
+ if(!Number.isFinite(x)||!Number.isFinite(y))return false;
+ // Reject degenerate/off-sheet viewports from damaged conversion metadata.
+ const minx=x-Number(v.width)/2,maxx=x+Number(v.width)/2,miny=y-Number(v.height)/2,maxy=y+Number(v.height)/2;
+ const intersectW=Math.max(0,Math.min(maxx,pw)-Math.max(minx,0));
+ const intersectH=Math.max(0,Math.min(maxy,ph)-Math.max(miny,0));
+ return intersectW>Math.min(Number(v.width)*.15,pw*.07)&&intersectH>Math.min(Number(v.height)*.15,ph*.07);
+}
 function modelPaperViewportEstimate(vp,layout){
  const ext=modelExtentsForPaper(),height=Number(vp.height||0),width=Number(vp.width||0);
  if(!(height>0&&width>0))return null;
@@ -520,22 +545,50 @@ function modelPaperViewportEstimate(vp,layout){
   estimateSource:ratio?(explicit?'escala elegida por usuario':annotated.source):'encuadre de geometría del Modelo',
   centerEstimated:!hasCenter,heightEstimated:true,originalViewHeight:vp.viewHeight};
 }
+function manualCadPaperView(layout){
+ const c=layout.manualView;
+ if(!c||!Number.isFinite(Number(c.viewHeight))||Number(c.viewHeight)<=0||!Number.isFinite(Number(c.center?.x))||!Number.isFinite(Number(c.center?.y)))return null;
+ const area=cadPaperMissingViewportArea(layout);
+ return {...area,layout:layout.name,id:2,status:1,viewCenter:{x:Number(c.center.x),y:Number(c.center.y)},viewHeight:Number(c.viewHeight),
+  generated:true,manual:true,paperRegionEstimated:true,estimated:false};
+}
 function effectivePaperViewports(layout){
- const configured=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
- if(configured.length){
-  const ext=modelExtentsForPaper();
-  return configured.slice(0,20).map(v=>{
-   if(!Number.isFinite(Number(v.viewHeight))||Number(v.viewHeight)<=1e-8)return modelPaperViewportEstimate(v,layout);
-   const center=v.viewCenter||{},validCenter=Number.isFinite(Number(center.x))&&Number.isFinite(Number(center.y));
-   // Some converters preserve the native view height but drop groups 12/22.
-   // Keep the authentic scale and recover ONLY the missing center, with a visible warning.
-   if(v.viewCenterKnown===false||!validCenter)
-    return {...v,viewCenter:ext.center,estimated:true,centerEstimated:true,heightEstimated:false,estimateSource:'centro geométrico provisional (altura original conservada)'};
-   return v;
+ if(layout.viewportFit==='manual'){const manual=manualCadPaperView(layout);if(manual)return [manual]}
+ const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.id!==1):[];
+ const ext=modelExtentsForPaper(),fallbackArea=cadPaperMissingViewportArea(layout);
+ if(imported.length){
+  const active=imported.filter(v=>v.status!==0);
+  const candidates=active.length?active:imported; // All recovered VIEWPORTs might be marked inactive by a converter.
+  return candidates.slice(0,20).map(v=>{
+   const validPaperArea=cadPaperViewportUsable(v,layout);
+   const recoveryArea=validPaperArea?null:fallbackArea;
+   const paperView=recoveryArea?{...v,center:recoveryArea.center,width:recoveryArea.width,height:recoveryArea.height}:v;
+   let result;
+   if(!Number.isFinite(Number(paperView.viewHeight))||Number(paperView.viewHeight)<=1e-8){
+    result=modelPaperViewportEstimate(paperView,layout);
+   }else{
+    const center=paperView.viewCenter||{},validCenter=Number.isFinite(Number(center.x))&&Number.isFinite(Number(center.y));
+    result=paperView.viewCenterKnown===false||!validCenter
+     ?{...paperView,viewCenter:ext.center,estimated:true,centerEstimated:true,heightEstimated:false,estimateSource:'centro geométrico provisional (altura original conservada)'}
+     :paperView;
+   }
+   if(!result)return null;
+   if(recoveryArea)result={...result,estimated:true,paperRegionEstimated:true,
+     estimateSource:result.estimateSource||'región libre de anotaciones de la hoja'};
+   if(v.status===0)result={...result,estimated:true,offViewportRecovered:true};
+   return result;
   }).filter(Boolean);
  }
- if(layout.source!=='new'&&layout.viewportFit!=='all')return [];
- const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
+ if(layout.source!=='new'&&layout.viewportFit!=='all'){
+  // A converted AutoCAD sheet can retain its border and title block but lose all
+  // VIEWPORT objects. Show a clearly labeled, non-destructive *screen-only* recovery
+  // when there is usable model geometry, rather than silently leaving the sheet blank.
+  if(!objects.some(o=>(o.cadLayout||'Model')==='Model'))return [];
+  const implied={layout:layout.name,id:2,status:1,...fallbackArea,viewCenterKnown:false,viewHeight:0};
+  const provisional=modelPaperViewportEstimate(implied,layout);
+  return provisional?[{...provisional,generated:true,estimated:true,paperRegionEstimated:true,viewportMissing:true}]:[];
+ }
+ const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin);
  const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);
  const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
  return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
@@ -552,6 +605,11 @@ function describePaperLayoutState(layout,viewports){
   if(withHeight.length)lines.push('VISTA PROVISIONAL: faltaba la altura del VIEWPORT; se utilizó '+withHeight[0].estimateSource+'. La escala original no está verificada.');
   if(estimated.some(v=>v.centerEstimated))lines.push('CENTRO PROVISIONAL: el conversor no preservó la ubicación de la vista; se usó el centro geométrico del Modelo sin modificar la geometría.');
  }
+ if(viewports.some(v=>v.manual))lines.push('VISTA CONFIGURADA POR USUARIO: se utilizó el encuadre tomado del Modelo. Esta configuración es independiente del VIEWPORT original.');
+ const recoveredArea=viewports.filter(v=>v.paperRegionEstimated&&!v.manual);
+ if(recoveredArea.length)lines.push('VENTANA RECUPERADA: el DWG convertido no conservó la posición o tamaño de la ventana gráfica. Se colocó una vista provisional en el área libre de la lámina, sin cambiar el original.');
+ if(viewports.some(v=>v.viewportMissing))lines.push('La conversión no entregó ninguna ventana gráfica; esta vista no representa un VIEWPORT original.');
+ if(viewports.some(v=>v.offViewportRecovered))lines.push('Un VIEWPORT figura desactivado en los datos importados. Se muestra provisionalmente para revisión.');
  if(layout.source!=='new'&&paperCount===0)
   lines.push('No se recuperaron entidades propias del espacio Papel para esta presentación.');
  if(layout.source!=='new'&&viewports.length&&!objects.some(x=>(x.cadLayout||'Model')==='Model'))
@@ -613,21 +671,29 @@ function showCadPaperSettings(){
  '<label>Ancho (mm)<input id="paperWidth" type="number" min="30" max="2000" step="0.1"></label>'+
  '<label>Alto (mm)<input id="paperHeight" type="number" min="30" max="2000" step="0.1"></label>'+
  '<label>Margen guía (mm)<input id="paperMargin" type="number" min="0" max="100" step="1"></label>'+
- '<label>Ventana de dibujo<select id="paperFit"><option value="imported">Conservar VIEWPORT importados</option><option value="all">Encuadrar todo el modelo</option></select></label>'+'<label>Escala de la vista (si se encuadra el modelo)<select id="paperScale"><option value="fit">Ajustar a la hoja</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option></select></label>'+'<label class="paper-check"><input type="checkbox" id="paperModelText"> Mostrar anotaciones de Modelo dentro de la ventana</label>'+
+ '<label>Ventana de dibujo<select id="paperFit"><option value="imported">Conservar VIEWPORT importados</option><option value="all">Encuadrar todo el modelo</option><option value="manual">Usar vista seleccionada desde Modelo</option></select></label>'+'<label>Escala de la vista (si se encuadra el modelo)<select id="paperScale"><option value="fit">Ajustar a la hoja</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option></select></label>'+'<label class="paper-check"><input type="checkbox" id="paperModelText"> Mostrar anotaciones de Modelo dentro de la ventana</label>'+'<button type="button" id="paperCopyModelView">Usar el último encuadre visible de Modelo</button>'+'<p>Para elegir una planta concreta: vuelve a Modelo, haz zoom sobre ella, regresa a esta hoja y pulsa este botón.</p>'+
  '<p id="paperWarning" role="status"></p><div class="cad-utility-actions"><button type="button" id="paperCancel">Cancelar</button><button type="button" id="paperApply">Aplicar</button></div></form>';
  document.body.append(dialog);
  const byId=id=>dialog.querySelector('#'+id);
  byId('paperWidth').value=layout.paperWidth||420;byId('paperHeight').value=layout.paperHeight||297;byId('paperMargin').value=layout.margin??10;
- byId('paperFit').value=layout.viewportFit==='all'?'all':'imported';byId('paperScale').value=String(layout.plotScale||'fit');byId('paperModelText').checked=!layout.hideModelText;
+ byId('paperFit').value=['all','manual'].includes(layout.viewportFit)?layout.viewportFit:'imported';byId('paperScale').value=String(layout.plotScale||'fit');byId('paperModelText').checked=!layout.hideModelText;
  const found=sizes.find(p=>Math.abs(Math.max(layout.paperWidth,layout.paperHeight)-p[1])<1&&Math.abs(Math.min(layout.paperWidth,layout.paperHeight)-p[2])<1);
  byId('paperSize').value=found?found[0]:'custom';byId('paperOrientation').value=layout.paperWidth>=layout.paperHeight?'landscape':'portrait';
  const resizeFromPreset=()=>{const preset=sizes.find(p=>p[0]===byId('paperSize').value);if(!preset)return;const vertical=byId('paperOrientation').value==='portrait';byId('paperWidth').value=vertical?preset[2]:preset[1];byId('paperHeight').value=vertical?preset[1]:preset[2]};
  byId('paperSize').onchange=resizeFromPreset;byId('paperOrientation').onchange=resizeFromPreset;
+ let selectedModelView=layout.manualView||null;
+ byId('paperCopyModelView').onclick=()=>{
+  if(!lastModelCamera){byId('paperWarning').textContent='Regresa a Modelo, encuadra la planta con zoom y vuelve a abrir esta configuración.';return}
+  selectedModelView={center:{...lastModelCamera.center},viewHeight:lastModelCamera.viewHeight};
+  byId('paperFit').value='manual';byId('paperWarning').textContent='Vista de Modelo capturada. Pulsa Aplicar para mostrar esa planta en la lámina.';
+ };
  byId('paperCancel').onclick=()=>dialog.close();
  byId('paperApply').onclick=()=>{
   const pw=Number(byId('paperWidth').value),ph=Number(byId('paperHeight').value),margin=Number(byId('paperMargin').value);
   if(!Number.isFinite(pw)||!Number.isFinite(ph)||pw<30||ph<30||pw>2000||ph>2000||!Number.isFinite(margin)||margin<0||margin>=Math.min(pw,ph)/3){byId('paperWarning').textContent='Revisa las medidas y los márgenes de impresión.';return}
+  if(byId('paperFit').value==='manual'&&!selectedModelView){byId('paperWarning').textContent='Primero selecciona una vista desde Modelo con el botón azul.';return}
   layout.paperWidth=pw;layout.paperHeight=ph;layout.margin=margin;layout.viewportFit=byId('paperFit').value;layout.plotScale=byId('paperScale').value;layout.hideModelText=!byId('paperModelText').checked;
+  if(selectedModelView)layout.manualView=selectedModelView;
   saveLayoutState();render();status.textContent='Hoja '+layout.name+' · '+pw+' × '+ph+' mm';dialog.close();
  };
  dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
@@ -1460,8 +1526,8 @@ copyImportReportButton.onclick=async()=>{
  try{await navigator.clipboard.writeText(report);status.textContent='Diagnóstico CAD copiado. Puedes pegarlo en el chat.'}
  catch(error){console.warn('No se pudo copiar el diagnóstico:',error);alert(report)}
 };
-$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas');arr.layoutDefinitions=Array.isArray(v.layouts)?v.layouts:[];arr.layoutViewports=Array.isArray(v.viewports)?v.viewports:[]}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!await protectDrawingBeforeReplacement())throw Error('Importación cancelada: conserva o descarga una copia del dibujo anterior.');pushReplacementUndo();objects=arr;layouts=clone(arr.layoutDefinitions||[]);layoutViewportRecords=clone(arr.layoutViewports||[]);activeLayout=layouts.some(l=>l.name===arr.activeCadLayout)?arr.activeCadLayout:'Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
- 'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,'Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model').length+' entidades', 'Etiquetas de texto en Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model'&&s.type==='text').length, 'Anotaciones MULTILEADER recuperadas: '+arr.filter(s=>s.cadSourceEntity==='MLEADER').length,'Presentaciones: '+(arr.layoutDefinitions||[]).map(l=>l.name+' ('+arr.filter(s=>s.cadLayout===l.name).length+' entidades)').join(', '),'Ventanas gráficas importadas: '+(arr.layoutViewports||[]).length,'Contenido de bloques Papel recuperado: '+(arr.paperBlockRecovery?.recovered||0)+' entidades', 'Pestaña original DWG: '+String(arr.activeCadLayout||'Model'),
+$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas');arr.layoutDefinitions=Array.isArray(v.layouts)?v.layouts:[];arr.layoutViewports=Array.isArray(v.viewports)?v.viewports:[]}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false,fallbackReason='';try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){fallbackReason=String(strictError?.message||strictError).slice(0,500);console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.dwgFallbackReason=fallbackReason;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!await protectDrawingBeforeReplacement())throw Error('Importación cancelada: conserva o descarga una copia del dibujo anterior.');pushReplacementUndo();objects=arr;layouts=clone(arr.layoutDefinitions||[]);layoutViewportRecords=clone(arr.layoutViewports||[]);activeLayout=layouts.some(l=>l.name===arr.activeCadLayout)?arr.activeCadLayout:'Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
+ 'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,'Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model').length+' entidades', 'Etiquetas de texto en Modelo: '+arr.filter(s=>(s.cadLayout||'Model')==='Model'&&s.type==='text').length, 'Anotaciones MULTILEADER recuperadas: '+arr.filter(s=>s.cadSourceEntity==='MLEADER').length,'Presentaciones: '+(arr.layoutDefinitions||[]).map(l=>l.name+' ('+arr.filter(s=>s.cadLayout===l.name).length+' entidades)').join(', '),'Ventanas gráficas importadas: '+(arr.layoutViewports||[]).length,'Detalle de recuperación DWG: '+String(arr.dwgFallbackReason||'No se necesitó recuperación parcial'),'Parámetros VIEWPORT: '+(arr.layoutViewports||[]).map(v=>v.layout+' #'+v.id+' (ancho '+v.width+', alto '+v.height+', vista '+v.viewHeight+', activo '+v.status+')').join(' | '),'Contenido de bloques Papel recuperado: '+(arr.paperBlockRecovery?.recovered||0)+' entidades', 'Pestaña original DWG: '+String(arr.activeCadLayout||'Model'),
  'Pérdidas o incompatibilidades:',...(arr.importWarnings?.length?arr.importWarnings:['Ninguna detectada']),
  'Ajustes visuales:',...(arr.importNotes?.length?arr.importNotes:['Ninguno']),
  'Causas dentro de bloques, cotas y sombreados (sin coordenadas):',
@@ -1991,7 +2057,7 @@ function parseDxfEntities(source){
   }
   else if(type==='VIEWPORT'){
     const vp={layout:st.cadLayout,center:{x:get(r,10),y:get(r,20)},width:get(r,40),height:get(r,41),viewCenter:{x:get(r,12)+get(r,17),y:get(r,22)+get(r,27)},viewHeight:get(r,45),viewCenterKnown:r.pairs.some(p=>p[0]===12&&Number.isFinite(Number(p[1])))&&r.pairs.some(p=>p[0]===22&&Number.isFinite(Number(p[1]))),twist:get(r,51),status:get(r,68,1),id:get(r,69)};
-    if(vp.width>0&&vp.height>0&&(vp.id!==1||vp.viewHeight>0)){(out.layoutViewports??=[]).push(vp);note('VIEWPORT de presentación preservado para vista en papel')}
+    if(st.cadLayout!=='Model'&&(vp.id!==1||vp.viewHeight>0)){(out.layoutViewports??=[]).push(vp);note(vp.width>0&&vp.height>0?'VIEWPORT de presentación preservado para vista en papel':'VIEWPORT con tamaño faltante conservado para recuperación provisional')}
    }
   else if(type==='VERTEX'||type==='SEQEND'){}
   else warn(type+' omitido');
