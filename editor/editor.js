@@ -120,10 +120,9 @@ let activeSnap=null;
 function snapCandidate(p,excludedIndex=-1){
  if(!osnapOn)return null;
  let best=null,limit=snapRadius/zoom;
- // Do not magnetize a grip to its own moving entity during touch edits.
- for(let i=0;i<objects.length;i++){
-  if(i===excludedIndex)continue;
-  const s=objects[i];
+ // Do not magnetize a grip to its own geometry in any OSNAP mode.
+ const snapObjects=excludedIndex>=0?objects.filter((_,i)=>i!==excludedIndex):objects;
+ for(const s of snapObjects){
   if(!isVisibleModelEntity(s))continue;
   const pts=[];
   if(osEnd){
@@ -142,20 +141,20 @@ function snapCandidate(p,excludedIndex=-1){
  }
  if(osIntersection){
   const near=[],radius=snapRadius/zoom;
-  for(const s of objects){if(!isVisibleModelEntity(s)||!['line','poly','polygon','rect'].includes(s.type))continue;for(const [a,b] of entitySegments(s)){if(pointLineDistance(p,a,b)<=radius){near.push([a,b]);if(near.length>=256)break}}if(near.length>=256)break}
+  for(const s of snapObjects){if(!isVisibleModelEntity(s)||!['line','poly','polygon','rect'].includes(s.type))continue;for(const [a,b] of entitySegments(s)){if(pointLineDistance(p,a,b)<=radius){near.push([a,b]);if(near.length>=256)break}}if(near.length>=256)break}
   for(let i=0;i<near.length;i++)for(let j=i+1;j<near.length;j++){const hit=lineIntersection(near[i][0],near[i][1],near[j][0],near[j][1],true);if(hit){const d=distance(p,hit);if(d<limit){limit=d;best={point:{x:hit.x,y:hit.y},type:'INTERSECCIÓN'}}}}
  }
 
- if(typeof osGeom!=='undefined'&&osGeom){for(const shape of objects){if(hiddenLayers.has(shape.layer))continue;let point=null;if(shape.type==='rect'&&shape.a&&shape.b)point={x:(shape.a.x+shape.b.x)/2,y:(shape.a.y+shape.b.y)/2};else if(shape.type==='polygon'&&shape.pts?.length>=3){let area=0,x=0,y=0;for(let i=0;i<shape.pts.length;i++){const a=shape.pts[i],b=shape.pts[(i+1)%shape.pts.length],v=a.x*b.y-b.x*a.y;area+=v;x+=(a.x+b.x)*v;y+=(a.y+b.y)*v}if(Math.abs(area)>1e-12)point={x:x/(3*area),y:y/(3*area)}}if(point){const d=distance(p,point);if(d<limit){limit=d;best={point,type:'CENTRO GEOMÉTRICO'}}}}}
- if(typeof osInsertion!=='undefined'&&osInsertion){for(const shape of objects){if(hiddenLayers.has(shape.layer)||shape.type!=='text'||!shape.a)continue;const d=distance(p,shape.a);if(d<limit){limit=d;best={point:shape.a,type:'INSERCIÓN'}}}}
- if(typeof osTangent!=='undefined'&&osTangent&&typeof start!=='undefined'&&start){for(const shape of objects){if(hiddenLayers.has(shape.layer)||shape.type!=='circle'||!shape.a||!shape.b)continue;const dx=start.x-shape.a.x,dy=start.y-shape.a.y,r=distance(shape.a,shape.b),d2=dx*dx+dy*dy;if(d2<r*r||d2<1e-18)continue;const k=r*r/d2,h=r*Math.sqrt(Math.max(0,d2-r*r))/d2;for(const sign of [-1,1]){const point={x:shape.a.x+k*dx-sign*h*dy,y:shape.a.y+k*dy+sign*h*dx},d=distance(p,point);if(d<limit){limit=d;best={point,type:'TANGENTE'}}}}}
- if(typeof osExtension!=='undefined'&&osExtension){for(const shape of objects){if(hiddenLayers.has(shape.layer)||shape.type!=='line'||!shape.a||!shape.b)continue;const a=shape.a,b=shape.b,dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((p.x-a.x)*dx+(p.y-a.y)*dy)/den;if(t>=0&&t<=1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'EXTENSIÓN'}}}}
- if(typeof osApparent!=='undefined'&&osApparent){const lines=objects.filter(s=>s.type==='line'&&s.a&&s.b&&!hiddenLayers.has(s.layer)).slice(0,128);for(let i=0;i<lines.length;i++)for(let j=i+1;j<lines.length;j++){const hit=lineIntersection(lines[i].a,lines[i].b,lines[j].a,lines[j].b,false);if(!hit)continue;const d=distance(p,hit);if(d<limit){limit=d;best={point:{x:hit.x,y:hit.y},type:'INTERSECCIÓN APARENTE'}}}}
+ if(typeof osGeom!=='undefined'&&osGeom){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer))continue;let point=null;if(shape.type==='rect'&&shape.a&&shape.b)point={x:(shape.a.x+shape.b.x)/2,y:(shape.a.y+shape.b.y)/2};else if(shape.type==='polygon'&&shape.pts?.length>=3){let area=0,x=0,y=0;for(let i=0;i<shape.pts.length;i++){const a=shape.pts[i],b=shape.pts[(i+1)%shape.pts.length],v=a.x*b.y-b.x*a.y;area+=v;x+=(a.x+b.x)*v;y+=(a.y+b.y)*v}if(Math.abs(area)>1e-12)point={x:x/(3*area),y:y/(3*area)}}if(point){const d=distance(p,point);if(d<limit){limit=d;best={point,type:'CENTRO GEOMÉTRICO'}}}}}
+ if(typeof osInsertion!=='undefined'&&osInsertion){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='text'||!shape.a)continue;const d=distance(p,shape.a);if(d<limit){limit=d;best={point:shape.a,type:'INSERCIÓN'}}}}
+ if(typeof osTangent!=='undefined'&&osTangent&&typeof start!=='undefined'&&start){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='circle'||!shape.a||!shape.b)continue;const dx=start.x-shape.a.x,dy=start.y-shape.a.y,r=distance(shape.a,shape.b),d2=dx*dx+dy*dy;if(d2<r*r||d2<1e-18)continue;const k=r*r/d2,h=r*Math.sqrt(Math.max(0,d2-r*r))/d2;for(const sign of [-1,1]){const point={x:shape.a.x+k*dx-sign*h*dy,y:shape.a.y+k*dy+sign*h*dx},d=distance(p,point);if(d<limit){limit=d;best={point,type:'TANGENTE'}}}}}
+ if(typeof osExtension!=='undefined'&&osExtension){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='line'||!shape.a||!shape.b)continue;const a=shape.a,b=shape.b,dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((p.x-a.x)*dx+(p.y-a.y)*dy)/den;if(t>=0&&t<=1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'EXTENSIÓN'}}}}
+ if(typeof osApparent!=='undefined'&&osApparent){const lines=snapObjects.filter(s=>s.type==='line'&&s.a&&s.b&&!hiddenLayers.has(s.layer)).slice(0,128);for(let i=0;i<lines.length;i++)for(let j=i+1;j<lines.length;j++){const hit=lineIntersection(lines[i].a,lines[i].b,lines[j].a,lines[j].b,false);if(!hit)continue;const d=distance(p,hit);if(d<limit){limit=d;best={point:{x:hit.x,y:hit.y},type:'INTERSECCIÓN APARENTE'}}}}
  if(typeof osPerpendicular!=='undefined'&&osPerpendicular&&typeof start!=='undefined'&&start){
-  for(const shape of objects){if(hiddenLayers.has(shape.layer)||!['line','poly','polygon','rect'].includes(shape.type))continue;for(const [a,b] of entitySegments(shape)){const dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((start.x-a.x)*dx+(start.y-a.y)*dy)/den;if(t<0||t>1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'PERPENDICULAR'}}}}
+  for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||!['line','poly','polygon','rect'].includes(shape.type))continue;for(const [a,b] of entitySegments(shape)){const dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((start.x-a.x)*dx+(start.y-a.y)*dy)/den;if(t<0||t>1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'PERPENDICULAR'}}}}
  }
  if(typeof osNearest!=='undefined'&&osNearest&&!best){
-  for(const shape of objects){if(hiddenLayers.has(shape.layer))continue;
+  for(const shape of snapObjects){if(hiddenLayers.has(shape.layer))continue;
    if(shape.type==='circle'&&shape.a&&shape.b){const r=distance(shape.a,shape.b),d=distance(p,shape.a);if(d>1e-12){const point={x:shape.a.x+(p.x-shape.a.x)*r/d,y:shape.a.y+(p.y-shape.a.y)*r/d},delta=distance(p,point);if(delta<limit){limit=delta;best={point,type:'MÁS CERCANO'}}}continue}
    if(!['line','poly','polygon','rect','leader','dim','dimaligned'].includes(shape.type))continue;
    for(const [a,b] of entitySegments(shape)){const dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den)),point={x:a.x+t*dx,y:a.y+t*dy},delta=distance(p,point);if(delta<limit){limit=delta;best={point,type:'MÁS CERCANO'}}}
