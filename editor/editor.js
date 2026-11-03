@@ -498,14 +498,39 @@ function modelExtentsForPaper(){
  const xs=p.map(v=>v.x),ys=p.map(v=>v.y),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
  return{center:{x:(minx+maxx)/2,y:(miny+maxy)/2},width:Math.max(maxx-minx,.001),height:Math.max(maxy-miny,.001)};
 }
+function cadLayoutScaleHint(layout){
+ const sheetText=objects.filter(o=>o.cadLayout===layout.name&&o.type==='text').map(o=>String(o.text||''));
+ for(const text of sheetText){
+  const match=text.match(/\b(?:ESCALA|ESC\.?|SCALE)\s*(?:DE\s*)?1\s*[:\/]\s*(\d+(?:[.,]\d+)?)/i);
+  if(match){const scale=Number(match[1].replace(',','.'));if(scale>=1&&scale<=10000)return {ratio:scale,source:'escala escrita en la lámina'}}
+ }
+ return null;
+}
+function modelPaperViewportEstimate(vp,layout){
+ const ext=modelExtentsForPaper(),height=Number(vp.height||0),width=Number(vp.width||0);
+ if(!(height>0&&width>0))return null;
+ const unitMm=units==='mm'?1:units==='cm'?10:1000;
+ const annotated=cadLayoutScaleHint(layout),explicit=Number(layout.plotScale)>0?Number(layout.plotScale):null;
+ const ratio=explicit||annotated?.ratio||null;
+ const viewHeight=ratio?height*ratio/unitMm:Math.max(ext.height*1.1,ext.width*height/width*1.1,.01);
+ const reportedCenter=vp.viewCenter||{x:0,y:0};
+ const hasCenter=Boolean(vp.viewCenterKnown)&&Number.isFinite(reportedCenter.x)&&Number.isFinite(reportedCenter.y);
+ return {...vp,viewCenter:hasCenter?reportedCenter:ext.center,viewHeight,estimated:true,
+  estimateSource:ratio?(explicit?'escala elegida por usuario':annotated.source):'encuadre de geometría del Modelo',
+  centerEstimated:!hasCenter,originalViewHeight:vp.viewHeight};
+}
 function effectivePaperViewports(layout){
- const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&Number.isFinite(Number(v.viewHeight))&&Number(v.viewHeight)>1e-8&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
- if(imported.length)return imported.slice(0,20);
- // Imported sheets without a recovered viewport must not display an invented model view.
- // New sheets and the explicit "Encadrar todo el modelo" option can generate a view.
+ const configured=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
+ const usable=configured.filter(v=>Number.isFinite(Number(v.viewHeight))&&Number(v.viewHeight)>1e-8);
+ if(usable.length)return usable.slice(0,20);
+ if(configured.length){
+  // This is explicitly a provisional display, not a replacement for the original CAD scale.
+  return configured.slice(0,20).map(v=>modelPaperViewportEstimate(v,layout)).filter(Boolean);
+ }
  if(layout.source!=='new'&&layout.viewportFit!=='all')return [];
  const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
- const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
+ const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);
+ const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
  return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
 }
 function describePaperLayoutState(layout,viewports){
@@ -513,7 +538,9 @@ function describePaperLayoutState(layout,viewports){
  const importedCount=layoutViewportRecords.filter(x=>x.layout===layout.name&&x.id!==1).length;
  const lines=[];
  if(layout.source!=='new'&&!viewports.length&&layout.viewportFit!=='all')
-  lines.push(importedCount?'La ventana gráfica llegó sin una altura de vista válida; no se puede calcular su escala original.':'El archivo no proporcionó un VIEWPORT utilizable para esta hoja. Revisa ⚙ Hoja o el informe de importación.');
+  lines.push(importedCount?'La ventana gráfica no incluye datos suficientes para dibujar el Modelo.':'El archivo no proporcionó un VIEWPORT utilizable para esta hoja. Revisa ⚙ Hoja o el informe de importación.');
+ const estimated=viewports.filter(v=>v.estimated);
+ if(estimated.length)lines.push('VISTA PROVISIONAL: falta la altura original del VIEWPORT. Se utilizó '+estimated[0].estimateSource+(estimated.some(v=>v.centerEstimated)?' y un centro estimado':'')+'. La escala original aún no está verificada.');
  if(layout.source!=='new'&&paperCount===0)
   lines.push('No se recuperaron entidades propias del espacio Papel para esta presentación.');
  if(layout.source!=='new'&&viewports.length&&!objects.some(x=>(x.cadLayout||'Model')==='Model'))
