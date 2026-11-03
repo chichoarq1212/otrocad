@@ -118,7 +118,22 @@ function drawEntity(s,sel=false,preview=false){
  else if(s.type==='circle'){ctx.beginPath();ctx.arc(a.x,a.y,distance(a,b),0,Math.PI*2);ctx.stroke()}
  else if(s.type==='rect'||s.type==='hatch'){const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y);ctx.strokeRect(x,y,w,h);if(s.type==='hatch'){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.lineWidth=.8;const spacing=Math.max(5,Math.min(60,Number(s.hatchSpacing||10)));const pattern=s.hatchPattern||'ANSI31';if(pattern==='SOLID'){ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??.18)));ctx.fillRect(x,y,w,h)}else{const lines=(reverse)=>{for(let k=-h-w;k<w+h*2;k+=spacing){ctx.beginPath();if(reverse){ctx.moveTo(x+k,y);ctx.lineTo(x+k-h,y+h)}else{ctx.moveTo(x+k,y);ctx.lineTo(x+k+h,y+h)}ctx.stroke()}};lines(false);if(pattern==='CROSS')lines(true);if(pattern==='GRID'){for(let k=0;k<w;k+=spacing){ctx.beginPath();ctx.moveTo(x+k,y);ctx.lineTo(x+k,y+h);ctx.stroke()}for(let k=0;k<h;k+=spacing){ctx.beginPath();ctx.moveTo(x,y+k);ctx.lineTo(x+w,y+k);ctx.stroke()}}}ctx.restore()}}
  else if(s.type==='ellipse'){ctx.beginPath();ctx.ellipse(a.x,a.y,Math.abs(b.x-a.x),Math.abs(b.y-a.y),0,0,Math.PI*2);ctx.stroke()}
- else if(s.type==='polygon'){ctx.beginPath();s.pts.forEach((p,i)=>{const v=screen(p);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath();if(s.solidFill&&!preview)ctx.fill();ctx.stroke()}
+ else if(s.type==='polygon'){
+  const loops=s.hatchLoops?.length?s.hatchLoops:[s.pts],allPoints=[];
+  ctx.beginPath();
+  for(const loop of loops){loop.forEach((p,i)=>{const v=screen(p);allPoints.push(v);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath()}
+  if(s.solidFill&&!preview)ctx.fill('evenodd');
+  else if(s.hatchPattern&&!preview&&allPoints.length){
+   ctx.save();ctx.clip('evenodd');ctx.globalAlpha=Math.max(.1,Math.min(1,Number(s.hatchOpacity??.65)));
+   const xs=allPoints.map(p=>p.x),ys=allPoints.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+   const radius=Math.min(30000,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))+20);
+   const spacing=Math.max(5,Math.min(100,Math.abs(Number(s.hatchSpacingWorld)||.2)*zoom));
+   ctx.translate(cx,cy);ctx.rotate(-Number(s.hatchAngle||45)*Math.PI/180);ctx.lineWidth=.8;
+   let lines=0;for(let x=-radius;x<=radius&&lines<800;x+=spacing,lines++){ctx.beginPath();ctx.moveTo(x,-radius);ctx.lineTo(x,radius);ctx.stroke()}
+   ctx.restore();
+  }
+  ctx.stroke();
+ }
  else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
  else if(s.type==='text'){const size=s.textHeightWorld?Math.max(1,Number(s.textHeightWorld)*zoom):Number(s.textHeight||14);ctx.font=size+'px system-ui';ctx.translate(a.x,a.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);String(s.text||'Texto').split('\n').forEach((line,i)=>ctx.fillText(line,0,i*size*1.2))}
  ctx.restore();
@@ -190,7 +205,7 @@ function setTool(t){parallelDirection=null;$('#offsetInline')?.remove();if(t==='
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;let d=1e9;
-  if(s.type==='poly'||s.type==='polygon'){const count=s.pts.length-1+(s.type==='polygon'?1:0);for(let j=0;j<count;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[(j+1)%s.pts.length]))}
+  if(s.type==='poly'||s.type==='polygon'){const loops=s.hatchLoops?.length?s.hatchLoops:[s.pts];for(const loop of loops){const count=loop.length-1+(s.type==='polygon'?1:0);for(let j=0;j<count;j++)d=Math.min(d,pointLineDistance(q,loop[j],loop[(j+1)%loop.length]))}}
   else if(s.type==='rect'||s.type==='hatch'){if(q.x>=Math.min(s.a.x,s.b.x)-best&&q.x<=Math.max(s.a.x,s.b.x)+best&&q.y>=Math.min(s.a.y,s.b.y)-best&&q.y<=Math.max(s.a.y,s.b.y)+best)d=0}
   else if(s.type==='ellipse'){const rx=Math.abs(s.b.x-s.a.x),ry=Math.abs(s.b.y-s.a.y);if(rx&&ry){const normalized=Math.hypot((q.x-s.a.x)/rx,(q.y-s.a.y)/ry);d=Math.abs(normalized-1)*Math.min(rx,ry)}}
   else if(s.type==='arc'&&s.pts?.length>=3){const g=arcParams(s.pts);if(g){const p=screen(q),theta=Math.atan2(p.y-g.y,p.x-g.x),span=v=>(v+2*Math.PI)%(2*Math.PI),onArc=g.anticlockwise?span(g.a1-theta)<=span(g.a1-g.a3):span(theta-g.a1)<=span(g.a3-g.a1);d=onArc?Math.abs(Math.hypot(p.x-g.x,p.y-g.y)-g.r)/zoom:Math.min(distance(q,s.pts[0]),distance(q,s.pts[2]))}else for(let j=0;j<s.pts.length-1;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[j+1]))}
@@ -467,7 +482,7 @@ function handleTap(p){
     transformEntityGeometry(src,mirror,axisAligned);
    }else if(tool==='scale'){
     const factor=Math.hypot(dx,dy),scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});
-    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);
+    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);if(src.hatchLoops)src.hatchLoops=src.hatchLoops.map(loop=>loop.map(scale));
    }
   }
   if(tool==='copy')applySelection(created);else applySelection(targets);
@@ -480,9 +495,9 @@ function handleTap(p){
 }
 function transformEntityGeometry(s,transform,axisAligned){
  if(s.type==='rect'&&!axisAligned&&s.a&&s.b){const a=s.a,b=s.b;s.pts=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}].map(transform);s.type='polygon';delete s.a;delete s.b;return}
- if(s.a)s.a=transform(s.a);if(s.b)s.b=transform(s.b);if(s.pts)s.pts=s.pts.map(transform);
+ if(s.a)s.a=transform(s.a);if(s.b)s.b=transform(s.b);if(s.pts)s.pts=s.pts.map(transform);if(s.hatchLoops)s.hatchLoops=s.hatchLoops.map(loop=>loop.map(transform));
 }
-function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy})}
+function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy});if(s.hatchLoops)s.hatchLoops.forEach(loop=>loop.forEach(p=>{p.x+=dx;p.y+=dy}))}
 function entitySegments(s){
  const pts=[];
  if(s.type==='line'||s.type==='dim'||s.type==='dimaligned'||s.type==='leader'){if(s.a&&s.b)pts.push([s.a,s.b]);return pts}
@@ -490,6 +505,7 @@ function entitySegments(s){
  if(s.type==='circle'){const r=distance(s.a,s.b);let prev=null;for(let i=0;i<=72;i++){const t=i*Math.PI*2/72,p={x:s.a.x+r*Math.cos(t),y:s.a.y+r*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
  if(s.type==='ellipse'){let prev=null;for(let i=0;i<=64;i++){const t=i*Math.PI*2/64,p={x:s.a.x+(s.b.x-s.a.x)*Math.cos(t),y:s.a.y+(s.b.y-s.a.y)*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
  if(s.type==='arc'&&s.pts?.length>=3){const g=arcParams(s.pts);let prev=null;for(let i=0;i<=48;i++){let p;if(g){const span=g.anticlockwise?-((g.a1-g.a3+Math.PI*2)%(Math.PI*2)):((g.a3-g.a1+Math.PI*2)%(Math.PI*2)),t=g.a1+span*i/48;p=world({x:g.x+g.r*Math.cos(t),y:g.y+g.r*Math.sin(t)})}else{const t=i/48,u=1-t,a=s.pts[0],b=s.pts[1],d=s.pts[2];p={x:u*u*a.x+2*u*t*b.x+t*t*d.x,y:u*u*a.y+2*u*t*b.y+t*t*d.y}}if(prev)pts.push([prev,p]);prev=p}return pts}
+ if(s.hatchLoops?.length){for(const loop of s.hatchLoops)for(let i=0;i<loop.length;i++)pts.push([loop[i],loop[(i+1)%loop.length]]);return pts}
  if(s.pts&&s.pts.length>1){for(let i=1;i<s.pts.length;i++)pts.push([s.pts[i-1],s.pts[i]]);if(s.type==='polygon')pts.push([s.pts[s.pts.length-1],s.pts[0]])}
  return pts
 }
@@ -872,7 +888,9 @@ async function getDwgRuntime(){
  }
  return dwgRuntimePromise;
 }
-$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
+const importReportButton=$('#importReport');let lastImportReport=[];
+importReportButton.onclick=()=>alert(lastImportReport.length?lastImportReport.join('\n'):'No hay advertencias en el último dibujo importado.');
+$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;lastImportReport=[...(arr.importWarnings||[]),...(arr.importNotes||[])];importReportButton.hidden=!lastImportReport.length;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')+(arr.importNotes?.length?' · '+arr.importNotes.length+' avisos de compatibilidad':'');status.title=[...(arr.importWarnings||[]),...(arr.importNotes||[])].join('\n')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
 function parseDxfEntities(source){
  const lines=source.replace(/\r/g,'').split('\n'),pairs=[];
  for(let i=0;i+1<lines.length;i+=2){const code=Number(lines[i].trim());if(Number.isFinite(code))pairs.push([code,lines[i+1].trim()])}
@@ -885,8 +903,9 @@ function parseDxfEntities(source){
  const style=r=>{const layer=str(r,8,'General'),aci=get(r,62,7),trueColor=get(r,420,-1),aciColors={1:'#ff3333',2:'#ffff33',3:'#33cc33',4:'#33ffff',5:'#3366ff',6:'#ff33ff',7:'#dce8f5',8:'#808080',9:'#b0b0b0'};return {layer,color:trueColor>=0?'#'+trueColor.toString(16).padStart(6,'0'):aciColors[aci]||colors[layer]||colors.General,lineweight:get(r,370,25)/100,linetype:str(r,6,'CONTINUOUS')==='DASHED'?'DASHED':'CONTINUOUS'}};
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
- const out=[],warnings={};let inEntities=false;
+ const out=[],warnings={},notes={};let inEntities=false,activeAttributeGroup=null;
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
+ const note=type=>notes[type]=(notes[type]||0)+1;
  const buildPolylinePoints=(vertices,closed)=>{
   const points=[];if(!vertices.length)return points;
   points.push({x:vertices[0].x,y:vertices[0].y});
@@ -925,13 +944,76 @@ function parseDxfEntities(source){
   const steps=Math.max(4,Math.ceil(sweep/(Math.PI/24))),radius=Math.hypot(a.x-cx,a.y-cy);
   return Array.from({length:steps+1},(_,i)=>{const t=a1+direction*sweep*i/steps;return{x:cx+radius*Math.cos(t),y:cy+radius*Math.sin(t)}});
  };
+
+ const hatchBoundaries=r=>{
+  const pairs=r.pairs,loops=[];let i=pairs.findIndex(p=>p[0]===91);if(i<0)return loops;
+  const total=Math.min(512,+pairs[i++][1]||0);
+  const val=(data,c,d=0)=>{const p=data.find(x=>x[0]===c);return p&&Number.isFinite(+p[1])?+p[1]:d};
+  const append=(list,part)=>{for(const p of part)if(Number.isFinite(p.x)&&Number.isFinite(p.y)&&(!list.length||distance(list[list.length-1],p)>1e-8))list.push(p)};
+  const sweep=(a,b,ccw)=>{const v=((ccw?b-a:a-b)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);return v<1e-8?Math.PI*2:v};
+  for(let k=0;k<total&&i<pairs.length;k++){
+   while(i<pairs.length&&pairs[i][0]!==92)i++;if(i>=pairs.length)break;
+   const flags=+pairs[i++][1],pts=[];
+   while(i<pairs.length&&pairs[i][0]!==93&&pairs[i][0]!==92)i++;
+   if(pairs[i]?.[0]!==93)break;
+   const count=Math.min(20000,+pairs[i++][1]||0);
+   if(flags&2){
+    const verts=[];
+    for(let j=0;j<count&&i<pairs.length;j++){
+     while(i<pairs.length&&![10,92,97].includes(pairs[i][0]))i++;
+     if(pairs[i]?.[0]!==10)break;
+     const v={x:+pairs[i++][1],y:0,bulge:0};
+     while(i<pairs.length&&![10,92,97].includes(pairs[i][0])){
+      if(pairs[i][0]===20)v.y=+pairs[i][1];
+      if(pairs[i][0]===42)v.bulge=+pairs[i][1];i++;
+     }
+     if(Number.isFinite(v.x)&&Number.isFinite(v.y))verts.push(v);
+    }
+    append(pts,buildPolylinePoints(verts,true));
+   }else for(let j=0;j<count&&i<pairs.length;j++){
+    while(i<pairs.length&&![72,92,97].includes(pairs[i][0]))i++;
+    if(pairs[i]?.[0]!==72)break;
+    const type=+pairs[i++][1],edge=[];
+    while(i<pairs.length&&![72,92,97].includes(pairs[i][0]))edge.push(pairs[i++]);
+    let part=[];
+    if(type===1)part=[{x:val(edge,10),y:val(edge,20)},{x:val(edge,11),y:val(edge,21)}];
+    if(type===2||type===3){
+     const cx=val(edge,10),cy=val(edge,20),rad=Math.PI/180,begin=val(edge,50)*rad,end=val(edge,51)*rad,ccw=val(edge,73,1)!==0,span=sweep(begin,end,ccw);
+     const steps=Math.min(180,Math.max(8,Math.ceil(span/(Math.PI/36))));
+     part=Array.from({length:steps+1},(_,q)=>{
+      const a=begin+(ccw?1:-1)*span*q/steps;
+      if(type===2)return{x:cx+val(edge,40)*Math.cos(a),y:cy+val(edge,40)*Math.sin(a)};
+      const vx=val(edge,11),vy=val(edge,21),ratio=val(edge,40,1);
+      return{x:cx+vx*Math.cos(a)-vy*ratio*Math.sin(a),y:cy+vy*Math.cos(a)+vx*ratio*Math.sin(a)};
+     });
+    }
+    if(type===4){
+     const vertices=(xc,yc)=>{const xs=edge.filter(p=>p[0]===xc).map(p=>+p[1]),ys=edge.filter(p=>p[0]===yc).map(p=>+p[1]);return xs.map((x,q)=>({x,y:ys[q]})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y))};
+     part=vertices(11,21);if(part.length<2)part=vertices(10,20);
+     warn('HATCH con borde SPLINE aproximado');
+    }
+    if(!part.length)warn('HATCH con borde no compatible');
+    append(pts,part);
+   }
+   if(pairs[i]?.[0]===97){const handles=Math.min(20000,+pairs[i++][1]||0);for(let j=0;j<handles&&pairs[i]?.[0]===330;j++)i++}
+   if(pts.length>2){if(distance(pts[0],pts[pts.length-1])<1e-8)pts.pop();loops.push(pts)}
+  }
+  return loops;
+ };
+ const cleanMText=raw=>String(raw||'')
+  .replace(/\\U\+([0-9A-Fa-f]{4,6})/g,(_,hex)=>String.fromCodePoint(parseInt(hex,16)))
+  .replace(/\\S([^;]*);/g,(_,v)=>v.replace(/[#^]/g,'/'))
+  .replace(/\\[PpX]/g,'\n').replace(/\\~/g,' ').replace(/\\([{}\\])/g,'$1')
+  .replace(/\\(?:[AaCcFfHhQqTtWw]|p)[^;]*;/g,'').replace(/\\[LlOoKk]/g,'')
+  .replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').replace(/%%[cC]/g,'Ø').replace(/[{}]/g,'');
  const polylineVertices=new Map();
  for(let i=0;i<records.length;i++)if(records[i].type==='POLYLINE'){
   const vertices=[];for(let j=i+1;j<records.length&&records[j].type!=='SEQEND';j++)if(records[j].type==='VERTEX')vertices.push({x:get(records[j],10),y:get(records[j],20),bulge:get(records[j],42)});
   polylineVertices.set(records[i],vertices);
  }
- const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId)=>{
+ const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId,insertStyle)=>{
   const item={...sourceItem,groupId},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
+  if(sourceItem.layer==='0'&&insertStyle){item.layer=insertStyle.layer;item.color=insertStyle.color}
   let points=null;
   if(sourceItem.type==='circle'&&nonUniform&&sourceItem.a&&sourceItem.b){
    const center=sourceItem.a,r=distance(center,sourceItem.b);points=Array.from({length:49},(_,i)=>{const t=i/48*Math.PI*2;return transformPoint({x:center.x+r*Math.cos(t),y:center.y+r*Math.sin(t)})});
@@ -953,6 +1035,7 @@ function parseDxfEntities(source){
    if(sourceItem.b)item.b=transformPoint(sourceItem.b);
    if(sourceItem.pts)item.pts=sourceItem.pts.map(transformPoint);
   }
+  if(sourceItem.hatchLoops)item.hatchLoops=sourceItem.hatchLoops.map(loop=>loop.map(transformPoint));
   if(sourceItem.type==='text'){
    const angle=Number(sourceItem.textRotation||0)*Math.PI/180,dx=Math.cos(angle)*scaleX,dy=Math.sin(angle)*scaleY;
    item.textRotation=(Math.atan2(dy,dx)+rotation)*180/Math.PI;
@@ -960,12 +1043,16 @@ function parseDxfEntities(source){
   }
   return item;
  };
+ const blockLines=[];for(const [key,items] of blockRecords){const base=blockBases.get(key)||{x:0,y:0};blockLines.push('0','BLOCK','2',key,'10',String(base.x),'20',String(base.y));for(const item of items)blockLines.push('0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]]));blockLines.push('0','ENDBLK')}
+ const blockSection=['0','SECTION','2','BLOCKS',...blockLines,'0','ENDSEC'];
+ const parseBlockItems=(items,depth=0)=>parseDxfEntities([...blockSection,'0','SECTION','2','ENTITIES',...items.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n'),depth+1);
  const header=records.find(r=>r.type==='SECTION'&&str(r,2).toUpperCase()==='HEADER');const unitIndex=header?.pairs.findIndex(p=>p[0]===9&&p[1]==='$INSUNITS')??-1;const unitCode=unitIndex>=0?Number(header.pairs[unitIndex+1]?.[1]):0;const unitMap={4:'mm',5:'cm',6:'m'};if(unitCode&&!unitMap[unitCode])warn('unidades DXF no admitidas; valores sin convertir');out.drawingUnits=unitMap[unitCode]||null;
  for(const r of records){
   if(r.type==='SECTION'){inEntities=str(r,2).toUpperCase()==='ENTITIES';continue}
   if(r.type==='ENDSEC'){inEntities=false;continue}
   if(!inEntities)continue;
   const st=style(r),type=r.type;
+  if(type==='SEQEND'&&activeAttributeGroup){activeAttributeGroup=null;continue}
   if(type==='LINE')out.push({type:'line',a:{x:get(r,10),y:get(r,20)},b:{x:get(r,11),y:get(r,21)},...st});
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
   else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))warn('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
@@ -983,36 +1070,39 @@ function parseDxfEntities(source){
    const scaleX=get(r,41,1),scaleY=get(r,42,1),rotation=get(r,50)*Math.PI/180;
    const columns=Math.max(1,Math.round(get(r,70,1))),rows=Math.max(1,Math.round(get(r,71,1)));
    if(!geometry?.length||depth>=5||!Number.isFinite(scaleX)||!Number.isFinite(scaleY)||Math.abs(scaleX)<1e-9||Math.abs(scaleY)<1e-9||columns*rows>256){warn('INSERT no compatible omitido');continue}
-   const blockLines=[];for(const [key,items] of blockRecords){const base=blockBases.get(key)||{x:0,y:0};blockLines.push('0','BLOCK','2',key,'10',String(base.x),'20',String(base.y));for(const item of items)blockLines.push('0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]]));blockLines.push('0','ENDBLK')}
-   const blockSource=['0','SECTION','2','BLOCKS',...blockLines,'0','ENDSEC','0','SECTION','2','ENTITIES',...geometry.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n');
-   const pieces=parseDxfEntities(blockSource,depth+1),base=blockBases.get(name)||{x:0,y:0},origin={x:get(r,10),y:get(r,20)},cos=Math.cos(rotation),sin=Math.sin(rotation);
+   const pieces=parseBlockItems(geometry,depth),base=blockBases.get(name)||{x:0,y:0},origin={x:get(r,10),y:get(r,20)},cos=Math.cos(rotation),sin=Math.sin(rotation);
    for(let row=0;row<rows;row++)for(let column=0;column<columns;column++){
     const transformPoint=p=>{const x=(p.x-base.x+column*get(r,44))*scaleX,y=(p.y-base.y+row*get(r,45))*scaleY;return{x:origin.x+x*cos-y*sin,y:origin.y+x*sin+y*cos}};
     const groupId='dxf-insert-'+depth+'-'+out.length+'-'+row+'-'+column;
-    for(const piece of pieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId));
+    for(const piece of pieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId,st));
    }
-   if(columns*rows>1)warn('MINSERT expandido a entidades editables');
-   warn('INSERT/MINSERT descompuesto, sin atributos de bloque');
-   if(pieces.importWarnings?.length)warn('INSERT con contenido simplificado u omitido');
+   if(columns*rows>1)note('MINSERT expandido a entidades editables');
+   note('INSERT/MINSERT importado como grupo editable');
+   if(get(r,66)===1)activeAttributeGroup='dxf-insert-'+depth+'-'+(out.length-pieces.length)+'-0-0';
+   if(pieces.importWarnings?.length)warn('INSERT con entidades no compatibles');
   }
   else if(type==='DIMENSION'){
+   if(Number(arguments[1]||0)>=5){warn('DIMENSION con anidación excesiva omitida');continue}
    const geometry=blockRecords.get(str(r,2).toUpperCase());
    if(!geometry?.length){warn('DIMENSION sin geometría gráfica omitida');continue}
-   const supported=geometry.filter(item=>['LINE','CIRCLE','ARC','LWPOLYLINE','ELLIPSE','TEXT','MTEXT'].includes(item.type));
-   if(!supported.length){warn('DIMENSION sin entidades compatibles omitida');continue}
-   const sourceBlock=['0','SECTION','2','ENTITIES',...supported.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n');
-   const pieces=parseDxfEntities(sourceBlock);if(!pieces.length){warn('DIMENSION sin entidades compatibles omitida');continue}const groupId='dxf-dimension-'+out.length;for(const item of pieces)out.push({...item,groupId});
-   warn('DIMENSION descompuesta, no asociativa');if(geometry.some(item=>item.type==='INSERT'))warn('símbolos de cota omitidos');
+   const pieces=parseBlockItems(geometry,Number(arguments[1]||0));
+   if(!pieces.length){warn('DIMENSION sin entidades compatibles omitida');continue}
+   const groupId='dxf-dimension-'+out.length;
+   for(const item of pieces)out.push({...item,groupId,layer:item.layer==='0'?st.layer:item.layer,color:item.layer==='0'?st.color:item.color});
+   note('DIMENSION dibujada como geometría no asociativa');
+   if(pieces.importWarnings?.length)warn('DIMENSION con elementos gráficos no compatibles');
   }
   else if(type==='HATCH'){
-   const firstPath=r.pairs.findIndex(p=>p[0]===93),endPath=r.pairs.findIndex((p,i)=>i>firstPath&&p[0]===97),path=firstPath>=0?r.pairs.slice(firstPath+1,endPath<0?undefined:endPath):[];
-   const xs=path.filter(p=>p[0]===10).map(p=>Number(p[1])),ys=path.filter(p=>p[0]===20).map(p=>Number(p[1]));
-   const solidPolygon=get(r,70)===1&&get(r,91)===1&&(get(r,92)&2)&&xs.length>=3&&xs.length===ys.length&&xs.every(Number.isFinite)&&ys.every(Number.isFinite)&&!path.some(pair=>pair[0]===42&&Number(pair[1])!==0);
-   if(solidPolygon&&!(get(r,93)===4&&new Set(xs).size===2&&new Set(ys).size===2)){out.push({type:'polygon',pts:xs.map((x,i)=>({x,y:ys[i]})),solidFill:true,...st});continue}
-   if(get(r,70)===1&&get(r,91)===1&&(get(r,92)&2)&&get(r,93)===4&&xs.length===4&&ys.length===4&&xs.every(Number.isFinite)&&ys.every(Number.isFinite)){
-    const minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys),corners=new Set(xs.map((x,i)=>`${x},${ys[i]}`));
-    if(minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(`${x},${y}`)))out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},hatchPattern:'SOLID',hatchOpacity:1,...st});else warn('HATCH no rectangular omitido');
-   }else warn('HATCH no compatible omitido');
+   const loops=hatchBoundaries(r),solid=get(r,70)===1,pattern=solid?'SOLID':str(r,2,'ANSI31'),pts=loops[0];
+   if(!pts?.length){warn('HATCH sin contorno compatible omitido');continue}
+   const minx=Math.min(...pts.map(p=>p.x)),maxx=Math.max(...pts.map(p=>p.x)),miny=Math.min(...pts.map(p=>p.y)),maxy=Math.max(...pts.map(p=>p.y));
+   const corners=new Set(pts.map(p=>p.x+','+p.y));
+   const rectangular=loops.length===1&&pts.length===4&&minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(x+','+y));
+   const hatchSpacingWorld=Math.hypot(get(r,45),get(r,46))||Math.max((maxx-minx+maxy-miny)/50,.01);
+   const appearance={hatchPattern:pattern,hatchOpacity:solid?1:.65,hatchSpacingWorld,hatchAngle:get(r,52,45),...st};
+   if(rectangular&&solid)out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},...appearance});
+   else out.push({type:'polygon',pts,hatchLoops:loops,solidFill:solid,...appearance});
+   if(!solid)note('HATCH con trama visual aproximada');
   }
   else if(type==='ELLIPSE'){
    const a={x:get(r,10),y:get(r,20)},vx=get(r,11),vy=get(r,21),ratio=get(r,40),begin=get(r,41),end=get(r,42,Math.PI*2),length=Math.hypot(vx,vy);
@@ -1021,12 +1111,17 @@ function parseDxfEntities(source){
    else if(length>0&&ratio>0&&end>begin){const pts=Array.from({length:65},(_,i)=>{const t=begin+(end-begin)*i/64;return{x:a.x+vx*Math.cos(t)-vy*ratio*Math.sin(t),y:a.y+vy*Math.cos(t)+vx*ratio*Math.sin(t)}});out.push({type:'poly',pts,...st});warn('elipses rotadas o parciales simplificadas')}
    else warn('elipses no válidas omitidas');
   }
-  else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'){
+  else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'||type==='ATTDEF'){
+   if(type==='ATTDEF'&&!(get(r,70)&2))continue; // non-constant attributes are represented by their INSERT's ATTRIB entities
    const raw=type==='MTEXT'?r.pairs.filter(p=>p[0]===3||p[0]===1).map(p=>p[1]).join(''):str(r,1,'');
-   if(type==='MTEXT'&&/[{}]|\\\\[A-Za-z]/.test(raw.replace(/\\\\P/g,'')))warn('formato de texto múltiple simplificado');
-   const value=raw.replace(/\\\\P/g,'\\n').replace(/\\\\~/g,' '),vx=get(r,11,1),vy=get(r,21,0);
+   const value=type==='MTEXT'?cleanMText(raw):raw;
+   if(type==='MTEXT'&&/\\(?:[AaCcFfHhQqTtWw]|p|S)/.test(raw))note('MTEXT con formato visual aproximado');
+   const vx=get(r,11,1),vy=get(r,21,0);
    const rotation=r.pairs.some(p=>p[0]===50)?get(r,50):(type==='MTEXT'?Math.atan2(vy,vx)*180/Math.PI:0);
-   out.push({type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:get(r,40,0.4),...st})
+   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:get(r,40,0.4),...st};
+   if(type==='MTEXT'){item.mtextRaw=raw;item.mtextPlain=value}
+   if(type==='ATTRIB'&&activeAttributeGroup)item.groupId=activeAttributeGroup;
+   out.push(item);
   }
   else if(type==='SOLID'||type==='TRACE'||type==='3DFACE'){
    const pts=[10,11,12,13].filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10)}));
@@ -1041,10 +1136,12 @@ function parseDxfEntities(source){
    const xs=all(r,10),ys=all(r,20),pts=xs.map((x,i)=>({x,y:ys[i]??0}));
    if(pts.length>=2)out.push({type:'poly',pts,...st});else warn('LEADER sin vértices omitida');
   }
+  else if(type==='VIEWPORT'){(out.layoutViewports??=[]).push({x:get(r,10),y:get(r,20),width:get(r,40),height:get(r,41),id:get(r,69)});note('VIEWPORT de presentación no editable')}
   else if(type==='VERTEX'||type==='SEQEND'){}
   else warn(type+' omitido');
  }
  out.importWarnings=Object.entries(warnings).map(([name,count])=>count+' '+name);
+ out.importNotes=Object.entries(notes).map(([name,count])=>count+' '+name);
  return out;
 }
 async function download(name,content,type){const blob=content instanceof Blob?content:new Blob([content],{type:type||'application/octet-stream'});if(window.OtroCadAndroid&&typeof window.OtroCadAndroid.saveFile==='function'){try{const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));window.OtroCadAndroid.saveFile(name,type||'application/octet-stream',btoa(binary));return}catch(err){console.error(err)}}const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1200)}
@@ -1062,7 +1159,7 @@ function buildDxf(){
  const dxfLayer=o=>String(o.layer||'General').replace(/[\x00-\x1f<>/\\":;?*|=]/g,'_').slice(0,255)||'General';
  const renamedLayers=objects.filter(o=>dxfLayer(o)!==String(o.layer||'General')).length;
  const groups=new Set(objects.map(o=>o.groupId).filter(Boolean));
- const approximated=objects.filter(o=>['dim','dimaligned','leader'].includes(o.type)||(o.type==='hatch'&&(o.hatchPattern!=='SOLID'||Number(o.hatchOpacity??.18)!==1))||(o.type==='arc'&&!arcGeometry(o.pts)));
+ const approximated=objects.filter(o=>['dim','dimaligned','leader'].includes(o.type)||(o.type==='hatch'&&(o.hatchPattern!=='SOLID'||Number(o.hatchOpacity??.18)!==1))||(o.type==='polygon'&&o.hatchPattern&&o.hatchPattern!=='SOLID')||(o.type==='arc'&&!arcGeometry(o.pts)));
  const unsupported=objects.filter(o=>!['line','dim','dimaligned','leader','circle','rect','hatch','poly','polygon','arc','ellipse','text'].includes(o.type)||(o.type==='ellipse'&&(!o.a||!o.b||o.a.x===o.b.x||o.a.y===o.b.y)));
  if((approximated.length||unsupported.length||renamedLayers||groups.size)&&!confirm('Este DXF aún no conserva todos los elementos con fidelidad: '+approximated.length+' se exportarán simplificados, '+unsupported.length+' se omitirán, '+renamedLayers+' tendrán nombres de capa ajustados y '+groups.size+' bloques se desagruparán. Conserva también una copia del proyecto. ¿Exportar de todos modos?'))return null;
  const rows=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1021','9','$INSUNITS','70',String(({mm:4,cm:5,m:6})[units]||0),'0','ENDSEC'];
@@ -1081,12 +1178,19 @@ function buildDxf(){
   const line=(p,q)=>add(0,'LINE',...common,100,'AcDbLine',10,p.x,20,p.y,30,0,11,q.x,21,q.y,31,0);
   const textEntity=(p,value,height,rotation=0)=>{const valueText=String(value||'').replace(/\r/g,'');if(valueText.includes('\n'))add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,50,rotation,1,valueText.replace(/\n/g,'\\P'));else add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,50,rotation,1,valueText)};
   if(['line','dim','dimaligned','leader'].includes(o.type)&&a&&b){line(a,b);if(o.type==='dim'||o.type==='dimaligned')textEntity({x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance(a,b).toFixed(2)+' '+units,12/zoom);if(o.type==='leader'&&o.text)textEntity(b,o.text,12/zoom)}
-  else if(o.type==='text'&&a)textEntity(a,o.text,o.textHeightWorld||Number(o.textHeight||14)/zoom,o.textRotation||0);
+  else if(o.type==='text'&&a){if(o.mtextRaw&&o.text===o.mtextPlain)add(0,'MTEXT',...common,100,'AcDbMText',10,a.x,20,a.y,30,0,40,o.textHeightWorld||.4,50,o.textRotation||0,1,o.mtextRaw);else textEntity(a,o.text,o.textHeightWorld||Number(o.textHeight||14)/zoom,o.textRotation||0)}
   else if(o.type==='circle'&&a&&b)add(0,'CIRCLE',...common,100,'AcDbCircle',10,a.x,20,a.y,30,0,40,distance(a,b));
   else if(o.type==='arc'&&arcGeometry(o.pts)){const g=arcGeometry(o.pts);add(0,'ARC',...common,100,'AcDbCircle',10,g.x,20,g.y,30,0,40,g.r,100,'AcDbArc',50,g.start,51,g.end)}
   else if(o.type==='ellipse'&&a&&b&&a.x!==b.x&&a.y!==b.y){const rx=Math.abs(b.x-a.x),ry=Math.abs(b.y-a.y),horizontal=rx>=ry;add(0,'ELLIPSE',...common,100,'AcDbEllipse',10,a.x,20,a.y,30,0,11,horizontal?rx:0,21,horizontal?0:ry,31,0,40,Math.min(rx,ry)/Math.max(rx,ry),41,0,42,Math.PI*2)}
-  else if(o.type==='polygon'&&o.solidFill&&o.pts?.length>=3){add(0,'HATCH',...common,100,'AcDbHatch',10,0,20,0,30,0,210,0,220,0,230,1,2,'SOLID',70,1,71,0,91,1,92,3,72,0,73,1,93,o.pts.length);o.pts.forEach(p=>add(10,p.x,20,p.y));add(97,0,75,1,76,1,98,0)}
-  else if(o.type==='hatch'&&o.hatchPattern==='SOLID'&&Number(o.hatchOpacity??.18)===1&&a&&b){const ps=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];add(0,'HATCH',...common,100,'AcDbHatch',10,0,20,0,30,0,210,0,220,0,230,1,2,'SOLID',70,1,71,0,91,1,92,3,72,0,73,1,93,4);ps.forEach(p=>add(10,p.x,20,p.y));add(97,0,75,1,76,1,98,0)}
+  else if(o.type==='polygon'&&(o.solidFill||o.hatchPattern)&&o.pts?.length>=3){
+    const loops=o.hatchLoops?.length?o.hatchLoops:[o.pts],solid=Boolean(o.solidFill),pattern=solid?'SOLID':o.hatchPattern;
+    add(0,'HATCH',...common,100,'AcDbHatch',10,0,20,0,30,0,210,0,220,0,230,1,2,pattern,70,solid?1:0,71,0,91,loops.length);
+    for(const loop of loops){add(92,3,72,0,73,1,93,loop.length);for(const p of loop)add(10,p.x,20,p.y);add(97,0)}
+    add(75,1,76,1);
+    if(!solid){const angle=Number(o.hatchAngle||45),spacing=Math.max(.0001,Number(o.hatchSpacingWorld||.2));add(52,angle,41,1,77,0,78,1,53,angle,43,0,44,0,45,0,46,spacing,79,0)}
+    add(98,0);
+   }
+   else if(o.type==='hatch'&&o.hatchPattern==='SOLID'&&Number(o.hatchOpacity??.18)===1&&a&&b){const ps=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];add(0,'HATCH',...common,100,'AcDbHatch',10,0,20,0,30,0,210,0,220,0,230,1,2,'SOLID',70,1,71,0,91,1,92,3,72,0,73,1,93,4);ps.forEach(p=>add(10,p.x,20,p.y));add(97,0,75,1,76,1,98,0)}
   else if((o.type==='rect'||o.type==='hatch')&&a&&b){const ps=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,4,70,1);ps.forEach(p=>add(10,p.x,20,p.y))}
   else if(o.pts){add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,o.pts.length,70,o.type==='polygon'?1:0);o.pts.forEach(p=>add(10,p.x,20,p.y))}
  });
@@ -1125,7 +1229,7 @@ $('#pdf').onclick=()=>window.print();
 $('#propertiesBtn').onclick=()=>{$('#properties').classList.toggle('open');showProperties()};
 $('#zoomIn').onclick=()=>{zoom*=1.2;render()};$('#zoomOut').onclick=()=>{zoom/=1.2;render()};
 function boundsPoints(o){
- const pts=[];if(o.a)pts.push(o.a);if(o.b)pts.push(o.b);if(o.pts)pts.push(...o.pts);
+ const pts=[];if(o.a)pts.push(o.a);if(o.b)pts.push(o.b);if(o.pts)pts.push(...o.pts);if(o.hatchLoops)for(const loop of o.hatchLoops)pts.push(...loop);
  if(o.type==='circle'&&o.a&&o.b){const r=distance(o.a,o.b);pts.push({x:o.a.x-r,y:o.a.y-r},{x:o.a.x+r,y:o.a.y+r})}
  if(o.type==='ellipse'&&o.a&&o.b){const rx=Math.abs(o.b.x-o.a.x),ry=Math.abs(o.b.y-o.a.y);pts.push({x:o.a.x-rx,y:o.a.y-ry},{x:o.a.x+rx,y:o.a.y+ry})}
  if(o.type==='arc'&&o.pts?.length>=3){const g=arcParams(o.pts);if(g){const span=v=>(v+2*Math.PI)%(2*Math.PI);for(const t of [0,Math.PI/2,Math.PI,3*Math.PI/2]){const onArc=g.anticlockwise?span(g.a1-t)<=span(g.a1-g.a3):span(t-g.a1)<=span(g.a3-g.a1);if(onArc)pts.push(world({x:g.x+g.r*Math.cos(t),y:g.y+g.r*Math.sin(t)}))}}}
