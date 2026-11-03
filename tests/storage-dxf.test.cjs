@@ -647,7 +647,7 @@ console.log('DXF native paper space checks passed: BLOCK_RECORD/LAYOUT handles, 
 assert.match(source,/showPaperLayoutNotice\(layout,vps\)/,'Layout must explain missing viewports instead of rendering a blank sheet');
 
 const paperPreviewScope={
- layoutViewportRecords:[{layout:'P-03',id:2,status:1,width:560,height:380,viewHeight:0,viewCenter:{x:0,y:0}}],
+ layoutViewportRecords:[{layout:'P-03',id:2,status:1,center:{x:297,y:210},width:560,height:380,viewHeight:0,viewCenter:{x:0,y:0}}],
  units:'m',objects:[{type:'line',cadLayout:'Model',a:{x:0,y:0},b:{x:1,y:1}}],
  modelExtentsForPaper:()=>({center:{x:0,y:0},width:1,height:1})
 };
@@ -682,6 +682,42 @@ const warning=vm.runInContext("describePaperLayoutState({name:'P-03',source:'imp
 assert.match(warning,/VISTA PROVISIONAL/);
 assert.match(warning,/CENTRO PROVISIONAL/);
 console.log('Paper viewport checks passed: provisional view, missing center, mixed viewports and preserved height');
+
+const truncatedPaperScope={
+ layoutViewportRecords:[{layout:'P-01',id:2,status:1,width:0,height:0,center:{x:0,y:0},viewHeight:0,viewCenterKnown:false}],
+ objects:[
+  {type:'line',cadLayout:'Model',a:{x:0,y:0},b:{x:18,y:12}},
+  {type:'text',cadLayout:'P-01',a:{x:435,y:280},text:'CRITERIO DE DISTRIBUCIÓN'},
+  {type:'text',cadLayout:'P-01',a:{x:12,y:380},text:'PLANTA BAJA'},
+  {type:'text',cadLayout:'P-01',a:{x:455,y:250},text:'PROGRAMA PROPUESTO'}
+ ],
+ units:'m',
+ modelExtentsForPaper:()=>({center:{x:9,y:6},width:18,height:12})
+};
+vm.createContext(truncatedPaperScope);
+vm.runInContext(source.slice(source.indexOf('function cadLayoutScaleHint('),source.indexOf('function renderPaperLayout(')),truncatedPaperScope);
+const damagedViewport=vm.runInContext("effectivePaperViewports({name:'P-01',source:'imported',paperWidth:594,paperHeight:420,margin:10})",truncatedPaperScope);
+assert.equal(damagedViewport.length,1,'Recuperar una vista de Modelo para P-01 con ancho/alto de VIEWPORT perdidos');
+assert.equal(damagedViewport[0].paperRegionEstimated,true,'El área de papel es estimada, sin modificar coordenadas del cajetín');
+assert.ok(damagedViewport[0].width>250&&damagedViewport[0].width<450);
+assert.ok(damagedViewport[0].height>200&&damagedViewport[0].height<360);
+assert.ok(damagedViewport[0].center.x<400,'La vista debe ubicarse a la izquierda de las notas en la hoja');
+assert.equal(damagedViewport[0].viewCenter.x,9);
+assert.ok(damagedViewport[0].viewHeight>0);
+const originalViewport=truncatedPaperScope.layoutViewportRecords[0];
+assert.equal(originalViewport.width,0,'No adulterar los datos originales de VIEWPORT importados');
+assert.equal(originalViewport.viewHeight,0);
+const missingWarning=vm.runInContext("describePaperLayoutState({name:'P-01',source:'imported'},effectivePaperViewports({name:'P-01',source:'imported',paperWidth:594,paperHeight:420,margin:10})).message",truncatedPaperScope);
+assert.match(missingWarning,/VENTANA RECUPERADA/);
+truncatedPaperScope.layoutViewportRecords.length=0;
+const absentViewport=vm.runInContext("effectivePaperViewports({name:'P-01',source:'imported',paperWidth:594,paperHeight:420,margin:10})",truncatedPaperScope);
+assert.equal(absentViewport.length,1,'Si el conversor elimina VIEWPORT, mostrar recuperación provisional del Modelo');
+assert.equal(absentViewport[0].viewportMissing,true);
+truncatedPaperScope.layoutViewportRecords.push({layout:'P-01',id:2,status:0,width:0,height:0});
+const inactiveViewport=vm.runInContext("effectivePaperViewports({name:'P-01',source:'imported',paperWidth:594,paperHeight:420,margin:10})",truncatedPaperScope);
+assert.equal(inactiveViewport[0].offViewportRecovered,true,'La vista inactiva se informa y se recupera solo para previsualización');
+console.log('Incomplete VIEWPORT recovery checks passed: zero-size, no viewport and inactive viewport');
+
 
 
 // Regression: localStorage quota must not prevent NEW when IndexedDB can retain the old drawing.
