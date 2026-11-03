@@ -69,16 +69,7 @@ jobs:
           script: |
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -W -n com.otrocad.app/.HybridActivity
-            for attempt in $(seq 1 12); do
-              if adb shell pidof com.otrocad.app >/dev/null 2>&1; then
-                echo "OtroCAD inició correctamente en Android (intento $attempt)"
-                exit 0
-              fi
-              echo "Esperando a que la actividad de OtroCAD arranque (intento $attempt/12)"
-              sleep 2
-            done
-            adb logcat -d -s AndroidRuntime:E ActivityManager:W WebViewFactory:E
-            exit 1
+            for attempt in $(seq 1 12); do if adb shell pidof com.otrocad.app >/dev/null 2>&1; then echo "OtroCAD inició en Android (intento $attempt)"; exit 0; fi; echo "Esperando inicio de OtroCAD ($attempt/12)"; sleep 2; done; adb logcat -d -s AndroidRuntime:E ActivityManager:W WebViewFactory:E; exit 1
       - name: Prepare named test APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.5.4-test.apk
       - name: Publish test APK in GitHub Releases
