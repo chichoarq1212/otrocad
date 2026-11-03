@@ -330,11 +330,13 @@ function surfaceData(){
 function terrainSamples(){
  const explicit=pointObjects().map(p=>({x:p.a.x,y:p.a.y,z:Number(p.z),id:p.civilPointId}));
  if(explicit.length>=3)return explicit;
- const contourVertices=api.getObjects().filter(o=>(o.type==='poly'||o.type==='polygon')&&o.elevation!==undefined&&Number.isFinite(Number(o.elevation))&&Array.isArray(o.pts)).flatMap((o,index)=>o.pts.map((p,i)=>({x:p.x,y:p.y,z:Number(o.elevation),id:'CURVA-'+index+'-'+i})));
+ const selectedContours=api.getSelectedObjects().filter(o=>(o.type==='poly'||o.type==='polygon')&&o.elevation!==undefined&&Number.isFinite(Number(o.elevation))&&Array.isArray(o.pts));
+ const contourSource=selectedContours.length?selectedContours:api.getObjects().filter(o=>(o.type==='poly'||o.type==='polygon')&&o.elevation!==undefined&&Math.abs(Number(o.elevation))>1e-9&&Array.isArray(o.pts));
+ const contourVertices=contourSource.flatMap((o,index)=>o.pts.map((p,i)=>({x:p.x,y:p.y,z:Number(o.elevation),id:'CURVA-'+index+'-'+i})));
  return explicit.concat(contourVertices);
 }
 function createTin(){
- const pts=terrainSamples();if(pts.length<3)throw Error('Importa al menos tres puntos XYZ o polilíneas de curvas de nivel con elevación.');
+ const pts=terrainSamples();if(pts.length<3)throw Error('Importa tres puntos XYZ o selecciona curvas de nivel con elevación para triangular.');
  const data=math.triangulate(pts);
  const z=data.points.map(p=>p.z),min=Math.min(...z),max=Math.max(...z),id='TIN-'+Date.now().toString(36);
  const triangles=data.triangles.map((tri,index)=>({type:'polygon',pts:tri.map(p=>({x:p.x,y:p.y,z:p.z})),layer:'Superficie TIN',color:elevationColor((tri[0].z+tri[1].z+tri[2].z)/3,min,max),lineweight:.13,solidFill:false,hatchOpacity:.12,importedHatch:true,civilTin:true,civilSurfaceId:id,civilTriangleIndex:index}));
@@ -413,7 +415,7 @@ function stationLabel(value){
 function createStations(){
  const alignment=requireAlignment(),length=pathLength(alignment.pts),factor=drawingToMeters();
  const intervalMeters=numberValue(prompt('Intervalo de progresivas (metros)', '10'));if(!(intervalMeters>0))return;
- const interval=intervalMeters/factor;
+ const interval=intervalMeters/factor;if(length<=0)throw Error('El alineamiento no tiene longitud.');
  const xs=alignment.pts.map(p=>p.x),ys=alignment.pts.map(p=>p.y),span=Math.max(1,Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys));
  const size=Math.max(interval*.035,span*.0008),height=Math.max(.05,size*.62),items=[];
  if(length/interval>5000)throw Error('El intervalo generaría más de 5000 progresivas; aumenta la separación.');
