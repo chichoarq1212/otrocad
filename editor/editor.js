@@ -1408,6 +1408,27 @@ function parseDxfEntities(source){
   if(handleToLayout.has(owner))return handleToLayout.get(owner);
   return get(r,67,0)===1?activePaperLayout:'Model';
  };
+ const entitiesHandles=new Set();let originalEntities=false;
+ for(const rec of records){
+  if(rec.type==='SECTION'){originalEntities=str(rec,2).toUpperCase()==='ENTITIES';continue}
+  if(rec.type==='ENDSEC'){originalEntities=false;continue}
+  const h=str(rec,5,'').toUpperCase();if(originalEntities&&h)entitiesHandles.add(h);
+ }
+ const paperSpaceRecords=[],paperBlockBreakdown={};
+ for(const [blockName,geometry] of blockRecords){
+  if(!/^\*PAPER_SPACE(?:\d+)?$/i.test(blockName))continue;
+  const paperLayout=paperBlockToLayout.get(blockName)||'Papel sin asociación';let count=0;
+  for(const rec of geometry){
+   const handle=str(rec,5,'').toUpperCase();
+   if(handle&&entitiesHandles.has(handle))continue;
+   const pairs=rec.pairs.filter(([code])=>code!==67&&code!==410);
+   pairs.push([67,'1'],[410,paperLayout]);
+   paperSpaceRecords.push({type:rec.type,pairs,originalRecord:rec});count++;
+  }
+  paperBlockBreakdown[blockName+' → '+paperLayout]=count;
+ }
+ if(paperSpaceRecords.length>100000)throw Error('Presentaciones demasiado grandes (más de 100000 entidades en BLOCKS)');
+ const paperRecordsForImport=[...records,{type:'SECTION',pairs:[[2,'ENTITIES']]},...paperSpaceRecords,{type:'ENDSEC',pairs:[]}];
  const out=[],warnings={},notes={},diagnostics={};let inEntities=false,activeAttributeGroup=null;
  const diagnose=(scope,counts)=>{for(const [name,count] of Object.entries(counts||{})){const key=scope+' → '+name;diagnostics[key]=(diagnostics[key]||0)+count}};
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
@@ -1644,7 +1665,7 @@ function parseDxfEntities(source){
   styleTableSection.push('0','ENDTAB','0','ENDSEC');
   const parseBlockItems=(items,depth=0)=>parseDxfEntities([...styleTableSection,...blockSection,'0','SECTION','2','ENTITIES',...items.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n'),depth+1);
  const header=records.find(r=>r.type==='SECTION'&&str(r,2).toUpperCase()==='HEADER');const unitIndex=header?.pairs.findIndex(p=>p[0]===9&&p[1]==='$INSUNITS')??-1;const unitCode=unitIndex>=0?Number(header.pairs[unitIndex+1]?.[1]):0;const unitMap={4:'mm',5:'cm',6:'m'};if(unitCode&&!unitMap[unitCode])warn('unidades DXF no admitidas; valores sin convertir');out.drawingUnits=unitMap[unitCode]||null;
- for(const r of records){
+ for(const r of paperRecordsForImport){
   if(r.type==='SECTION'){inEntities=str(r,2).toUpperCase()==='ENTITIES';continue}
   if(r.type==='ENDSEC'){inEntities=false;continue}
   if(!inEntities)continue;
@@ -1659,7 +1680,7 @@ function parseDxfEntities(source){
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
   else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
   else if(type==='POLYLINE'){
-   const flags=get(r,70,0),vertices=polylineVertices.get(r)||[];
+   const flags=get(r,70,0),vertices=polylineVertices.get(r.originalRecord||r)||[];
    if(flags&(8|16|64)){warn('polilíneas 3D o malla no compatibles omitidas');continue}
    if(vertices.length<2){warn('POLYLINE sin vértices omitida');continue}
    const closed=Boolean(flags&1),pts=buildPolylinePoints(vertices,closed);
@@ -1794,6 +1815,8 @@ function parseDxfEntities(source){
  }
  out.layoutDefinitions=[...layoutMap.values()].sort((a,b)=>a.tabOrder-b.tabOrder);
  if(out.layoutDefinitions.length)note('Modelo y '+out.layoutDefinitions.length+' presentaciones diferenciados');
+ if(paperSpaceRecords.length)note(paperSpaceRecords.length+' entidades originales recuperadas desde BLOCKS de Layout');
+ out.paperBlockRecovery={recovered:paperSpaceRecords.length,breakdown:paperBlockBreakdown,unmatched:unknownPaperBlocks};
  out.importWarnings=Object.entries(warnings).map(([name,count])=>count+' '+name);
  out.importNotes=Object.entries(notes).map(([name,count])=>count+' '+name);
  out.importWarningCounts={...warnings};out.importDiagnostics=diagnostics;
