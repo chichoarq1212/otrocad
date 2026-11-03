@@ -542,8 +542,8 @@ console.log('CAD text fidelity checks passed: STYLE table, font fallback, height
 // Edited single-line MTEXT must remain MTEXT and preserve the selected native font.
 context.objects=[{type:'text',a:{x:0,y:0},text:'MTEXT EDITADO',isMText:true,mtextWidthWorld:0,mtextAttachment:1,mtextLineSpacingFactor:1,textHeightWorld:.18,textStyleName:'OTROCAD_ARIAL_B',textFontFile:'arialbd.ttf',textFontFamily:'Arial, Helvetica, sans-serif',textFontBold:true,textWidthFactor:1,textStyleWidthFactor:1,textStyleFixedHeight:0,textStyleObliqueAngle:0,layer:'Textos',color:'#ffffff'}];
 downloaded=null;accept=true;handlers.get('#dxf').onclick();
-assert.match(downloaded.content,/\\r\\nMTEXT\\r\\n/,'Single-line MTEXT should not be downgraded to TEXT');
-assert.match(downloaded.content,/arialbd\\.ttf/);
+assert.match(downloaded.content,/\r\nMTEXT\r\n/,'Single-line MTEXT should not be downgraded to TEXT');
+assert.match(downloaded.content,/arialbd\.ttf/);
 context.editedMtextDxf=downloaded.content;
 const editedMtextRoundtrip=vm.runInContext('parseDxfEntities(editedMtextDxf)',context);
 assert.equal(editedMtextRoundtrip[0].isMText,true);
