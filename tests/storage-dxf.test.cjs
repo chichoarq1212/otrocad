@@ -663,8 +663,25 @@ assert.equal(annotated[0].viewHeight,28.5,'La escala escrita 1:75 en una lámina
 assert.match(annotated[0].estimateSource,/escala escrita/);
 paperPreviewScope.objects.pop();
 paperPreviewScope.layoutViewportRecords[0].viewHeight=18;
-assert.equal(vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420}).length",paperPreviewScope),1,'Valid imported viewports must retain their real view height');
-console.log('Paper viewport checks passed: provisional view, explicit scale annotation, imported scale preserved');
+const missingCenter=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})",paperPreviewScope);
+assert.equal(missingCenter[0].viewHeight,18,'La altura real del VIEWPORT no debe reemplazarse');
+assert.equal(Boolean(missingCenter[0].heightEstimated),false);
+paperPreviewScope.layoutViewportRecords[0].viewCenterKnown=false;
+const correctedCenter=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})",paperPreviewScope);
+assert.equal(correctedCenter[0].viewHeight,18,'Conservar la altura real al recuperar solo el centro');
+assert.equal(correctedCenter[0].centerEstimated,true);
+assert.equal(correctedCenter[0].viewCenter.x,0,'Usar el centro geométrico del Modelo cuando el conversor pierde grupos 12/22');
+assert.equal(correctedCenter[0].heightEstimated,false,'No afirmar que se estimó la escala si es válida');
+paperPreviewScope.layoutViewportRecords.push({layout:'P-03',id:3,status:1,width:280,height:200,viewHeight:0,viewCenterKnown:false});
+const mixed=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})",paperPreviewScope);
+assert.equal(mixed.length,2,'Mantener todas las ventanas de una lámina aunque sus campos sean distintos');
+assert.equal(mixed[0].viewHeight,18);
+assert.equal(mixed[1].heightEstimated,true);
+assert.equal(mixed[1].centerEstimated,true);
+const warning=vm.runInContext("describePaperLayoutState({name:'P-03',source:'imported'},effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})).message",paperPreviewScope);
+assert.match(warning,/VISTA PROVISIONAL/);
+assert.match(warning,/CENTRO PROVISIONAL/);
+console.log('Paper viewport checks passed: provisional view, missing center, mixed viewports and preserved height');
 
 
 // Regression: localStorage quota must not prevent NEW when IndexedDB can retain the old drawing.
@@ -756,3 +773,33 @@ assert.equal(leaderLabels[0].textHeightWorld,.2);
 assert.equal(leaderLabels[0].a.x,6);
 assert.match(leaderLabels[0].text,/COCINA/);
 console.log('CAD annotation recovery checks passed: room ATTDEF, ATTRIB de-duplication and MLEADER text');
+
+
+// Critical regression: TEXT/MTEXT use drawing-space anchor coordinates converted
+// by screen(), not raw world coordinates treated as canvas pixels.
+const textCanvasTranslations=[];
+const textRenderScope={
+ ctx:{
+  save(){},restore(){},setLineDash(){},translate(x,y){textCanvasTranslations.push([x,y])},
+  rotate(){},transform(){},fillText(){},measureText(value){return {width:String(value).length*8}}
+ },
+ zoom:100,layoutRenderTransform:null,
+ resolveCadColor:()=>'#222222',canvasIsLight:()=>true,cadLineDash:()=>[],
+ cadFontFamilyFromFile:()=>'"Arial", sans-serif',
+ wrapCadTextLines:(value)=>String(value).split('\n'),
+ screen(p){const q=this.layoutRenderTransform;return q?{x:q.tx+p.x*q.scale,y:q.ty-p.y*q.scale}:{x:500+p.x*this.zoom,y:400-p.y*this.zoom}}
+};
+textRenderScope.screen=p=>{
+ const transform=textRenderScope.layoutRenderTransform;
+ return transform?{x:transform.tx+p.x*transform.scale,y:transform.ty-p.y*transform.scale}:{x:500+p.x*textRenderScope.zoom,y:400-p.y*textRenderScope.zoom};
+};
+vm.createContext(textRenderScope);
+vm.runInContext(source.slice(source.indexOf('function drawEntity('),source.indexOf('\nfunction drawGrid(')),textRenderScope);
+vm.runInContext("drawEntity({type:'text',a:{x:2,y:3},text:'SALA',textHeightWorld:.2})",textRenderScope);
+assert.deepEqual(textCanvasTranslations.pop(),[700,100],'Model-space label must render at screen-projected position');
+vm.runInContext("drawEntity({type:'text',a:{x:2,y:3},text:'ALINEADO',textHeightWorld:.2,textAlignmentPoint:{x:4,y:5},textHorizontalAlignment:1})",textRenderScope);
+assert.deepEqual(textCanvasTranslations.pop(),[900,-100],'TEXT alignment point also requires world-to-screen projection');
+textRenderScope.layoutRenderTransform={tx:55,ty:500,scale:2};
+vm.runInContext("drawEntity({type:'text',a:{x:10,y:20},text:'CAJETIN',isMText:true,textHeightWorld:3})",textRenderScope);
+assert.deepEqual(textCanvasTranslations.pop(),[75,460],'Paper-space MTEXT must follow layout sheet transform rather than raw millimeter coords');
+console.log('CAD text projection checks passed: Model TEXT, aligned TEXT and Paper MTEXT anchors');

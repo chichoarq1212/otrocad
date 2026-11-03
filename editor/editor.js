@@ -384,7 +384,8 @@ function drawEntity(s,sel=false,preview=false){
   const oblique=Math.max(-80,Math.min(80,Number(s.textObliqueAngle||0)))*Math.PI/180,flags=Number(s.textGenerationFlags||0);
   const horizontal=Number(s.textHorizontalAlignment||0),vertical=Number(s.textVerticalAlignment||0);let renderWidthFactor=widthFactor;
   if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=ctx.measureText(value).width*renderWidthFactor,target=Number(s.textFitWidthWorld)*drawZoom;if(natural>0)renderWidthFactor*=target/natural}
-  const anchor=(!mtext&&(horizontal||vertical)&&horizontal!==3&&horizontal!==5&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
+  const anchorWorld=(!mtext&&(horizontal||vertical)&&horizontal!==3&&horizontal!==5&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
+  const anchor=screen(anchorWorld); // Convert CAD world coordinates to pixels before drawing any TEXT/MTEXT.
   ctx.translate(anchor.x,anchor.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);
   ctx.transform(renderWidthFactor*(flags&2?-1:1),0,Math.tan(oblique),flags&4?-1:1,0,0);
   const lineHeight=size*1.2*(Number(s.mtextLineSpacingFactor)>0?Math.max(.5,Math.min(4,Number(s.mtextLineSpacingFactor))):1);
@@ -517,15 +518,21 @@ function modelPaperViewportEstimate(vp,layout){
  const hasCenter=Boolean(vp.viewCenterKnown)&&Number.isFinite(reportedCenter.x)&&Number.isFinite(reportedCenter.y);
  return {...vp,viewCenter:hasCenter?reportedCenter:ext.center,viewHeight,estimated:true,
   estimateSource:ratio?(explicit?'escala elegida por usuario':annotated.source):'encuadre de geometría del Modelo',
-  centerEstimated:!hasCenter,originalViewHeight:vp.viewHeight};
+  centerEstimated:!hasCenter,heightEstimated:true,originalViewHeight:vp.viewHeight};
 }
 function effectivePaperViewports(layout){
  const configured=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
- const usable=configured.filter(v=>Number.isFinite(Number(v.viewHeight))&&Number(v.viewHeight)>1e-8);
- if(usable.length)return usable.slice(0,20);
  if(configured.length){
-  // This is explicitly a provisional display, not a replacement for the original CAD scale.
-  return configured.slice(0,20).map(v=>modelPaperViewportEstimate(v,layout)).filter(Boolean);
+  const ext=modelExtentsForPaper();
+  return configured.slice(0,20).map(v=>{
+   if(!Number.isFinite(Number(v.viewHeight))||Number(v.viewHeight)<=1e-8)return modelPaperViewportEstimate(v,layout);
+   const center=v.viewCenter||{},validCenter=Number.isFinite(Number(center.x))&&Number.isFinite(Number(center.y));
+   // Some converters preserve the native view height but drop groups 12/22.
+   // Keep the authentic scale and recover ONLY the missing center, with a visible warning.
+   if(v.viewCenterKnown===false||!validCenter)
+    return {...v,viewCenter:ext.center,estimated:true,centerEstimated:true,heightEstimated:false,estimateSource:'centro geométrico provisional (altura original conservada)'};
+   return v;
+  }).filter(Boolean);
  }
  if(layout.source!=='new'&&layout.viewportFit!=='all')return [];
  const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
@@ -540,7 +547,11 @@ function describePaperLayoutState(layout,viewports){
  if(layout.source!=='new'&&!viewports.length&&layout.viewportFit!=='all')
   lines.push(importedCount?'La ventana gráfica no incluye datos suficientes para dibujar el Modelo.':'El archivo no proporcionó un VIEWPORT utilizable para esta hoja. Revisa ⚙ Hoja o el informe de importación.');
  const estimated=viewports.filter(v=>v.estimated);
- if(estimated.length)lines.push('VISTA PROVISIONAL: falta la altura original del VIEWPORT. Se utilizó '+estimated[0].estimateSource+(estimated.some(v=>v.centerEstimated)?' y un centro estimado':'')+'. La escala original aún no está verificada.');
+ if(estimated.length){
+  const withHeight=estimated.filter(v=>v.heightEstimated);
+  if(withHeight.length)lines.push('VISTA PROVISIONAL: faltaba la altura del VIEWPORT; se utilizó '+withHeight[0].estimateSource+'. La escala original no está verificada.');
+  if(estimated.some(v=>v.centerEstimated))lines.push('CENTRO PROVISIONAL: el conversor no preservó la ubicación de la vista; se usó el centro geométrico del Modelo sin modificar la geometría.');
+ }
  if(layout.source!=='new'&&paperCount===0)
   lines.push('No se recuperaron entidades propias del espacio Papel para esta presentación.');
  if(layout.source!=='new'&&viewports.length&&!objects.some(x=>(x.cadLayout||'Model')==='Model'))
