@@ -1519,6 +1519,48 @@ async function getDwgRuntime(){
  return dwgRuntimePromise;
 }
 const importReportButton=$('#importReport'),copyImportReportButton=$('#copyImportReport'),convertedDxfButton=$('#convertedDxf');let lastImportReport=[],lastConvertedDxf=null,lastConvertedName='dibujo';
+// Persist the last local DWG conversion and its diagnostic report across reloads.
+// IndexedDB is used instead of localStorage because architectural DXF files can be large.
+function openImportCache(){
+ return new Promise((resolve,reject)=>{
+  if(!window.indexedDB){reject(new Error('IndexedDB no disponible'));return}
+  const request=indexedDB.open('otrocad-import-cache',1);
+  request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains('imports'))db.createObjectStore('imports')};
+  request.onsuccess=()=>resolve(request.result);
+  request.onerror=()=>reject(request.error||new Error('No se pudo abrir la caché local'));
+ });
+}
+async function persistImportCache(){
+ let db;
+ try{
+  db=await openImportCache();
+  await new Promise((resolve,reject)=>{
+   const tx=db.transaction('imports','readwrite');
+   tx.objectStore('imports').put({report:lastImportReport,dxf:lastConvertedDxf,filename:lastConvertedName,savedAt:Date.now()},'latest');
+   tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('No se pudo guardar el diagnóstico'));tx.onabort=()=>reject(tx.error||new Error('Guardado cancelado'));
+  });
+ }catch(error){console.warn('No se pudo conservar el informe/DXF local:',error)}
+ finally{if(db)db.close()}
+}
+async function restoreImportCache(){
+ let db;
+ try{
+  db=await openImportCache();
+  const cached=await new Promise((resolve,reject)=>{
+   const tx=db.transaction('imports','readonly'),request=tx.objectStore('imports').get('latest');
+   request.onsuccess=()=>resolve(request.result||null);request.onerror=()=>reject(request.error||new Error('No se pudo leer el diagnóstico guardado'));
+  });
+  if(!cached)return;
+  lastImportReport=Array.isArray(cached.report)?cached.report:[];
+  lastConvertedDxf=typeof cached.dxf==='string'?cached.dxf:null;
+  lastConvertedName=String(cached.filename||'dibujo');
+  importReportButton.hidden=!lastImportReport.length;
+  copyImportReportButton.hidden=!lastImportReport.length;
+  convertedDxfButton.hidden=!lastConvertedDxf;
+ }catch(error){console.warn('No se pudo restaurar el informe/DXF local:',error)}
+ finally{if(db)db.close()}
+}
+void restoreImportCache();
 if(convertedDxfButton)convertedDxfButton.onclick=()=>{if(lastConvertedDxf)download(lastConvertedName.replace(/\.[^.]+$/,'')+'-convertido.dxf',lastConvertedDxf,'application/dxf')};
 importReportButton.onclick=()=>alert(lastImportReport.length?lastImportReport.join('\n'):'No hay advertencias en el último dibujo importado.');
 copyImportReportButton.onclick=async()=>{
@@ -1532,7 +1574,7 @@ $('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const
  'Ajustes visuales:',...(arr.importNotes?.length?arr.importNotes:['Ninguno']),
  'Causas dentro de bloques, cotas y sombreados (sin coordenadas):',
  ...((Object.entries(arr.importDiagnostics||{}).sort((a,b)=>b[1]-a[1]).map(([name,count])=>count+' '+name))||[])
-];importReportButton.hidden=false;copyImportReportButton.hidden=false;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')+(arr.importNotes?.length?' · '+arr.importNotes.length+' avisos de compatibilidad':'');status.title=[...(arr.importWarnings||[]),...(arr.importNotes||[])].join('\n')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
+];importReportButton.hidden=false;copyImportReportButton.hidden=false;if(arr.drawingUnits)units=arr.drawingUnits;await persistImportCache();clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')+(arr.importNotes?.length?' · '+arr.importNotes.length+' avisos de compatibilidad':'');status.title=[...(arr.importWarnings||[]),...(arr.importNotes||[])].join('\n')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
 function parseDxfEntities(source){
  const lines=source.replace(/\r/g,'').split('\n'),pairs=[];
  for(let i=0;i+1<lines.length;i+=2){const code=Number(lines[i].trim());if(Number.isFinite(code))pairs.push([code,lines[i+1].trim()])}
