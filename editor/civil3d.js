@@ -327,7 +327,7 @@ function createTin(){
  const pts=pointObjects();if(pts.length<3)throw Error('Importa primero al menos tres puntos con coordenadas XYZ.');
  const data=math.triangulate(pts.map(p=>({x:p.a.x,y:p.a.y,z:Number(p.z),id:p.civilPointId})));
  const z=data.points.map(p=>p.z),min=Math.min(...z),max=Math.max(...z),id='TIN-'+Date.now().toString(36);
- const triangles=data.triangles.map((tri,index)=>({type:'polygon',pts:tri.map(p=>({x:p.x,y:p.y,z:p.z})),layer:'Superficie TIN',color:elevationColor((tri[0].z+tri[1].z+tri[2].z)/3,min,max),lineweight:.13,solidFill:false,importedHatch:true,civilTin:true,civilSurfaceId:id,civilTriangleIndex:index}));
+ const triangles=data.triangles.map((tri,index)=>({type:'polygon',pts:tri.map(p=>({x:p.x,y:p.y,z:p.z})),layer:'Superficie TIN',color:elevationColor((tri[0].z+tri[1].z+tri[2].z)/3,min,max),lineweight:.13,solidFill:false,hatchOpacity:.12,importedHatch:true,civilTin:true,civilSurfaceId:id,civilTriangleIndex:index}));
  api.ensureLayer('Superficie TIN','#4ca6d5');
  api.replaceObjects(o=>o.civilTin||o.civilContour||o.civilSlope,triangles,'Superficie TIN creada · '+data.points.length+' puntos · '+triangles.length+' triángulos');
  activeSurfaceId=id;try{localStorage.setItem('otrocad-civil-active-surface',id)}catch(e){}
