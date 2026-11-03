@@ -317,3 +317,32 @@ const nestedFailure=context.parseDxfEntities(nestedFailureFixture);
 assert.ok(nestedFailure.importWarnings.some(w=>w.includes('DIMENSION con elementos gráficos no compatibles')));
 assert.equal(nestedFailure.importDiagnostics['DIMENSION → UNSUPPORTED_DWG_ENTITY omitido'],1,'Report should explain what is missing inside a dimension');
 console.log('Dimension DEFPOINTS and nested diagnostics checks passed');
+
+
+const hatchFallbackFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','HATCH','8','Suelos','10','100','20','100','2','SOLID','70','1','91','1',
+ '10','0','20','0','10','4','20','0','10','4','20','3','10','0','20','3',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const hatchRecovered=context.parseDxfEntities(hatchFallbackFixture);
+assert.equal(hatchRecovered.length,1,'HATCH should recover non-collinear raw DXF boundary vertices');
+assert.equal(hatchRecovered[0].pts.length,4,'Elevation coordinates must not contaminate hatch boundary');
+assert.ok(hatchRecovered.importNotes.some(w=>w.includes('HATCH con borde reconstruido')));
+assert.ok(!hatchRecovered.importWarnings.some(w=>w.includes('HATCH sin contorno')));
+
+const nonRecoverableHatchFixture=[
+ '0','SECTION','2','ENTITIES','0','HATCH','2','SOLID','70','1','91','0',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const unrecoveredHatch=context.parseDxfEntities(nonRecoverableHatchFixture);
+assert.equal(unrecoveredHatch.length,0,'Never invent a boundary for a HATCH without geometric data');
+assert.ok(unrecoveredHatch.importWarnings.some(w=>w.includes('HATCH sin contorno')));
+
+const curvedPolylineNote=context.parseDxfEntities([
+ '0','SECTION','2','ENTITIES','0','LWPOLYLINE','90','2','10','0','20','0','42','0.5','10','2','20','0',
+ '0','ENDSEC','0','EOF'
+].join('\n'));
+assert.ok(curvedPolylineNote.importNotes.some(w=>w.includes('polilíneas curvas aproximadas')));
+assert.ok(!curvedPolylineNote.importWarnings.length,'Tessellated curves should be a nonblocking compatibility note');
+console.log('HATCH fallback and nonblocking curve diagnostics checks passed');
