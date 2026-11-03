@@ -507,7 +507,7 @@ const wrappedCadText=JSON.parse(JSON.stringify(vm.runInContext("wrapCadTextLines
 assert.deepEqual(wrappedCadText,['ALCANCE DE','ESTA','PROPUESTA'],'MTEXT must wrap to its stored reference width');
 context.objects=styledTexts;accept=true;
 const styledDxf=vm.runInContext('buildDxf()',context);
-assert.match(styledDxf,/\nSTYLE\n/);
+assert.match(styledDxf,/\r?\nSTYLE\r?\n/);
 assert.match(styledDxf,/impact\.ttf/);
 assert.match(styledDxf,/ANOTACION/);
 assert.match(styledDxf,/ALCANCE DEL PROYECTO/);
