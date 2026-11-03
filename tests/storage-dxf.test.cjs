@@ -645,3 +645,15 @@ assert.equal(nativeAfter.filter(x=>x.cadLayout==='P-03').length,2);
 console.log('DXF native paper space checks passed: BLOCK_RECORD/LAYOUT handles, inactive paper blocks, viewport restoration, duplicate protection');
 
 assert.match(source,/showPaperLayoutNotice\(layout,vps\)/,'Layout must explain missing viewports instead of rendering a blank sheet');
+
+const paperPreviewScope={
+ layoutViewportRecords:[{layout:'P-03',id:2,status:1,width:560,height:380,viewHeight:0,viewCenter:{x:0,y:0}}],
+ units:'m',objects:[{type:'line',cadLayout:'Model',a:{x:0,y:0},b:{x:1,y:1}}],
+ modelExtentsForPaper:()=>({center:{x:0,y:0},width:1,height:1})
+};
+vm.createContext(paperPreviewScope);
+vm.runInContext(source.slice(source.indexOf('function effectivePaperViewports('),source.indexOf('function renderPaperLayout(')),paperPreviewScope);
+assert.equal(vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420}).length",paperPreviewScope),0,'Viewport without view height must not collapse drawing into a blue dot');
+paperPreviewScope.layoutViewportRecords[0].viewHeight=18;
+assert.equal(vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420}).length",paperPreviewScope),1,'Valid imported viewports must retain their real view height');
+console.log('Paper viewport checks passed: invalid scale rejected, imported scale preserved');
