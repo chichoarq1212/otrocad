@@ -653,10 +653,18 @@ const paperPreviewScope={
 };
 vm.createContext(paperPreviewScope);
 vm.runInContext(source.slice(source.indexOf('function effectivePaperViewports('),source.indexOf('function renderPaperLayout(')),paperPreviewScope);
-assert.equal(vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420}).length",paperPreviewScope),0,'Viewport without view height must not collapse drawing into a blue dot');
+const provisional=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})",paperPreviewScope);
+assert.equal(provisional.length,1,'Un VIEWPORT sin altura debe presentar una vista provisional, no un punto azul ni una hoja vacía');
+assert.equal(provisional[0].estimated,true);
+assert.ok(provisional[0].viewHeight>0);
+paperPreviewScope.objects.push({type:'text',cadLayout:'P-03',text:'ESCALA 1:75 / A2 / m'});
+const annotated=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420})",paperPreviewScope);
+assert.equal(annotated[0].viewHeight,28.5,'La escala escrita 1:75 en una lámina de metros proporciona altura provisional en metros');
+assert.match(annotated[0].estimateSource,/escala escrita/);
+paperPreviewScope.objects.pop();
 paperPreviewScope.layoutViewportRecords[0].viewHeight=18;
 assert.equal(vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420}).length",paperPreviewScope),1,'Valid imported viewports must retain their real view height');
-console.log('Paper viewport checks passed: invalid scale rejected, imported scale preserved');
+console.log('Paper viewport checks passed: provisional view, explicit scale annotation, imported scale preserved');
 
 
 // Regression: localStorage quota must not prevent NEW when IndexedDB can retain the old drawing.
@@ -717,3 +725,34 @@ console.log('Paper viewport checks passed: invalid scale rejected, imported scal
  assert.equal(newScope.status.textContent,'Dibujo nuevo creado · plano anterior respaldado');
  console.log('New drawing checks passed: IndexedDB, download, cancellation and reset');
 })().catch(error=>{console.error(error);process.exitCode=1});
+
+
+// Labels must not disappear if block ATTDEF is the only text still present in converted DXF.
+const cadLabelsFixture=[
+ '0','SECTION','2','BLOCKS',
+ '0','BLOCK','2','ROOM','10','0','20','0',
+ '0','ATTDEF','70','0','2','ROOM_NAME','1','DORMITORIO','10','0','20','0','40','0.25',
+ '0','LINE','10','0','20','0','11','2','21','0',
+ '0','ENDBLK','0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','INSERT','2','ROOM','10','10','20','10',
+ '0','INSERT','2','ROOM','10','20','20','20','66','1',
+ '0','ATTRIB','2','ROOM_NAME','1','SALA','10','20','20','20','40','0.25',
+ '0','SEQEND','0','ENDSEC','0','EOF'
+].join('\n');
+const cadLabels=context.parseDxfEntities(cadLabelsFixture);
+assert.equal(cadLabels.filter(o=>o.type==='text'&&o.text==='DORMITORIO').length,1,'ATTDEF sin atributo real recupera su texto existente');
+assert.equal(cadLabels.filter(o=>o.type==='text'&&o.text==='SALA').length,1,'ATTRIB real conserva etiqueta del espacio');
+assert.equal(cadLabels.filter(o=>o.type==='text').length,2,'No duplicar etiqueta predeterminada junto con ATTRIB real');
+const leaderLabels=context.parseDxfEntities([
+ '0','SECTION','2','ENTITIES',
+ '0','MULTILEADER','8','Textos','12','6','22','9','44','0.2','304','COCINA\\PSALA',
+ '0','ENDSEC','0','EOF'
+].join('\n'));
+assert.equal(leaderLabels.length,1);
+assert.equal(leaderLabels[0].type,'text');
+assert.equal(leaderLabels[0].cadSourceEntity,'MLEADER');
+assert.equal(leaderLabels[0].textHeightWorld,.2);
+assert.equal(leaderLabels[0].a.x,6);
+assert.match(leaderLabels[0].text,/COCINA/);
+console.log('CAD annotation recovery checks passed: room ATTDEF, ATTRIB de-duplication and MLEADER text');
