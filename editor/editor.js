@@ -155,14 +155,59 @@ function strokeCadHatchPattern(s,allPoints){
  return rendered>0;
 }
 
+const CAD_TEXT_FONT_CATALOG=[
+ {id:'arial',label:'Arial',file:'arial.ttf',boldFile:'arialbd.ttf',italicFile:'ariali.ttf',boldItalicFile:'arialbi.ttf',family:'Arial, Helvetica, sans-serif'},
+ {id:'arial-narrow',label:'Arial Narrow',file:'arialn.ttf',boldFile:'arialnb.ttf',italicFile:'arialni.ttf',boldItalicFile:'arialnbi.ttf',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'bahnschrift',label:'Bahnschrift',file:'bahnschrift.ttf',boldFile:'bahnschrift.ttf',italicFile:'bahnschrift.ttf',boldItalicFile:'bahnschrift.ttf',family:'Bahnschrift, "Arial Narrow", Arial, sans-serif'},
+ {id:'book-antiqua',label:'Book Antiqua',file:'BKANT.TTF',boldFile:'ANTQUAB.TTF',italicFile:'ANTQUAI.TTF',boldItalicFile:'ANTQUABI.TTF',family:'"Book Antiqua", Palatino, serif'},
+ {id:'calibri',label:'Calibri',file:'calibri.ttf',boldFile:'calibrib.ttf',italicFile:'calibrii.ttf',boldItalicFile:'calibriz.ttf',family:'Calibri, "Segoe UI", Arial, sans-serif'},
+ {id:'cambria',label:'Cambria',file:'cambria.ttf',boldFile:'cambriab.ttf',italicFile:'cambriai.ttf',boldItalicFile:'cambriaz.ttf',family:'Cambria, Georgia, serif'},
+ {id:'candara',label:'Candara',file:'candara.ttf',boldFile:'candarab.ttf',italicFile:'candarai.ttf',boldItalicFile:'candaraz.ttf',family:'Candara, Calibri, Arial, sans-serif'},
+ {id:'century-gothic',label:'Century Gothic',file:'gothic.ttf',boldFile:'gothicb.ttf',italicFile:'gothici.ttf',boldItalicFile:'gothicbi.ttf',family:'"Century Gothic", Arial, sans-serif'},
+ {id:'comic-sans',label:'Comic Sans MS',file:'comic.ttf',boldFile:'comicbd.ttf',italicFile:'comic.ttf',boldItalicFile:'comicbd.ttf',family:'"Comic Sans MS", cursive, sans-serif'},
+ {id:'consolas',label:'Consolas',file:'consola.ttf',boldFile:'consolab.ttf',italicFile:'consolai.ttf',boldItalicFile:'consolaz.ttf',family:'Consolas, "Courier New", monospace'},
+ {id:'courier-new',label:'Courier New',file:'cour.ttf',boldFile:'courbd.ttf',italicFile:'couri.ttf',boldItalicFile:'courbi.ttf',family:'"Courier New", Courier, monospace'},
+ {id:'franklin-gothic',label:'Franklin Gothic Medium',file:'framd.ttf',boldFile:'framd.ttf',italicFile:'framd.ttf',boldItalicFile:'framd.ttf',family:'"Franklin Gothic Medium", Arial, sans-serif'},
+ {id:'garamond',label:'Garamond',file:'gara.ttf',boldFile:'garabd.ttf',italicFile:'garait.ttf',boldItalicFile:'garabi.ttf',family:'Garamond, Georgia, serif'},
+ {id:'georgia',label:'Georgia',file:'georgia.ttf',boldFile:'georgiab.ttf',italicFile:'georgiai.ttf',boldItalicFile:'georgiaz.ttf',family:'Georgia, "Times New Roman", serif'},
+ {id:'impact',label:'Impact',file:'impact.ttf',boldFile:'impact.ttf',italicFile:'impact.ttf',boldItalicFile:'impact.ttf',family:'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif'},
+ {id:'lucida-console',label:'Lucida Console',file:'lucon.ttf',boldFile:'lucon.ttf',italicFile:'lucon.ttf',boldItalicFile:'lucon.ttf',family:'"Lucida Console", Consolas, monospace'},
+ {id:'palatino',label:'Palatino Linotype',file:'pala.ttf',boldFile:'palab.ttf',italicFile:'palai.ttf',boldItalicFile:'palabi.ttf',family:'"Palatino Linotype", Palatino, serif'},
+ {id:'segoe-ui',label:'Segoe UI',file:'segoeui.ttf',boldFile:'segoeuib.ttf',italicFile:'segoeuii.ttf',boldItalicFile:'segoeuiz.ttf',family:'"Segoe UI", Arial, sans-serif'},
+ {id:'tahoma',label:'Tahoma',file:'tahoma.ttf',boldFile:'tahomabd.ttf',italicFile:'tahoma.ttf',boldItalicFile:'tahomabd.ttf',family:'Tahoma, Arial, sans-serif'},
+ {id:'times-new-roman',label:'Times New Roman',file:'times.ttf',boldFile:'timesbd.ttf',italicFile:'timesi.ttf',boldItalicFile:'timesbi.ttf',family:'"Times New Roman", Times, serif'},
+ {id:'trebuchet',label:'Trebuchet MS',file:'trebuc.ttf',boldFile:'trebucbd.ttf',italicFile:'trebucit.ttf',boldItalicFile:'trebucbi.ttf',family:'"Trebuchet MS", Arial, sans-serif'},
+ {id:'verdana',label:'Verdana',file:'verdana.ttf',boldFile:'verdanab.ttf',italicFile:'verdanai.ttf',boldItalicFile:'verdanaz.ttf',family:'Verdana, Geneva, sans-serif'},
+ {id:'shx-txt',label:'AutoCAD TXT (SHX)',file:'txt.shx',boldFile:'txt.shx',italicFile:'txt.shx',boldItalicFile:'txt.shx',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'shx-simplex',label:'AutoCAD Simplex (SHX)',file:'simplex.shx',boldFile:'simplex.shx',italicFile:'simplex.shx',boldItalicFile:'simplex.shx',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'shx-romans',label:'AutoCAD Romans (SHX)',file:'romans.shx',boldFile:'romans.shx',italicFile:'romans.shx',boldItalicFile:'romans.shx',family:'"Times New Roman", Georgia, serif'},
+ {id:'shx-romand',label:'AutoCAD RomanD (SHX)',file:'romand.shx',boldFile:'romand.shx',italicFile:'romand.shx',boldItalicFile:'romand.shx',family:'"Times New Roman", Georgia, serif'},
+ {id:'shx-iso',label:'AutoCAD ISO (SHX)',file:'iso.shx',boldFile:'iso.shx',italicFile:'iso.shx',boldItalicFile:'iso.shx',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'shx-isocp',label:'AutoCAD ISOCP (SHX)',file:'isocp.shx',boldFile:'isocp.shx',italicFile:'isocp.shx',boldItalicFile:'isocp.shx',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'shx-gothic',label:'AutoCAD Gothic (SHX)',file:'gothice.shx',boldFile:'gothice.shx',italicFile:'gothice.shx',boldItalicFile:'gothice.shx',family:'Arial, Helvetica, sans-serif'},
+ {id:'shx-script',label:'AutoCAD Script (SHX)',file:'script.shx',boldFile:'script.shx',italicFile:'script.shx',boldItalicFile:'script.shx',family:'"Segoe Script", "Comic Sans MS", cursive'},
+ {id:'shx-complex',label:'AutoCAD Complex (SHX)',file:'complex.shx',boldFile:'complex.shx',italicFile:'complex.shx',boldItalicFile:'complex.shx',family:'"Times New Roman", Georgia, serif'},
+ {id:'shx-technic',label:'AutoCAD Technic (SHX)',file:'technic.shx',boldFile:'technic.shx',italicFile:'technic.shx',boldItalicFile:'technic.shx',family:'"Arial Narrow", Arial, sans-serif'}
+];
+function cadFontEntryForFile(file){
+ const base=String(file||'').replace(/\\/g,'/').split('/').pop().toLowerCase();
+ return CAD_TEXT_FONT_CATALOG.find(entry=>[entry.file,entry.boldFile,entry.italicFile,entry.boldItalicFile].some(name=>String(name||'').toLowerCase()===base))||null;
+}
+function cadFontVariantFile(entry,bold,italic){
+ if(bold&&italic)return entry.boldItalicFile||entry.boldFile||entry.file;
+ if(bold)return entry.boldFile||entry.file;
+ if(italic)return entry.italicFile||entry.file;
+ return entry.file;
+}
 function cadFontFamilyFromFile(file){
+ const entry=cadFontEntryForFile(file);if(entry)return entry.family;
  const base=String(file||'txt.shx').replace(/\\/g,'/').split('/').pop().toLowerCase();
- const name=base.replace(/\.(?:shx|ttf|otf)$/i,'');
- if(name.includes('impact'))return 'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif';
- if(/arialbd|bold/.test(name))return 'Arial, Helvetica, sans-serif';
- if(/romans|romand|times|serif/.test(name))return '"Times New Roman", Georgia, serif';
- if(/mono|courier/.test(name))return '"Courier New", monospace';
- if(/narrow|condensed|txt|simplex|iso/.test(name))return '"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif';
+ if(/impact/.test(base))return 'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif';
+ if(/arialn|narrow|condensed|txt|simplex|iso|technic/.test(base))return '"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif';
+ if(/arial|verdana|tahoma|segoe|gothic|framd/.test(base))return 'Arial, Helvetica, sans-serif';
+ if(/romans|romand|times|serif|complex/.test(base))return '"Times New Roman", Georgia, serif';
+ if(/mono|courier|consola|lucon/.test(base))return '"Courier New", monospace';
+ if(/script/.test(base))return '"Segoe Script", "Comic Sans MS", cursive';
  return 'Arial, Helvetica, sans-serif';
 }
 function wrapCadTextLines(value,maxWidth,measureText){
@@ -187,6 +232,39 @@ function wrapCadTextLines(value,maxWidth,measureText){
   if(line)out.push(line);
  }
  return out.length?out:[''];
+}
+function cadTextBoundsWorld(s){
+ if(!s||s.type!=='text'||!s.a||!ctx||typeof ctx.measureText!=='function')return [];
+ const height=Math.max(.001,Number(s.textHeightWorld||Number(s.textHeight||14)/Math.max(zoom,.001))),size=Math.max(.5,height*zoom);
+ const fontFile=String(s.textFontFile||'txt.shx'),fontFamily=s.textFontFamily||cadFontFamilyFromFile(fontFile);
+ const bold=Boolean(s.textFontBold)||/(?:bd|bold|bi)\.(?:ttf|otf)$/i.test(fontFile),italic=Boolean(s.textFontItalic)||/(?:italic|oblique|i|it|z|bi)\.(?:ttf|otf)$/i.test(fontFile);
+ ctx.save();ctx.font=(bold?'bold ':'')+(italic?'italic ':'')+size+'px '+fontFamily;
+ const value=String(s.text||'Texto'),mtext=Boolean(s.isMText)||Number(s.mtextWidthWorld||0)>0,widthFactor=Math.max(.05,Math.min(20,Number(s.textWidthFactor||s.textStyleWidthFactor)||1));
+ const lines=mtext&&Number(s.mtextWidthWorld)>0?wrapCadTextLines(value,Number(s.mtextWidthWorld)*zoom/widthFactor,t=>ctx.measureText(t).width):value.split('\n');
+ const widths=lines.map(line=>ctx.measureText(line).width),maxWidth=Math.max(1,...widths);
+ let renderWidthFactor=widthFactor;
+ const horizontal=Number(s.textHorizontalAlignment||0),vertical=Number(s.textVerticalAlignment||0);
+ if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=maxWidth*renderWidthFactor,target=Number(s.textFitWidthWorld)*zoom;if(natural>0)renderWidthFactor*=target/natural}
+ const lineHeight=size*1.2*(Number(s.mtextLineSpacingFactor)>0?Math.max(.5,Math.min(4,Number(s.mtextLineSpacingFactor))):1);
+ let xMin=0,xMax=maxWidth,yMin=0,yMax=lines.length*lineHeight;
+ if(mtext){
+  const boxWidth=Number(s.mtextWidthWorld)>0?Number(s.mtextWidthWorld)*zoom/widthFactor:maxWidth;
+  const attachment=Math.max(1,Math.min(9,Math.round(Number(s.mtextAttachment||1)))),column=(attachment-1)%3,row=Math.floor((attachment-1)/3);
+  xMin=column===0?0:column===1?-boxWidth/2:-boxWidth;xMax=xMin+boxWidth;
+  const totalHeight=Math.max(size,lines.length*lineHeight);yMin=row===0?0:row===1?-totalHeight/2:-totalHeight;yMax=yMin+totalHeight;
+ }else{
+  xMin=horizontal===1||horizontal===4?-maxWidth/2:horizontal===2?-maxWidth:0;xMax=xMin+maxWidth;
+  const baseTop=vertical===1?-size:vertical===2?-.5*size:vertical===3?0:-.8*size;
+  const baseBottom=vertical===1?0:vertical===2?.5*size:vertical===3?size:.2*size;
+  yMin=baseTop;yMax=(lines.length-1)*lineHeight+baseBottom;
+ }
+ const anchor=(!mtext&&(horizontal||vertical)&&horizontal!==3&&horizontal!==5&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
+ const anchorScreen=screen(anchor),theta=Number(s.textRotation||0)*Math.PI/180,c=Math.cos(theta),sn=Math.sin(theta),shear=Math.tan(Math.max(-80,Math.min(80,Number(s.textObliqueAngle||0)))*Math.PI/180),flipX=Number(s.textGenerationFlags||0)&2?-1:1,flipY=Number(s.textGenerationFlags||0)&4?-1:1;
+ const corners=[[xMin,yMin],[xMax,yMin],[xMax,yMax],[xMin,yMax]].map(([x,y])=>{
+  const lx=x*renderWidthFactor*flipX+shear*y,ly=y*flipY;
+  return world({x:anchorScreen.x+c*lx+sn*ly,y:anchorScreen.y-sn*lx+c*ly});
+ });
+ ctx.restore();return corners;
 }
 
 function drawEntity(s,sel=false,preview=false){
@@ -324,6 +402,7 @@ function selectAt(q){
   else if(s.type==='ellipse'){const rx=Math.abs(s.b.x-s.a.x),ry=Math.abs(s.b.y-s.a.y);if(rx&&ry){const normalized=Math.hypot((q.x-s.a.x)/rx,(q.y-s.a.y)/ry);d=Math.abs(normalized-1)*Math.min(rx,ry)}}
   else if(s.type==='arc'&&s.pts?.length>=3){const g=arcParams(s.pts);if(g){const p=screen(q),theta=Math.atan2(p.y-g.y,p.x-g.x),span=v=>(v+2*Math.PI)%(2*Math.PI),onArc=g.anticlockwise?span(g.a1-theta)<=span(g.a1-g.a3):span(theta-g.a1)<=span(g.a3-g.a1);d=onArc?Math.abs(Math.hypot(p.x-g.x,p.y-g.y)-g.r)/zoom:Math.min(distance(q,s.pts[0]),distance(q,s.pts[2]))}else for(let j=0;j<s.pts.length-1;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[j+1]))}
   else if(s.type==='circle')d=Math.abs(distance(q,s.a)-distance(s.a,s.b));
+  else if(s.type==='text'){const bounds=cadTextBoundsWorld(s);if(bounds.length===4){if(pointInPolygon(q,bounds))d=0;else for(let j=0;j<4;j++)d=Math.min(d,pointLineDistance(q,bounds[j],bounds[(j+1)%4]))}}
   else if(s.a&&s.b)d=pointLineDistance(q,s.a,s.b);else if(s.a)d=distance(q,s.a);
   if(d<best){best=d;found=i}
  }
@@ -640,7 +719,8 @@ function selectByWindow(rect,windowMode){
  for(let i=0;i<objects.length;i++){
   const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;
   const segs=entitySegments(s),pts=[];
-  if(segs.length){for(const [a,b] of segs)pts.push(a,b)}
+  if(s.type==='text')pts.push(...cadTextBoundsWorld(s));
+  else if(segs.length){for(const [a,b] of segs)pts.push(a,b)}
   else {if(s.a)pts.push(s.a);if(s.b)pts.push(s.b);if(s.pts)pts.push(...s.pts)}
   if(!pts.length)continue;
   const fully=pts.every(p=>inSelectionRect(p,rect));
@@ -1401,9 +1481,9 @@ function parseDxfEntities(source){
    const value=type==='MTEXT'?cleanMText(raw):raw;
    if(type==='MTEXT'&&/\\(?:[AaCcFfHhQqTtWw]|p|S)/.test(raw))note('MTEXT con formato visual aproximado');
    const styleName=str(r,7,'STANDARD')||'STANDARD',textStyle=textStyles.get(styleName.toUpperCase())||{name:styleName,fontFile:'txt.shx',bigFontFile:'',fixedHeight:0,widthFactor:1,obliqueAngle:0,generationFlags:0,lastHeight:0};
-   const entityHeight=get(r,40,0),height=entityHeight>1e-9?entityHeight:(textStyle.fixedHeight>1e-9?textStyle.fixedHeight:.4);
+   const entityHeight=get(r,40,0),height=entityHeight>1e-9?entityHeight:(textStyle.fixedHeight>1e-9?textStyle.fixedHeight:(textStyle.lastHeight>1e-9?textStyle.lastHeight:.4));
    const vx=get(r,11,1),vy=get(r,21,0),rotation=r.pairs.some(p=>p[0]===50)?get(r,50):(type==='MTEXT'?Math.atan2(vy,vx)*180/Math.PI:0);
-   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:height,textStyleName:styleName,textFontFile:textStyle.fontFile,textBigFontFile:textStyle.bigFontFile,textFontFamily:cadFontFamilyFromFile(textStyle.fontFile),textFontBold:/(?:bd|bold)/i.test(textStyle.fontFile),textFontItalic:/(?:italic|oblique)/i.test(textStyle.fontFile),textWidthFactor:type==='MTEXT'?textStyle.widthFactor:(get(r,41,textStyle.widthFactor)||textStyle.widthFactor),textObliqueAngle:type==='MTEXT'?textStyle.obliqueAngle:get(r,51,textStyle.obliqueAngle),textGenerationFlags:type==='MTEXT'?textStyle.generationFlags:get(r,71,textStyle.generationFlags),textStyleGenerationFlags:textStyle.generationFlags,textStyleFixedHeight:textStyle.fixedHeight,textStyleWidthFactor:textStyle.widthFactor,textStyleObliqueAngle:textStyle.obliqueAngle,...st};
+   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:height,textStyleName:styleName,textFontFile:textStyle.fontFile,textBigFontFile:textStyle.bigFontFile,textFontFamily:cadFontFamilyFromFile(textStyle.fontFile),textFontBold:/(?:bd|bold|bi)\.(?:ttf|otf)$/i.test(textStyle.fontFile),textFontItalic:/(?:italic|oblique|i|it|z|bi)\.(?:ttf|otf)$/i.test(textStyle.fontFile),textWidthFactor:type==='MTEXT'?textStyle.widthFactor:(get(r,41,textStyle.widthFactor)||textStyle.widthFactor),textObliqueAngle:type==='MTEXT'?textStyle.obliqueAngle:get(r,51,textStyle.obliqueAngle),textGenerationFlags:type==='MTEXT'?textStyle.generationFlags:get(r,71,textStyle.generationFlags),textStyleGenerationFlags:textStyle.generationFlags,textStyleFixedHeight:textStyle.fixedHeight,textStyleWidthFactor:textStyle.widthFactor,textStyleObliqueAngle:textStyle.obliqueAngle,...st};
    if(type!=='MTEXT'){
     item.textHorizontalAlignment=get(r,72,0);item.textVerticalAlignment=get(r,73,0);
     if(r.pairs.some(p=>p[0]===11)&&r.pairs.some(p=>p[0]===21)){item.textAlignmentPoint={x:get(r,11),y:get(r,21)};item.textFitWidthWorld=distance(item.a,item.textAlignmentPoint)}
@@ -1537,7 +1617,7 @@ $('#pdf').onclick=()=>window.print();
 $('#propertiesBtn').onclick=()=>{$('#properties').classList.toggle('open');showProperties()};
 $('#zoomIn').onclick=()=>{zoom*=1.2;render()};$('#zoomOut').onclick=()=>{zoom/=1.2;render()};
 function boundsPoints(o){
- const pts=[];if(o.a)pts.push(o.a);if(o.b)pts.push(o.b);if(o.pts)pts.push(...o.pts);if(o.hatchLoops)for(const loop of o.hatchLoops)pts.push(...loop);
+ const pts=[];if(o.type==='text')pts.push(...cadTextBoundsWorld(o));if(o.a)pts.push(o.a);if(o.b)pts.push(o.b);if(o.pts)pts.push(...o.pts);if(o.hatchLoops)for(const loop of o.hatchLoops)pts.push(...loop);
  if(o.type==='circle'&&o.a&&o.b){const r=distance(o.a,o.b);pts.push({x:o.a.x-r,y:o.a.y-r},{x:o.a.x+r,y:o.a.y+r})}
  if(o.type==='ellipse'&&o.a&&o.b){const rx=Math.abs(o.b.x-o.a.x),ry=Math.abs(o.b.y-o.a.y);pts.push({x:o.a.x-rx,y:o.a.y-ry},{x:o.a.x+rx,y:o.a.y+ry})}
  if(o.type==='arc'&&o.pts?.length>=3){const g=arcParams(o.pts);if(g){const span=v=>(v+2*Math.PI)%(2*Math.PI);for(const t of [0,Math.PI/2,Math.PI,3*Math.PI/2]){const onArc=g.anticlockwise?span(g.a1-t)<=span(g.a1-g.a3):span(t-g.a1)<=span(g.a3-g.a1);if(onArc)pts.push(world({x:g.x+g.r*Math.cos(t),y:g.y+g.r*Math.sin(t)}))}}}
