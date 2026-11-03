@@ -2039,7 +2039,7 @@ function parseDxfEntities(source){
   }
   else if(type==='VIEWPORT'){
     const vp={layout:st.cadLayout,center:{x:get(r,10),y:get(r,20)},width:get(r,40),height:get(r,41),viewCenter:{x:get(r,12)+get(r,17),y:get(r,22)+get(r,27)},viewHeight:get(r,45),viewCenterKnown:r.pairs.some(p=>p[0]===12&&Number.isFinite(Number(p[1])))&&r.pairs.some(p=>p[0]===22&&Number.isFinite(Number(p[1]))),twist:get(r,51),status:get(r,68,1),id:get(r,69)};
-    if(vp.width>0&&vp.height>0&&(vp.id!==1||vp.viewHeight>0)){(out.layoutViewports??=[]).push(vp);note('VIEWPORT de presentación preservado para vista en papel')}
+    if(st.cadLayout!=='Model'&&(vp.id!==1||vp.viewHeight>0)){(out.layoutViewports??=[]).push(vp);note(vp.width>0&&vp.height>0?'VIEWPORT de presentación preservado para vista en papel':'VIEWPORT con tamaño faltante conservado para recuperación provisional')}
    }
   else if(type==='VERTEX'||type==='SEQEND'){}
   else warn(type+' omitido');
