@@ -795,6 +795,11 @@ function selectByWindow(rect,windowMode){
   const vertexHit=pts.some(p=>inSelectionRect(p,rect));
   const edgeHit=segs.some(([a,b])=>segmentHitsRect(a,b,rect));
   const center={x:(rect.left+rect.right)/2,y:(rect.bottom+rect.top)/2};
+  if(s.type==='text'){
+   const bounds=cadTextBoundsWorld(s),rectCorners=[{x:rect.left,y:rect.bottom},{x:rect.right,y:rect.bottom},{x:rect.right,y:rect.top},{x:rect.left,y:rect.top}],textEdgeHit=bounds.some((p,j)=>segmentHitsRect(p,bounds[(j+1)%bounds.length],rect)),rectCornerHit=rectCorners.some(p=>pointInPolygon(p,bounds));
+   if(vertexHit||textEdgeHit||rectCornerHit||pointInPolygon(center,bounds))hits.push(i);
+   continue;
+  }
   if(vertexHit||edgeHit||objectContainsPoint(s,center))hits.push(i);
  }
  return hits
