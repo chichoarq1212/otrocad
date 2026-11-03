@@ -359,7 +359,7 @@ function drawEntity(s,sel=false,preview=false){
   ctx.beginPath();
   for(const loop of loops){loop.forEach((p,i)=>{const v=screen(p);allPoints.push(v);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath()}
   if(s.solidFill&&!preview){
-   ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??1)));
+   ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??1)))*Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
    ctx.fillStyle=cadHatchGradient(s,allPoints)||color;ctx.fill('evenodd');ctx.restore();
   }else if(s.hatchPattern&&!preview&&allPoints.length){
    ctx.save();ctx.clip('evenodd');ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??.65)));
@@ -372,7 +372,7 @@ function drawEntity(s,sel=false,preview=false){
    }
    ctx.restore();
   }
-  if(!s.importedHatch||sel||preview)ctx.stroke();
+  if(!s.importedHatch||sel||preview||s.civilTin||s.civilSlope)ctx.stroke();
  }
  else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
  else if(s.type==='text'){
@@ -1957,11 +1957,11 @@ function parseDxfEntities(source){
   if(type==='POINT'){
    // DEFPOINTS is AutoCAD's non-printing dimension construction layer.
    if(str(r,8,'').toUpperCase()==='DEFPOINTS')continue;
-   out.push({type:'point',a:{x:get(r,10),y:get(r,20)},...st});
+   out.push({type:'point',a:{x:get(r,10),y:get(r,20)},z:get(r,30,0),...st});
   }
   else if(type==='LINE')out.push({type:'line',a:{x:get(r,10),y:get(r,20)},b:{x:get(r,11),y:get(r,21)},...st});
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
-  else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
+  else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,elevation:get(r,38,0),...st})}
   else if(type==='POLYLINE'){
    const flags=get(r,70,0),vertices=polylineVertices.get(r.originalRecord||r)||[];
    if(flags&(8|16|64)){warn('polilíneas 3D o malla no compatibles omitidas');continue}
@@ -2001,7 +2001,7 @@ function parseDxfEntities(source){
    if(pieces.importWarnings?.length){warn('DIMENSION con elementos gráficos no compatibles');diagnose('DIMENSION',pieces.importWarningCounts);diagnose('DIMENSION',pieces.importDiagnostics)}
   }
   else if(type==='HATCH'){
-   const loops=hatchBoundaries(r),solid=get(r,70)===1,pattern=solid?'SOLID':str(r,2,'ANSI31');
+   const loops=hatchBoundaries(r),solid=get(r,70)===1,pattern=solid?'SOLID':str(r,2,'ANSI31');let degenerateBoundary=[];
    if(!loops.length){
     // Some DWG->DXF writers retain vertex pairs but omit the HATCH path markers.
     // Recover only a real non-collinear contour; never fabricate one from a bounding box.
@@ -2013,7 +2013,7 @@ function parseDxfEntities(source){
     }
     if(vertices.length>3&&distance(vertices[0],vertices.at(-1))<1e-9)vertices.pop();
     const area=vertices.reduce((sum,p,i)=>{const q=vertices[(i+1)%vertices.length];return sum+p.x*q.y-q.x*p.y},0);
-    if(vertices.length>=3&&Math.abs(area)>1e-8){loops.push(vertices);note('HATCH con borde reconstruido desde vértices DXF')}
+    if(vertices.length>=3&&Math.abs(area)>1e-8){loops.push(vertices);note('HATCH con borde reconstruido desde vértices DXF')}else if(solid&&vertices.length===2&&distance(vertices[0],vertices[1])>1e-9){degenerateBoundary=vertices}
    }
    let association={loops:[],refs:[],types:{}};
    if(!loops.length){
@@ -2022,6 +2022,7 @@ function parseDxfEntities(source){
    }
    const pts=loops[0];
    if(!pts?.length){
+    if(solid&&degenerateBoundary.length===2){out.push({type:'line',a:degenerateBoundary[0],b:degenerateBoundary[1],...st,cadSourceEntity:'HATCH',cadHatchRecovery:'degenerate-solid'});note('HATCH sólido degenerado recuperado como segmento lineal');continue}
     warn('HATCH sin contorno compatible omitido');
     const paths=get(r,91,-1),vertices=r.pairs.filter(p=>p[0]===10).length;
     diagnose('HATCH capa='+st.layer+' handle='+str(r,5,'?')+' patrón='+pattern,{['rutas='+paths+', vértices='+vertices+', referencias='+association.refs.length+', entidades asociadas='+(Object.keys(association.types).join('/')||'ninguna')+', códigos='+[...new Set(r.pairs.map(p=>p[0]))].join('/')]:1});
@@ -2033,7 +2034,7 @@ function parseDxfEntities(source){
    const hatchSpacingWorld=Math.hypot(get(r,45),get(r,46))||Math.max((maxx-minx+maxy-miny)/50,.01);
    const gradient=get(r,450)===1,rgbGradient=r.pairs.filter(p=>p[0]===421).slice(0,2).map(p=>'#'+(Number(p[1])&0xffffff).toString(16).padStart(6,'0'));
    const patternLines=solid?[]:hatchPatternDefinitions(r);
-   const appearance={...st,hatchPattern:pattern,hatchOpacity:st.cadOpacity??1,hatchSpacingWorld,hatchAngle:get(r,52,45),hatchPatternLines:patternLines,
+   const appearance={...st,hatchPattern:pattern,hatchOpacity:1,hatchSpacingWorld,hatchAngle:get(r,52,45),hatchPatternLines:patternLines,
     hatchGradientColors:gradient&&rgbGradient.length?rgbGradient:null,hatchGradientAngle:get(r,460)*180/Math.PI,importedHatch:true};
    if(rectangular&&solid)out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},...appearance});
    else out.push({type:'polygon',pts,hatchLoops:loops,solidFill:solid,...appearance});
@@ -2083,9 +2084,9 @@ function parseDxfEntities(source){
    // AutoCAD SOLID/TRACE vertex order is 1-2-4-3 (not 1-2-3-4).
    // The previous outline-only import lost the opaque gray areas of many floor plans.
    const order=type==='3DFACE'?[10,11,12,13]:[10,11,13,12];
-   const pts=order.filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10)}));
+   const pts=order.filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10),z:get(r,code+20,0)}));
    while(pts.length>3&&distance(pts.at(-1),pts.at(-2))<1e-9)pts.pop();
-   if(pts.length>=3)out.push({type:'polygon',pts,solidFill:true,importedHatch:true,...st});
+   if(pts.length>=3)out.push({type:'polygon',pts,solidFill:true,importedHatch:true,civilTin:type==='3DFACE',hatchOpacity:1,cadSourceEntity:type,...st});
    else warn(type+' no compatible omitido');
    if(type==='3DFACE')note('3DFACE proyectada a relleno 2D');
   }
@@ -2160,7 +2161,7 @@ function buildDxf(){
   add(0,'ENDTAB',0,'ENDSEC',0,'SECTION',2,'ENTITIES');
  objects.forEach(o=>{
   const a=o.a,b=o.b,layer=dxfLayer(o),color=String(o.color||colors[layer]||colors.General),rgb=/^#[0-9a-f]{6}$/i.test(color)?parseInt(color.slice(1),16):0xffffff;
-  const space=String(o.cadLayout||'Model');const common=[100,'AcDbEntity',8,layer,67,space==='Model'?0:1,410,space,370,Math.round(Number(o.lineweight||.25)*100),6,o.linetype==='DASHED'?'DASHED':'CONTINUOUS',420,rgb];
+  const space=String(o.cadLayout||'Model');const opacity=Math.max(0,Math.min(1,Number(o.civilTin||o.civilSlope?o.hatchOpacity??o.cadOpacity??1:(o.type==='polygon'&&o.solidFill?o.hatchOpacity??o.cadOpacity??1:o.cadOpacity??1))));const transparency=opacity<.999999?[440,0x02000000|Math.round(opacity*255)]:[];const common=[100,'AcDbEntity',8,layer,67,space==='Model'?0:1,410,space,370,Math.round(Number(o.lineweight||.25)*100),6,o.linetype==='DASHED'?'DASHED':'CONTINUOUS',420,rgb,...transparency];
   const line=(p,q)=>add(0,'LINE',...common,100,'AcDbLine',10,p.x,20,p.y,30,0,11,q.x,21,q.y,31,0);
   const textEntity=(p,value,height,rotation=0,source={})=>{
     const valueText=String(value||'').replace(/\r/g,''),styleName=dxfTextStyleName(source),widthFactor=Number(source.textWidthFactor||1),oblique=Number(source.textObliqueAngle||0);
@@ -2168,12 +2169,13 @@ function buildDxf(){
     else{add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,41,widthFactor,50,rotation,51,oblique,7,styleName,71,Number(source.textGenerationFlags||0),72,Number(source.textHorizontalAlignment||0),73,Number(source.textVerticalAlignment||0),1,valueText);if(source.textAlignmentPoint)add(11,source.textAlignmentPoint.x,21,source.textAlignmentPoint.y,31,0)}
    };
   if(['line','dim','dimaligned','leader'].includes(o.type)&&a&&b){line(a,b);if(o.type==='dim'||o.type==='dimaligned')textEntity({x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance(a,b).toFixed(2)+' '+units,12/zoom);if(o.type==='leader'&&o.text)textEntity(b,o.text,12/zoom)}
-  else if(o.type==='point'&&a)add(0,'POINT',...common,100,'AcDbPoint',10,a.x,20,a.y,30,0);
+  else if(o.type==='point'&&a)add(0,'POINT',...common,100,'AcDbPoint',10,a.x,20,a.y,30,Number(o.z)||0);
   else if(o.type==='text'&&a){if(o.mtextRaw&&o.text===o.mtextPlain)add(0,'MTEXT',...common,100,'AcDbMText',10,a.x,20,a.y,30,0,40,o.textHeightWorld||.4,41,Number(o.mtextWidthWorld||0),44,Number(o.mtextLineSpacingFactor||1),71,Number(o.mtextAttachment||1),50,o.textRotation||0,7,dxfTextStyleName(o),1,o.mtextRaw);else textEntity(a,o.text,o.textHeightWorld||Number(o.textHeight||14)/zoom,o.textRotation||0,o)}
   else if(o.type==='circle'&&a&&b)add(0,'CIRCLE',...common,100,'AcDbCircle',10,a.x,20,a.y,30,0,40,distance(a,b));
   else if(o.type==='arc'&&arcGeometry(o.pts)){const g=arcGeometry(o.pts);add(0,'ARC',...common,100,'AcDbCircle',10,g.x,20,g.y,30,0,40,g.r,100,'AcDbArc',50,g.start,51,g.end)}
   else if(o.type==='ellipse'&&a&&b&&a.x!==b.x&&a.y!==b.y){const rx=Math.abs(b.x-a.x),ry=Math.abs(b.y-a.y),horizontal=rx>=ry;add(0,'ELLIPSE',...common,100,'AcDbEllipse',10,a.x,20,a.y,30,0,11,horizontal?rx:0,21,horizontal?0:ry,31,0,40,Math.min(rx,ry)/Math.max(rx,ry),41,0,42,Math.PI*2)}
-  else if(o.type==='polygon'&&(o.solidFill||o.hatchPattern)&&o.pts?.length>=3){
+  else if(o.civilTin&&o.pts?.length>=3){const face=o.pts.slice(0,4);while(face.length<4)face.push(face[face.length-1]);add(0,'3DFACE',...common,100,'AcDbFace',10,face[0].x,20,face[0].y,30,Number(face[0].z)||0,11,face[1].x,21,face[1].y,31,Number(face[1].z)||0,12,face[2].x,22,face[2].y,32,Number(face[2].z)||0,13,face[3].x,23,face[3].y,33,Number(face[3].z)||0,70,0)}
+   else if(o.type==='polygon'&&(o.solidFill||o.hatchPattern)&&o.pts?.length>=3){
     const loops=o.hatchLoops?.length?o.hatchLoops:[o.pts],solid=Boolean(o.solidFill),pattern=solid?'SOLID':o.hatchPattern;
     add(0,'HATCH',...common,100,'AcDbHatch',10,0,20,0,30,0,210,0,220,0,230,1,2,pattern,70,solid?1:0,71,0,91,loops.length);
     for(const loop of loops){add(92,3,72,0,73,1,93,loop.length);for(const p of loop)add(10,p.x,20,p.y);add(97,0)}
@@ -2183,7 +2185,7 @@ function buildDxf(){
    }
    else if(o.type==='hatch'&&o.hatchPattern==='SOLID'&&Number(o.hatchOpacity??.18)===1&&a&&b){const ps=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];add(0,'HATCH',...common,100,'AcDbHatch',10,0,20,0,30,0,210,0,220,0,230,1,2,'SOLID',70,1,71,0,91,1,92,3,72,0,73,1,93,4);ps.forEach(p=>add(10,p.x,20,p.y));add(97,0,75,1,76,1,98,0)}
   else if((o.type==='rect'||o.type==='hatch')&&a&&b){const ps=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,4,70,1);ps.forEach(p=>add(10,p.x,20,p.y))}
-  else if(o.pts){add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,o.pts.length,70,o.type==='polygon'?1:0);o.pts.forEach(p=>add(10,p.x,20,p.y))}
+  else if(o.pts){add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,o.pts.length,70,o.type==='polygon'?1:0,38,Number(o.elevation)||0);o.pts.forEach(p=>add(10,p.x,20,p.y))}
  });
  add(0,'ENDSEC',0,'EOF');return rows.join('\r\n')+'\r\n';
 }
@@ -2254,5 +2256,49 @@ $('#paperCreate').onclick=createCadLayout;
 $('#paperSetup').onclick=showCadPaperSettings;
 $('#toggleAnnotations').onclick=()=>{hideModelAnnotations=!hideModelAnnotations;refreshLayoutTabs();saveLayoutState();render();status.textContent=hideModelAnnotations?'Textos de Modelo ocultos (no borrados)':'Textos de Modelo visibles'};
 window.addEventListener('beforeprint',()=>{printing=true;render()});window.addEventListener('afterprint',()=>{printing=false;render()});
+
+window.OtroCadCivilAPI={
+ getObjects:()=>objects,
+ getSelectedObjects:()=>selectedItems().map(i=>objects[i]).filter(Boolean),
+ getUnits:()=>units,
+ setStatus:value=>{status.textContent=String(value||'')},
+ ensureLayer:(name,color)=>{
+  if(color)colors[name]=color;
+  const select=$('#layer');
+  if(select&&![...select.options].some(option=>option.value===name||option.textContent===name)){
+   const option=document.createElement('option');option.value=name;option.textContent=name;select.append(option);
+  }
+ },
+ addObjects:(items,message)=>{
+  const valid=(Array.isArray(items)?items:[]).filter(item=>item&&typeof item==='object');
+  if(!valid.length)return false;
+  checkpoint();objects.push(...valid);
+  const saved=save();render();
+  status.textContent=String(message||('Añadidas '+valid.length+' entidades Civil'))+(saved?'':' · respaldo local pendiente');
+  return saved;
+ },
+ replaceObjects:(predicate,items,message)=>{
+  if(typeof predicate!=='function')return false;
+  const valid=(Array.isArray(items)?items:[]).filter(item=>item&&typeof item==='object');
+  checkpoint();objects=objects.filter(item=>!predicate(item));objects.push(...valid);
+  const saved=save();render();
+  status.textContent=String(message||('Actualizados elementos Civil · '+valid.length))+(saved?'':' · respaldo local pendiente');
+  return saved;
+ },
+ removeObjects:(predicate,message)=>{
+  if(typeof predicate!=='function')return false;
+  if(!objects.some(predicate))return false;
+  checkpoint();objects=objects.filter(item=>!predicate(item));
+  const saved=save();render();
+  status.textContent=String(message||'Elementos Civil eliminados')+(saved?'':' · respaldo local pendiente');
+  return true;
+ },
+ updateSelected:patch=>{
+  const ids=selectedItems();if(!ids.length)return 0;
+  checkpoint();ids.forEach(i=>Object.assign(objects[i],patch||{}));save();render();return ids.length;
+ },
+ fit:()=>$('#fit').click()
+};
+
 new ResizeObserver(resize).observe(stage);setTool('line');resize();
 })();
