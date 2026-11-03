@@ -654,7 +654,7 @@ $('#cmd').addEventListener('input',updateCursorCommand);
 applyCanvasTheme(cadTheme);
 $('#canvasTheme').addEventListener('change',e=>applyCanvasTheme(e.target.value));$('#canvasTheme').value=cadTheme;
 $('#cmd').addEventListener('keydown',e=>{
- if(e.key==='Enter'||e.key===' '&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();e.stopPropagation();submitCommand();$('#cmd').blur()}
+ if(e.key==='Enter'||e.key===' '&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();e.stopImmediatePropagation();submitCommand();$('#cmd').blur()}
  else if(e.key==='Escape'){e.preventDefault();cancelCurrentAction();$('#cmd').blur();stage.focus({preventScroll:true})}
 });
 $('#cmdRun').addEventListener('click',()=>{submitCommand();$('#cmd').blur()});
@@ -800,7 +800,7 @@ function runCommand(raw){
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
-$('#cmd').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '&&$('#cmd').value.trim()===''){e.preventDefault();e.stopPropagation();submitCommand()}});
+
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>{const active=x===b;x.classList.toggle('active',active);x.setAttribute('aria-selected',String(active))});document.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!==b.dataset.tab)});
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
 const furnitureList=Array.isArray(window.otroCadFurnitureCatalog)?window.otroCadFurnitureCatalog:[];
