@@ -41,11 +41,12 @@ jobs:
       - name: Bundle latest web editor for offline Android mode
         run: |
           mkdir -p android/app/src/main/assets/editor
-          cp editor/index.html editor/editor.js android/app/src/main/assets/editor/
+          cp editor/index.html editor/editor.js editor/civil3d.js android/app/src/main/assets/editor/
           cp -R editor/demo editor/library android/app/src/main/assets/editor/
           if [ -d editor/vendor ]; then cp -R editor/vendor android/app/src/main/assets/editor/; fi
           test -s android/app/src/main/assets/editor/index.html
           test -s android/app/src/main/assets/editor/editor.js
+          test -s android/app/src/main/assets/editor/civil3d.js
       - name: Build Android debug APK
         run: gradle -p android clean assembleDebug --no-daemon --stacktrace
       - name: Verify APK exists and inspect package
