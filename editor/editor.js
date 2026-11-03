@@ -978,7 +978,7 @@ function parseDxfEntities(source){
    if(vertices.some(v=>Math.abs(v.bulge)>1e-9))warn('polilíneas curvas aproximadas');
   }
   else if(type==='ARC'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40),a1=get(r,50)*Math.PI/180,a2=get(r,51)*Math.PI/180,span=(a2-a1+Math.PI*2)%(Math.PI*2);if(rad>0&&span>0){const pts=[a1,a1+span/2,a1+span].map(t=>({x:a.x+rad*Math.cos(t),y:a.y+rad*Math.sin(t)}));out.push({type:'arc',pts,...st})}else warn('arcos no válidos omitidos')}
-  else if(type==='INSERT'){
+  else if(type==='INSERT'||type==='MINSERT'){
    const name=str(r,2).toUpperCase(),geometry=blockRecords.get(name),depth=Number(arguments[1]||0);
    const scaleX=get(r,41,1),scaleY=get(r,42,1),rotation=get(r,50)*Math.PI/180;
    const columns=Math.max(1,Math.round(get(r,70,1))),rows=Math.max(1,Math.round(get(r,71,1)));
@@ -992,7 +992,7 @@ function parseDxfEntities(source){
     for(const piece of pieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId));
    }
    if(columns*rows>1)warn('MINSERT expandido a entidades editables');
-   warn('INSERT descompuesto, sin atributos de bloque');
+   warn('INSERT/MINSERT descompuesto, sin atributos de bloque');
    if(pieces.importWarnings?.length)warn('INSERT con contenido simplificado u omitido');
   }
   else if(type==='DIMENSION'){
@@ -1029,7 +1029,7 @@ function parseDxfEntities(source){
    out.push({type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:get(r,40,0.4),...st})
   }
   else if(type==='SOLID'||type==='TRACE'||type==='3DFACE'){
-   const pts=[10,11,12,13].map(code=>({x:get(r,code),y:get(r,code+10)}));
+   const pts=[10,11,12,13].filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10)}));
    while(pts.length>3&&distance(pts[pts.length-1],pts[pts.length-2])<1e-9)pts.pop();
    if(pts.length>=3)out.push({type:'polygon',pts,...st});else warn(type+' no compatible omitido');
   }
