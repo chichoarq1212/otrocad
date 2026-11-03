@@ -1231,6 +1231,31 @@ function parseDxfEntities(source){
  };
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
+ const importedLayouts=[];
+ for(const record of records){
+  if(record.type!=='LAYOUT')continue;
+  let part='',name='',width=0,height=0,margin=8,tabOrder=1;
+  for(const [code,value] of record.pairs){
+   if(code===100){part=value;continue}
+   if(part==='AcDbPlotSettings'){
+    if(code===44)width=Number(value);
+    if(code===45)height=Number(value);
+    if(code===40&&Number(value)>=0)margin=Math.max(0,Number(value));
+   }
+   if(part==='AcDbLayout'){
+    if(code===1)name=String(value).trim();
+    if(code===71)tabOrder=Number(value);
+   }
+  }
+  if(name&&name.toLowerCase()!=='model'){
+   importedLayouts.push({name,paperWidth:Number.isFinite(width)&&width>0?width:420,paperHeight:Number.isFinite(height)&&height>0?height:297,margin:Number.isFinite(margin)?margin:8,tabOrder:Number.isFinite(tabOrder)?tabOrder:1,source:'imported'});
+  }
+ }
+ const entitySpace=r=>{
+  const name=str(r,410,'').trim();
+  if(name)return name.toLowerCase()==='model'?'Model':name;
+  return get(r,67,0)===1?'Layout1':'Model';
+ };
  const out=[],warnings={},notes={},diagnostics={};let inEntities=false,activeAttributeGroup=null;
  const diagnose=(scope,counts)=>{for(const [name,count] of Object.entries(counts||{})){const key=scope+' → '+name;diagnostics[key]=(diagnostics[key]||0)+count}};
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
@@ -1425,7 +1450,7 @@ function parseDxfEntities(source){
   return {loops:closed,refs,types};
  };
  const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId,insertStyle)=>{
-  const item={...sourceItem,groupId},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
+  const item={...sourceItem,groupId,cadLayout:insertStyle?.cadLayout||sourceItem.cadLayout||'Model'},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
   if(insertStyle&&(sourceItem.layer==='0'||sourceItem.cadByBlock)){if(sourceItem.layer==='0')item.layer=insertStyle.layer;if(sourceItem.layer==='0'||sourceItem.cadByBlock)item.color=insertStyle.color;item.cadByBlock=false}
   let points=null;
   if(sourceItem.type==='circle'&&nonUniform&&sourceItem.a&&sourceItem.b){
@@ -1471,7 +1496,7 @@ function parseDxfEntities(source){
   if(r.type==='SECTION'){inEntities=str(r,2).toUpperCase()==='ENTITIES';continue}
   if(r.type==='ENDSEC'){inEntities=false;continue}
   if(!inEntities)continue;
-  const st=style(r),type=r.type;
+  const st={...style(r),cadLayout:entitySpace(r)},type=r.type;
   if(type==='SEQEND'&&activeAttributeGroup){activeAttributeGroup=null;continue}
   if(type==='POINT'){
    // DEFPOINTS is AutoCAD's non-printing dimension construction layer.
@@ -1513,7 +1538,7 @@ function parseDxfEntities(source){
    const pieces=parseBlockItems(geometry,Number(arguments[1]||0));
    if(!pieces.length){warn('DIMENSION sin entidades compatibles omitida');continue}
    const groupId='dxf-dimension-'+out.length;
-   for(const item of pieces)out.push({...item,groupId,layer:item.layer==='0'?st.layer:item.layer,color:item.layer==='0'?st.color:item.color});
+   for(const item of pieces)out.push({...item,groupId,cadLayout:st.cadLayout,layer:item.layer==='0'?st.layer:item.layer,color:item.layer==='0'?st.color:item.color});
    note('DIMENSION dibujada como geometría no asociativa');
    if(pieces.importWarnings?.length){warn('DIMENSION con elementos gráficos no compatibles');diagnose('DIMENSION',pieces.importWarningCounts);diagnose('DIMENSION',pieces.importDiagnostics)}
   }
@@ -1599,10 +1624,24 @@ function parseDxfEntities(source){
    const xs=all(r,10),ys=all(r,20),pts=xs.map((x,i)=>({x,y:ys[i]??0}));
    if(pts.length>=2)out.push({type:'poly',pts,...st});else warn('LEADER sin vértices omitida');
   }
-  else if(type==='VIEWPORT'){(out.layoutViewports??=[]).push({x:get(r,10),y:get(r,20),width:get(r,40),height:get(r,41),id:get(r,69)});note('VIEWPORT de presentación no editable')}
+  else if(type==='VIEWPORT'){
+    const vp={layout:st.cadLayout,center:{x:get(r,10),y:get(r,20)},width:get(r,40),height:get(r,41),viewCenter:{x:get(r,12)+get(r,17),y:get(r,22)+get(r,27)},viewHeight:get(r,45),twist:get(r,51),status:get(r,68,1),id:get(r,69)};
+    if(vp.width>0&&vp.height>0&&(vp.id!==1||vp.viewHeight>0)){(out.layoutViewports??=[]).push(vp);note('VIEWPORT de presentación preservado para vista en papel')}
+   }
   else if(type==='VERTEX'||type==='SEQEND'){}
   else warn(type+' omitido');
  }
+ const layoutMap=new Map(importedLayouts.map(info=>[info.name.toLowerCase(),info]));
+ for(const obj of out){
+  if(!obj.cadLayout||obj.cadLayout==='Model')continue;
+  if(!layoutMap.has(obj.cadLayout.toLowerCase()))layoutMap.set(obj.cadLayout.toLowerCase(),{name:obj.cadLayout,paperWidth:420,paperHeight:297,margin:8,tabOrder:layoutMap.size+1,source:'entity'});
+ }
+ for(const vp of out.layoutViewports||[]){
+  if(vp.layout==='Model')continue;
+  if(!layoutMap.has(vp.layout.toLowerCase()))layoutMap.set(vp.layout.toLowerCase(),{name:vp.layout,paperWidth:420,paperHeight:297,margin:8,tabOrder:layoutMap.size+1,source:'viewport'});
+ }
+ out.layoutDefinitions=[...layoutMap.values()].sort((a,b)=>a.tabOrder-b.tabOrder);
+ if(out.layoutDefinitions.length)note('Modelo y '+out.layoutDefinitions.length+' presentaciones diferenciados');
  out.importWarnings=Object.entries(warnings).map(([name,count])=>count+' '+name);
  out.importNotes=Object.entries(notes).map(([name,count])=>count+' '+name);
  out.importWarningCounts={...warnings};out.importDiagnostics=diagnostics;
