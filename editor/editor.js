@@ -902,8 +902,8 @@ function parseDxfEntities(source){
    if(!geometry?.length){warn('DIMENSION sin geometría gráfica omitida');continue}
    const supported=geometry.filter(item=>['LINE','CIRCLE','ARC','LWPOLYLINE','ELLIPSE','TEXT','MTEXT'].includes(item.type));
    if(!supported.length){warn('DIMENSION sin entidades compatibles omitida');continue}
-   const sourceBlock=['0','SECTION','2','ENTITIES',...supported.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\\n');
-   const pieces=parseDxfEntities(sourceBlock),groupId='dxf-dimension-'+out.length;for(const item of pieces)out.push({...item,groupId});
+   const sourceBlock=['0','SECTION','2','ENTITIES',...supported.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n');
+   const pieces=parseDxfEntities(sourceBlock);if(!pieces.length){warn('DIMENSION sin entidades compatibles omitida');continue}const groupId='dxf-dimension-'+out.length;for(const item of pieces)out.push({...item,groupId});
    warn('DIMENSION descompuesta, no asociativa');if(geometry.some(item=>item.type==='INSERT'))warn('símbolos de cota omitidos');
   }
   else if(type==='HATCH'){
