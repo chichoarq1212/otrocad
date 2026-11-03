@@ -111,7 +111,8 @@ function applyCanvasTheme(name){if(!CAD_THEMES[name])return;cadTheme=name;$('#st
 function drawEntity(s,sel=false,preview=false){
  ctx.save();const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:(s.linetype==='DASHED'?[8,5]:[]));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:1;
  const a=s.a&&screen(s.a),b=s.b&&screen(s.b);
- if(s.type==='line'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+ if(s.type==='point'){ctx.beginPath();ctx.moveTo(a.x-4,a.y);ctx.lineTo(a.x+4,a.y);ctx.moveTo(a.x,a.y-4);ctx.lineTo(a.x,a.y+4);ctx.stroke()}
+ else if(s.type==='line'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
  else if(s.type==='poly'){ctx.beginPath();s.pts.forEach((p,i)=>{const v=screen(p);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.stroke()}
  else if(s.type==='arc'){const g=arcParams(s.pts);if(g){ctx.beginPath();ctx.arc(g.x,g.y,g.r,g.a1,g.a3,g.anticlockwise);ctx.stroke()}else{const ps=s.pts.map(screen);ctx.beginPath();ctx.moveTo(ps[0].x,ps[0].y);ctx.quadraticCurveTo(ps[1].x,ps[1].y,ps[2].x,ps[2].y);ctx.stroke()}}
  else if(s.type==='leader'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.font='12px system-ui';ctx.fillText(s.text||'',b.x+4,b.y-4)}
@@ -225,7 +226,7 @@ function gripDescriptors(s){
   const r=distance(s.a,s.b);add('a',s.a);add('radius',{x:s.a.x+r,y:s.a.y});add('radius',{x:s.a.x-r,y:s.a.y});add('radius',{x:s.a.x,y:s.a.y+r});add('radius',{x:s.a.x,y:s.a.y-r});
  }else if(s.type==='ellipse'&&s.a&&s.b){
   add('a',s.a);add('rx+',{x:s.a.x+Math.abs(s.b.x-s.a.x),y:s.a.y});add('rx-',{x:s.a.x-Math.abs(s.b.x-s.a.x),y:s.a.y});add('ry+',{x:s.a.x,y:s.a.y+Math.abs(s.b.y-s.a.y)});add('ry-',{x:s.a.x,y:s.a.y-Math.abs(s.b.y-s.a.y)});
- }else if(s.type==='text'){add('a',s.a||(s.pts&&s.pts[0]))}
+ }else if(s.type==='point'||s.type==='text'){add('a',s.a||(s.pts&&s.pts[0]))}
  else if(s.type==='poly'||s.type==='polygon'||s.type==='arc'){(s.pts||[]).forEach((p,i)=>add('pt:'+i,p))}
  return out;
 }
@@ -888,9 +889,20 @@ async function getDwgRuntime(){
  }
  return dwgRuntimePromise;
 }
-const importReportButton=$('#importReport');let lastImportReport=[];
+const importReportButton=$('#importReport'),copyImportReportButton=$('#copyImportReport');let lastImportReport=[];
 importReportButton.onclick=()=>alert(lastImportReport.length?lastImportReport.join('\n'):'No hay advertencias en el último dibujo importado.');
-$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;lastImportReport=[...(arr.importWarnings||[]),...(arr.importNotes||[])];importReportButton.hidden=!lastImportReport.length;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')+(arr.importNotes?.length?' · '+arr.importNotes.length+' avisos de compatibilidad':'');status.title=[...(arr.importWarnings||[]),...(arr.importNotes||[])].join('\n')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
+copyImportReportButton.onclick=async()=>{
+ const report=lastImportReport.join('\n');if(!report)return;
+ try{await navigator.clipboard.writeText(report);status.textContent='Diagnóstico CAD copiado. Puedes pegarlo en el chat.'}
+ catch(error){console.warn('No se pudo copiar el diagnóstico:',error);alert(report)}
+};
+$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;lastImportReport=[
+ 'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,
+ 'Pérdidas o incompatibilidades:',...(arr.importWarnings?.length?arr.importWarnings:['Ninguna detectada']),
+ 'Ajustes visuales:',...(arr.importNotes?.length?arr.importNotes:['Ninguno']),
+ 'Causas dentro de bloques y cotas:',
+ ...((Object.entries(arr.importDiagnostics||{}).sort((a,b)=>b[1]-a[1]).map(([name,count])=>count+' '+name))||[])
+];importReportButton.hidden=false;copyImportReportButton.hidden=false;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')+(arr.importNotes?.length?' · '+arr.importNotes.length+' avisos de compatibilidad':'');status.title=[...(arr.importWarnings||[]),...(arr.importNotes||[])].join('\n')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
 function parseDxfEntities(source){
  const lines=source.replace(/\r/g,'').split('\n'),pairs=[];
  for(let i=0;i+1<lines.length;i+=2){const code=Number(lines[i].trim());if(Number.isFinite(code))pairs.push([code,lines[i+1].trim()])}
@@ -903,7 +915,8 @@ function parseDxfEntities(source){
  const style=r=>{const layer=str(r,8,'General'),aci=get(r,62,7),trueColor=get(r,420,-1),aciColors={1:'#ff3333',2:'#ffff33',3:'#33cc33',4:'#33ffff',5:'#3366ff',6:'#ff33ff',7:'#dce8f5',8:'#808080',9:'#b0b0b0'};return {layer,color:trueColor>=0?'#'+trueColor.toString(16).padStart(6,'0'):aciColors[aci]||colors[layer]||colors.General,lineweight:get(r,370,25)/100,linetype:str(r,6,'CONTINUOUS')==='DASHED'?'DASHED':'CONTINUOUS'}};
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
- const out=[],warnings={},notes={};let inEntities=false,activeAttributeGroup=null;
+ const out=[],warnings={},notes={},diagnostics={};let inEntities=false,activeAttributeGroup=null;
+ const diagnose=(scope,counts)=>{for(const [name,count] of Object.entries(counts||{})){const key=scope+' → '+name;diagnostics[key]=(diagnostics[key]||0)+count}};
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
  const note=type=>notes[type]=(notes[type]||0)+1;
  const buildPolylinePoints=(vertices,closed)=>{
@@ -990,7 +1003,7 @@ function parseDxfEntities(source){
     if(type===4){
      const vertices=(xc,yc)=>{const xs=edge.filter(p=>p[0]===xc).map(p=>+p[1]),ys=edge.filter(p=>p[0]===yc).map(p=>+p[1]);return xs.map((x,q)=>({x,y:ys[q]})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y))};
      part=vertices(11,21);if(part.length<2)part=vertices(10,20);
-     warn('HATCH con borde SPLINE aproximado');
+     note('HATCH con borde SPLINE aproximado');
     }
     if(!part.length)warn('HATCH con borde no compatible');
     append(pts,part);
@@ -1028,8 +1041,8 @@ function parseDxfEntities(source){
   if(points){
    const solidHatch=sourceItem.type==='hatch'&&sourceItem.hatchPattern==='SOLID'&&Number(sourceItem.hatchOpacity??.18)===1;
    item.type=solidHatch?'polygon':'poly';item.pts=points;if(solidHatch)item.solidFill=true;delete item.a;delete item.b;
-   if(sourceItem.type==='ellipse')warn('elipses rotadas aproximadas');
-   if(sourceItem.type==='hatch'&&!solidHatch)warn('HATCH rotado convertido a contorno');
+   if(sourceItem.type==='ellipse')note('elipses rotadas aproximadas');
+   if(sourceItem.type==='hatch'&&!solidHatch)note('HATCH rotado convertido a contorno');
   }else{
    if(sourceItem.a)item.a=transformPoint(sourceItem.a);
    if(sourceItem.b)item.b=transformPoint(sourceItem.b);
@@ -1053,16 +1066,21 @@ function parseDxfEntities(source){
   if(!inEntities)continue;
   const st=style(r),type=r.type;
   if(type==='SEQEND'&&activeAttributeGroup){activeAttributeGroup=null;continue}
-  if(type==='LINE')out.push({type:'line',a:{x:get(r,10),y:get(r,20)},b:{x:get(r,11),y:get(r,21)},...st});
+  if(type==='POINT'){
+   // DEFPOINTS is AutoCAD's non-printing dimension construction layer.
+   if(str(r,8,'').toUpperCase()==='DEFPOINTS')continue;
+   out.push({type:'point',a:{x:get(r,10),y:get(r,20)},...st});
+  }
+  else if(type==='LINE')out.push({type:'line',a:{x:get(r,10),y:get(r,20)},b:{x:get(r,11),y:get(r,21)},...st});
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
-  else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))warn('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
+  else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
   else if(type==='POLYLINE'){
    const flags=get(r,70,0),vertices=polylineVertices.get(r)||[];
    if(flags&(8|16|64)){warn('polilíneas 3D o malla no compatibles omitidas');continue}
    if(vertices.length<2){warn('POLYLINE sin vértices omitida');continue}
    const closed=Boolean(flags&1),pts=buildPolylinePoints(vertices,closed);
    if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st});
-   if(vertices.some(v=>Math.abs(v.bulge)>1e-9))warn('polilíneas curvas aproximadas');
+   if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');
   }
   else if(type==='ARC'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40),a1=get(r,50)*Math.PI/180,a2=get(r,51)*Math.PI/180,span=(a2-a1+Math.PI*2)%(Math.PI*2);if(rad>0&&span>0){const pts=[a1,a1+span/2,a1+span].map(t=>({x:a.x+rad*Math.cos(t),y:a.y+rad*Math.sin(t)}));out.push({type:'arc',pts,...st})}else warn('arcos no válidos omitidos')}
   else if(type==='INSERT'||type==='MINSERT'){
@@ -1079,7 +1097,7 @@ function parseDxfEntities(source){
    if(columns*rows>1)note('MINSERT expandido a entidades editables');
    note('INSERT/MINSERT importado como grupo editable');
    if(get(r,66)===1)activeAttributeGroup='dxf-insert-'+depth+'-'+(out.length-pieces.length)+'-0-0';
-   if(pieces.importWarnings?.length)warn('INSERT con entidades no compatibles');
+   if(pieces.importWarnings?.length){warn('INSERT con entidades no compatibles');diagnose('INSERT '+name,pieces.importWarningCounts);diagnose('INSERT '+name,pieces.importDiagnostics)}
   }
   else if(type==='DIMENSION'){
    if(Number(arguments[1]||0)>=5){warn('DIMENSION con anidación excesiva omitida');continue}
@@ -1090,11 +1108,25 @@ function parseDxfEntities(source){
    const groupId='dxf-dimension-'+out.length;
    for(const item of pieces)out.push({...item,groupId,layer:item.layer==='0'?st.layer:item.layer,color:item.layer==='0'?st.color:item.color});
    note('DIMENSION dibujada como geometría no asociativa');
-   if(pieces.importWarnings?.length)warn('DIMENSION con elementos gráficos no compatibles');
+   if(pieces.importWarnings?.length){warn('DIMENSION con elementos gráficos no compatibles');diagnose('DIMENSION',pieces.importWarningCounts);diagnose('DIMENSION',pieces.importDiagnostics)}
   }
   else if(type==='HATCH'){
-   const loops=hatchBoundaries(r),solid=get(r,70)===1,pattern=solid?'SOLID':str(r,2,'ANSI31'),pts=loops[0];
-   if(!pts?.length){warn('HATCH sin contorno compatible omitido');continue}
+   const loops=hatchBoundaries(r),solid=get(r,70)===1,pattern=solid?'SOLID':str(r,2,'ANSI31');
+   if(!loops.length){
+    // Some DWG->DXF writers retain vertex pairs but omit the HATCH path markers.
+    // Recover only a real non-collinear contour; never fabricate one from a bounding box.
+    const vertices=[],boundaryStart=r.pairs.findIndex(p=>p[0]===91);for(let i=boundaryStart<0?r.pairs.length:boundaryStart+1;i<r.pairs.length-1;i++){
+     if(r.pairs[i][0]===10&&r.pairs[i+1][0]===20){
+      const x=Number(r.pairs[i][1]),y=Number(r.pairs[i+1][1]);
+      if(Number.isFinite(x)&&Number.isFinite(y)&&(!vertices.length||Math.hypot(x-vertices.at(-1).x,y-vertices.at(-1).y)>1e-9))vertices.push({x,y});
+     }
+    }
+    if(vertices.length>3&&distance(vertices[0],vertices.at(-1))<1e-9)vertices.pop();
+    const area=vertices.reduce((sum,p,i)=>{const q=vertices[(i+1)%vertices.length];return sum+p.x*q.y-q.x*p.y},0);
+    if(vertices.length>=3&&Math.abs(area)>1e-8){loops.push(vertices);note('HATCH con borde reconstruido desde vértices DXF')}
+   }
+   const pts=loops[0];
+   if(!pts?.length){warn('HATCH sin contorno compatible omitido');const paths=get(r,91,-1),vertices=r.pairs.filter(p=>p[0]===10).length;diagnose('HATCH',{['rutas de borde='+paths+', pares X/Y='+vertices]:1});continue}
    const minx=Math.min(...pts.map(p=>p.x)),maxx=Math.max(...pts.map(p=>p.x)),miny=Math.min(...pts.map(p=>p.y)),maxy=Math.max(...pts.map(p=>p.y));
    const corners=new Set(pts.map(p=>p.x+','+p.y));
    const rectangular=loops.length===1&&pts.length===4&&minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(x+','+y));
@@ -1108,7 +1140,7 @@ function parseDxfEntities(source){
    const a={x:get(r,10),y:get(r,20)},vx=get(r,11),vy=get(r,21),ratio=get(r,40),begin=get(r,41),end=get(r,42,Math.PI*2),length=Math.hypot(vx,vy);
    const full=Math.abs((end-begin)-2*Math.PI)<1e-6,aligned=Math.abs(vx)<1e-9||Math.abs(vy)<1e-9;
    if(length>0&&ratio>0&&ratio<=1&&full&&aligned){const rx=Math.abs(vx)+Math.abs(vy)*ratio,ry=Math.abs(vy)+Math.abs(vx)*ratio;out.push({type:'ellipse',a,b:{x:a.x+rx,y:a.y+ry},...st})}
-   else if(length>0&&ratio>0&&end>begin){const pts=Array.from({length:65},(_,i)=>{const t=begin+(end-begin)*i/64;return{x:a.x+vx*Math.cos(t)-vy*ratio*Math.sin(t),y:a.y+vy*Math.cos(t)+vx*ratio*Math.sin(t)}});out.push({type:'poly',pts,...st});warn('elipses rotadas o parciales simplificadas')}
+   else if(length>0&&ratio>0&&end>begin){const pts=Array.from({length:65},(_,i)=>{const t=begin+(end-begin)*i/64;return{x:a.x+vx*Math.cos(t)-vy*ratio*Math.sin(t),y:a.y+vy*Math.cos(t)+vx*ratio*Math.sin(t)}});out.push({type:'poly',pts,...st});note('elipses rotadas o parciales simplificadas')}
    else warn('elipses no válidas omitidas');
   }
   else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'||type==='ATTDEF'){
@@ -1130,7 +1162,7 @@ function parseDxfEntities(source){
   }
   else if(type==='SPLINE'){
    const fitX=all(r,11),fitY=all(r,21),controlX=all(r,10),controlY=all(r,20),xs=fitX.length>=2?fitX:controlX,ys=fitY.length>=2?fitY:controlY,pts=xs.map((x,i)=>({x,y:ys[i]??0}));
-   if(pts.length>=2){out.push({type:'poly',pts,...st});warn(fitX.length>=2?'SPLINE aproximada por puntos de ajuste':'SPLINE aproximada por puntos de control')}else warn('SPLINE sin puntos compatibles omitida');
+   if(pts.length>=2){out.push({type:'poly',pts,...st});note(fitX.length>=2?'SPLINE aproximada por puntos de ajuste':'SPLINE aproximada por puntos de control')}else warn('SPLINE sin puntos compatibles omitida');
   }
   else if(type==='LEADER'){
    const xs=all(r,10),ys=all(r,20),pts=xs.map((x,i)=>({x,y:ys[i]??0}));
@@ -1142,11 +1174,12 @@ function parseDxfEntities(source){
  }
  out.importWarnings=Object.entries(warnings).map(([name,count])=>count+' '+name);
  out.importNotes=Object.entries(notes).map(([name,count])=>count+' '+name);
+ out.importWarningCounts={...warnings};out.importDiagnostics=diagnostics;
  return out;
 }
 async function download(name,content,type){const blob=content instanceof Blob?content:new Blob([content],{type:type||'application/octet-stream'});if(window.OtroCadAndroid&&typeof window.OtroCadAndroid.saveFile==='function'){try{const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));window.OtroCadAndroid.saveFile(name,type||'application/octet-stream',btoa(binary));return}catch(err){console.error(err)}}const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1200)}
 $('#project').onclick=()=>download('otrocad.json',JSON.stringify({version:2,shapes:objects},null,2),'application/json');
-$('#export').onclick=()=>{let s='<svg xmlns="http://www.w3.org/2000/svg"><g fill="none">';const attrs=o=>' stroke="'+(o.color||colors[o.layer]||colors.General)+'" stroke-width="'+(o.lineweight||.25)+'"'+(o.linetype==='DASHED'?' stroke-dasharray="6 4"':'');objects.forEach(o=>{const a=o.a,b=o.b,at=attrs(o);if(o.type==='line'||o.type==='dim')s+='<line'+at+' x1="'+a.x+'" y1="'+(-a.y)+'" x2="'+b.x+'" y2="'+(-b.y)+'"/>';else if(o.type==='circle')s+='<circle'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" r="'+distance(a,b)+'"/>';else if(o.type==='rect'||o.type==='hatch')s+='<rect'+at+' x="'+Math.min(a.x,b.x)+'" y="'+(-Math.max(a.y,b.y))+'" width="'+Math.abs(b.x-a.x)+'" height="'+Math.abs(b.y-a.y)+'"/>';else if(o.type==='ellipse')s+='<ellipse'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" rx="'+Math.abs(b.x-a.x)+'" ry="'+Math.abs(b.y-a.y)+'"/>';else if(o.pts)s+='<polyline'+at+' points="'+o.pts.map(p=>p.x+','+(-p.y)).join(' ')+'"/>';else if(o.type==='text')s+='<text'+at+' x="'+a.x+'" y="'+(-a.y)+'">'+String(o.text||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</text>'});download('otrocad.svg',s+'</g></svg>','image/svg+xml')};
+$('#export').onclick=()=>{let s='<svg xmlns="http://www.w3.org/2000/svg"><g fill="none">';const attrs=o=>' stroke="'+(o.color||colors[o.layer]||colors.General)+'" stroke-width="'+(o.lineweight||.25)+'"'+(o.linetype==='DASHED'?' stroke-dasharray="6 4"':'');objects.forEach(o=>{const a=o.a,b=o.b,at=attrs(o);if(o.type==='line'||o.type==='dim')s+='<line'+at+' x1="'+a.x+'" y1="'+(-a.y)+'" x2="'+b.x+'" y2="'+(-b.y)+'"/>';else if(o.type==='point')s+='<circle'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" r="0.05"/>';else if(o.type==='circle')s+='<circle'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" r="'+distance(a,b)+'"/>';else if(o.type==='rect'||o.type==='hatch')s+='<rect'+at+' x="'+Math.min(a.x,b.x)+'" y="'+(-Math.max(a.y,b.y))+'" width="'+Math.abs(b.x-a.x)+'" height="'+Math.abs(b.y-a.y)+'"/>';else if(o.type==='ellipse')s+='<ellipse'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" rx="'+Math.abs(b.x-a.x)+'" ry="'+Math.abs(b.y-a.y)+'"/>';else if(o.pts)s+='<polyline'+at+' points="'+o.pts.map(p=>p.x+','+(-p.y)).join(' ')+'"/>';else if(o.type==='text')s+='<text'+at+' x="'+a.x+'" y="'+(-a.y)+'">'+String(o.text||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</text>'});download('otrocad.svg',s+'</g></svg>','image/svg+xml')};
 function buildDxf(){
  const arcGeometry=points=>{
   if(!points||points.length!==3)return null;
@@ -1160,7 +1193,7 @@ function buildDxf(){
  const renamedLayers=objects.filter(o=>dxfLayer(o)!==String(o.layer||'General')).length;
  const groups=new Set(objects.map(o=>o.groupId).filter(Boolean));
  const approximated=objects.filter(o=>['dim','dimaligned','leader'].includes(o.type)||(o.type==='hatch'&&(o.hatchPattern!=='SOLID'||Number(o.hatchOpacity??.18)!==1))||(o.type==='polygon'&&o.hatchPattern&&o.hatchPattern!=='SOLID')||(o.type==='arc'&&!arcGeometry(o.pts)));
- const unsupported=objects.filter(o=>!['line','dim','dimaligned','leader','circle','rect','hatch','poly','polygon','arc','ellipse','text'].includes(o.type)||(o.type==='ellipse'&&(!o.a||!o.b||o.a.x===o.b.x||o.a.y===o.b.y)));
+ const unsupported=objects.filter(o=>!['line','dim','dimaligned','leader','circle','rect','hatch','poly','polygon','arc','ellipse','text','point'].includes(o.type)||(o.type==='ellipse'&&(!o.a||!o.b||o.a.x===o.b.x||o.a.y===o.b.y)));
  if((approximated.length||unsupported.length||renamedLayers||groups.size)&&!confirm('Este DXF aún no conserva todos los elementos con fidelidad: '+approximated.length+' se exportarán simplificados, '+unsupported.length+' se omitirán, '+renamedLayers+' tendrán nombres de capa ajustados y '+groups.size+' bloques se desagruparán. Conserva también una copia del proyecto. ¿Exportar de todos modos?'))return null;
  const rows=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1021','9','$INSUNITS','70',String(({mm:4,cm:5,m:6})[units]||0),'0','ENDSEC'];
  const add=(...v)=>rows.push(...v.map(String));
@@ -1178,6 +1211,7 @@ function buildDxf(){
   const line=(p,q)=>add(0,'LINE',...common,100,'AcDbLine',10,p.x,20,p.y,30,0,11,q.x,21,q.y,31,0);
   const textEntity=(p,value,height,rotation=0)=>{const valueText=String(value||'').replace(/\r/g,'');if(valueText.includes('\n'))add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,50,rotation,1,valueText.replace(/\n/g,'\\P'));else add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,50,rotation,1,valueText)};
   if(['line','dim','dimaligned','leader'].includes(o.type)&&a&&b){line(a,b);if(o.type==='dim'||o.type==='dimaligned')textEntity({x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance(a,b).toFixed(2)+' '+units,12/zoom);if(o.type==='leader'&&o.text)textEntity(b,o.text,12/zoom)}
+  else if(o.type==='point'&&a)add(0,'POINT',...common,100,'AcDbPoint',10,a.x,20,a.y,30,0);
   else if(o.type==='text'&&a){if(o.mtextRaw&&o.text===o.mtextPlain)add(0,'MTEXT',...common,100,'AcDbMText',10,a.x,20,a.y,30,0,40,o.textHeightWorld||.4,50,o.textRotation||0,1,o.mtextRaw);else textEntity(a,o.text,o.textHeightWorld||Number(o.textHeight||14)/zoom,o.textRotation||0)}
   else if(o.type==='circle'&&a&&b)add(0,'CIRCLE',...common,100,'AcDbCircle',10,a.x,20,a.y,30,0,40,distance(a,b));
   else if(o.type==='arc'&&arcGeometry(o.pts)){const g=arcGeometry(o.pts);add(0,'ARC',...common,100,'AcDbCircle',10,g.x,20,g.y,30,0,40,g.r,100,'AcDbArc',50,g.start,51,g.end)}
