@@ -925,6 +925,68 @@ function parseDxfEntities(source){
   const steps=Math.max(4,Math.ceil(sweep/(Math.PI/24))),radius=Math.hypot(a.x-cx,a.y-cy);
   return Array.from({length:steps+1},(_,i)=>{const t=a1+direction*sweep*i/steps;return{x:cx+radius*Math.cos(t),y:cy+radius*Math.sin(t)}});
  };
+
+ const hatchBoundaries=r=>{
+  const pairs=r.pairs,loops=[];let i=pairs.findIndex(p=>p[0]===91);if(i<0)return loops;
+  const total=Math.min(512,+pairs[i++][1]||0);
+  const val=(data,c,d=0)=>{const p=data.find(x=>x[0]===c);return p&&Number.isFinite(+p[1])?+p[1]:d};
+  const append=(list,part)=>{for(const p of part)if(Number.isFinite(p.x)&&Number.isFinite(p.y)&&(!list.length||distance(list[list.length-1],p)>1e-8))list.push(p)};
+  const sweep=(a,b,ccw)=>{const v=((ccw?b-a:a-b)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);return v<1e-8?Math.PI*2:v};
+  for(let k=0;k<total&&i<pairs.length;k++){
+   while(i<pairs.length&&pairs[i][0]!==92)i++;if(i>=pairs.length)break;
+   const flags=+pairs[i++][1],pts=[];
+   while(i<pairs.length&&pairs[i][0]!==93&&pairs[i][0]!==92)i++;
+   if(pairs[i]?.[0]!==93)break;
+   const count=Math.min(20000,+pairs[i++][1]||0);
+   if(flags&2){
+    const verts=[];
+    for(let j=0;j<count&&i<pairs.length;j++){
+     while(i<pairs.length&&![10,92,97].includes(pairs[i][0]))i++;
+     if(pairs[i]?.[0]!==10)break;
+     const v={x:+pairs[i++][1],y:0,bulge:0};
+     while(i<pairs.length&&![10,92,97].includes(pairs[i][0])){
+      if(pairs[i][0]===20)v.y=+pairs[i][1];
+      if(pairs[i][0]===42)v.bulge=+pairs[i][1];i++;
+     }
+     if(Number.isFinite(v.x)&&Number.isFinite(v.y))verts.push(v);
+    }
+    append(pts,buildPolylinePoints(verts,true));
+   }else for(let j=0;j<count&&i<pairs.length;j++){
+    while(i<pairs.length&&![72,92,97].includes(pairs[i][0]))i++;
+    if(pairs[i]?.[0]!==72)break;
+    const type=+pairs[i++][1],edge=[];
+    while(i<pairs.length&&![72,92,97].includes(pairs[i][0]))edge.push(pairs[i++]);
+    let part=[];
+    if(type===1)part=[{x:val(edge,10),y:val(edge,20)},{x:val(edge,11),y:val(edge,21)}];
+    if(type===2||type===3){
+     const cx=val(edge,10),cy=val(edge,20),rad=Math.PI/180,begin=val(edge,50)*rad,end=val(edge,51)*rad,ccw=val(edge,73,1)!==0,span=sweep(begin,end,ccw);
+     const steps=Math.min(180,Math.max(8,Math.ceil(span/(Math.PI/36))));
+     part=Array.from({length:steps+1},(_,q)=>{
+      const a=begin+(ccw?1:-1)*span*q/steps;
+      if(type===2)return{x:cx+val(edge,40)*Math.cos(a),y:cy+val(edge,40)*Math.sin(a)};
+      const vx=val(edge,11),vy=val(edge,21),ratio=val(edge,40,1);
+      return{x:cx+vx*Math.cos(a)-vy*ratio*Math.sin(a),y:cy+vy*Math.cos(a)+vx*ratio*Math.sin(a)};
+     });
+    }
+    if(type===4){
+     const vertices=(xc,yc)=>{const xs=edge.filter(p=>p[0]===xc).map(p=>+p[1]),ys=edge.filter(p=>p[0]===yc).map(p=>+p[1]);return xs.map((x,q)=>({x,y:ys[q]})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y))};
+     part=vertices(11,21);if(part.length<2)part=vertices(10,20);
+     warn('HATCH con borde SPLINE aproximado');
+    }
+    if(!part.length)warn('HATCH con borde no compatible');
+    append(pts,part);
+   }
+   if(pairs[i]?.[0]===97){const handles=Math.min(20000,+pairs[i++][1]||0);for(let j=0;j<handles&&pairs[i]?.[0]===330;j++)i++}
+   if(pts.length>2){if(distance(pts[0],pts[pts.length-1])<1e-8)pts.pop();loops.push(pts)}
+  }
+  return loops;
+ };
+ const cleanMText=raw=>String(raw||'')
+  .replace(/\\U\+([0-9A-Fa-f]{4,6})/g,(_,hex)=>String.fromCodePoint(parseInt(hex,16)))
+  .replace(/\\S([^;]*);/g,(_,v)=>v.replace(/[#^]/g,'/'))
+  .replace(/\\[PpX]/g,'\n').replace(/\\~/g,' ').replace(/\\([{}\\])/g,'$1')
+  .replace(/\\(?:[AaCcFfHhQqTtWw]|p)[^;]*;/g,'').replace(/\\[LlOoKk]/g,'')
+  .replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').replace(/%%[cC]/g,'Ø').replace(/[{}]/g,'');
  const polylineVertices=new Map();
  for(let i=0;i<records.length;i++)if(records[i].type==='POLYLINE'){
   const vertices=[];for(let j=i+1;j<records.length&&records[j].type!=='SEQEND';j++)if(records[j].type==='VERTEX')vertices.push({x:get(records[j],10),y:get(records[j],20),bulge:get(records[j],42)});
@@ -1005,14 +1067,16 @@ function parseDxfEntities(source){
    warn('DIMENSION descompuesta, no asociativa');if(geometry.some(item=>item.type==='INSERT'))warn('símbolos de cota omitidos');
   }
   else if(type==='HATCH'){
-   const firstPath=r.pairs.findIndex(p=>p[0]===93),endPath=r.pairs.findIndex((p,i)=>i>firstPath&&p[0]===97),path=firstPath>=0?r.pairs.slice(firstPath+1,endPath<0?undefined:endPath):[];
-   const xs=path.filter(p=>p[0]===10).map(p=>Number(p[1])),ys=path.filter(p=>p[0]===20).map(p=>Number(p[1]));
-   const solidPolygon=get(r,70)===1&&get(r,91)===1&&(get(r,92)&2)&&xs.length>=3&&xs.length===ys.length&&xs.every(Number.isFinite)&&ys.every(Number.isFinite)&&!path.some(pair=>pair[0]===42&&Number(pair[1])!==0);
-   if(solidPolygon&&!(get(r,93)===4&&new Set(xs).size===2&&new Set(ys).size===2)){out.push({type:'polygon',pts:xs.map((x,i)=>({x,y:ys[i]})),solidFill:true,...st});continue}
-   if(get(r,70)===1&&get(r,91)===1&&(get(r,92)&2)&&get(r,93)===4&&xs.length===4&&ys.length===4&&xs.every(Number.isFinite)&&ys.every(Number.isFinite)){
-    const minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys),corners=new Set(xs.map((x,i)=>`${x},${ys[i]}`));
-    if(minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(`${x},${y}`)))out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},hatchPattern:'SOLID',hatchOpacity:1,...st});else warn('HATCH no rectangular omitido');
-   }else warn('HATCH no compatible omitido');
+   const loops=hatchBoundaries(r),solid=get(r,70)===1,pattern=solid?'SOLID':str(r,2,'ANSI31'),pts=loops[0];
+   if(!pts?.length){warn('HATCH sin contorno compatible omitido');continue}
+   const minx=Math.min(...pts.map(p=>p.x)),maxx=Math.max(...pts.map(p=>p.x)),miny=Math.min(...pts.map(p=>p.y)),maxy=Math.max(...pts.map(p=>p.y));
+   const corners=new Set(pts.map(p=>p.x+','+p.y));
+   const rectangular=loops.length===1&&pts.length===4&&minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(x+','+y));
+   const hatchSpacingWorld=Math.hypot(get(r,45),get(r,46))||Math.max((maxx-minx+maxy-miny)/50,.01);
+   const appearance={hatchPattern:pattern,hatchOpacity:solid?1:.65,hatchSpacingWorld,hatchAngle:get(r,52,45),...st};
+   if(rectangular&&solid)out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},...appearance});
+   else out.push({type:'polygon',pts,hatchLoops:loops,solidFill:solid,...appearance});
+   if(!solid)warn('HATCH con trama visual aproximada');
   }
   else if(type==='ELLIPSE'){
    const a={x:get(r,10),y:get(r,20)},vx=get(r,11),vy=get(r,21),ratio=get(r,40),begin=get(r,41),end=get(r,42,Math.PI*2),length=Math.hypot(vx,vy);
