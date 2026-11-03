@@ -1,9 +1,9 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
 const root=path.join(process.cwd(),'dist');
-const required=['index.html','editor/index.html','editor/editor.js','editor/civil3d.js','descargas/index.html','tutorial/index.html','herramientas/index.html','sw.js','manifest.webmanifest','icon.svg','editor-preview.svg'];
+const required=['index.html','editor/index.html','editor/editor.js','editor/civil3d.js','descargas/index.html','tutorial/index.html','herramientas/index.html','ios/index.html','sw.js','manifest.webmanifest','icon.svg','apple-touch-icon.png','icon-192.png','icon-512.png','editor-preview.svg'];
 for(const file of required){if(!fs.existsSync(path.join(root,file)))throw Error('Missing '+file);}
-const pages=['index.html','descargas/index.html','tutorial/index.html','herramientas/index.html','editor/index.html'];
+const pages=['index.html','descargas/index.html','tutorial/index.html','herramientas/index.html','ios/index.html','editor/index.html'];
 for(const page of pages){
  const html=fs.readFileSync(path.join(root,page),'utf8');
  for(const match of html.matchAll(/(?:href|src)=["']([^"'#]+)["']/g)){
@@ -29,3 +29,16 @@ for(const page of ['index.html','descargas/index.html']){
  if(/android-hybrid-test-|OtroCAD-Android-0\.5\.4-test\.apk/.test(html))throw Error('Outdated Android APK still advertised in '+page);
 }
 console.log('Direct current APK 0.5.6 links verified in home and downloads');
+
+// Safari iOS needs real PNG Apple touch icon, standalone manifest and touch-friendly CAD editing.
+const icon=fs.readFileSync(path.join(root,'apple-touch-icon.png'));
+if(icon.length<1000||!icon.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))throw Error('Apple touch icon is not a valid PNG file');
+for(const page of ['index.html','editor/index.html','ios/index.html','descargas/index.html']){
+ const html=fs.readFileSync(path.join(root,page),'utf8');
+ if(!html.includes('rel="apple-touch-icon"')||!html.includes('apple-mobile-web-app'))throw Error('iOS PWA metadata missing in '+page);
+}
+const iOSManifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.webmanifest'),'utf8'));
+if(!iOSManifest.icons.some(x=>x.src==='icon-192.png')||!iOSManifest.icons.some(x=>x.src==='icon-512.png'))throw Error('PNG icons not configured in PWA manifest');
+const cadJS=fs.readFileSync(path.join(root,'editor/editor.js'),'utf8');
+if(!cadJS.includes('findGripAt(p,e.pointerType')||!cadJS.includes('snapPoint(world(p),gripDrag.index)'))throw Error('iOS touch grip improvements missing');
+console.log('iOS Apple touch icon, home screen install and CAD grip support verified');
