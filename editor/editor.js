@@ -155,7 +155,7 @@ function strokeCadHatchPattern(s,allPoints){
  return rendered>0;
 }
 function drawEntity(s,sel=false,preview=false){
- ctx.save();const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:1;
+ ctx.save();const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
  const a=s.a&&screen(s.a),b=s.b&&screen(s.b);
  if(s.type==='point'){ctx.beginPath();ctx.moveTo(a.x-4,a.y);ctx.lineTo(a.x+4,a.y);ctx.moveTo(a.x,a.y-4);ctx.lineTo(a.x,a.y+4);ctx.stroke()}
  else if(s.type==='line'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
@@ -985,14 +985,14 @@ function parseDxfEntities(source){
   if(record.type==='ENDTAB'){inLayerTable=false;continue}
   if(inLayerTable&&record.type==='LAYER'){
    const aci=Math.abs(get(record,62,7)),rgb=get(record,420,-1),name=str(record,2,'0');
-   layerStyles.set(name,{color:rgb>=0?'#'+(rgb&0xffffff).toString(16).padStart(6,'0'):aciColor(aci),linetype:str(record,6,'CONTINUOUS'),lineweight:get(record,370,25)});
+   layerStyles.set(name,{color:rgb>=0?'#'+(rgb&0xffffff).toString(16).padStart(6,'0'):aciColor(aci),linetype:str(record,6,'CONTINUOUS'),lineweight:get(record,370,25),opacity:dxfOpacity(get(record,440,-1))});
   }
  }
  const style=r=>{
   const layer=str(r,8,'0'),ly=layerStyles.get(layer)||{},aci=get(r,62,256),trueColor=get(r,420,-1),lineweight=get(r,370,-1),linetype=str(r,6,'BYLAYER');
   const byBlock=aci===0;
   const color=trueColor>=0?'#'+(trueColor&0xffffff).toString(16).padStart(6,'0'):(aci>=1&&aci<=255?aciColor(aci):ly.color)||colors[layer]||colors.General;
-  return {layer,color,cadByBlock:byBlock,lineweight:(lineweight>=0?lineweight:(ly.lineweight>=0?ly.lineweight:25))/100,linetype:linetype==='BYLAYER'?(ly.linetype||'CONTINUOUS'):linetype};
+  return {layer,color,cadByBlock:byBlock,cadOpacity:r.pairs.some(p=>p[0]===440)?dxfOpacity(get(r,440,-1)):(ly.opacity??1),lineweight:(lineweight>=0?lineweight:(ly.lineweight>=0?ly.lineweight:25))/100,linetype:linetype==='BYLAYER'?(ly.linetype||'CONTINUOUS'):linetype};
  };
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
@@ -1039,6 +1039,22 @@ function parseDxfEntities(source){
   return Array.from({length:steps+1},(_,i)=>{const t=a1+direction*sweep*i/steps;return{x:cx+radius*Math.cos(t),y:cy+radius*Math.sin(t)}});
  };
 
+ const hatchPatternDefinitions=r=>{
+  const p=r.pairs,idx=p.findIndex(pair=>pair[0]===78);
+  if(idx<0)return [];
+  const count=Math.min(64,Math.max(0,Number(p[idx][1])||0)),defs=[];let i=idx+1;
+  for(let k=0;k<count&&i<p.length;k++){
+   while(i<p.length&&p[i][0]!==53&&p[i][0]!==98&&p[i][0]!==450)i++;
+   if(p[i]?.[0]!==53)break;
+   const part=[];part.push(p[i++]);
+   while(i<p.length&&![53,98,450].includes(p[i][0]))part.push(p[i++]);
+   const val=(code,def=0)=>{const pair=part.find(v=>v[0]===code);return pair&&Number.isFinite(Number(pair[1]))?Number(pair[1]):def};
+   const dashes=part.filter(v=>v[0]===49).slice(0,32).map(v=>Number(v[1])).filter(Number.isFinite);
+   defs.push({angle:val(53),base:{x:val(43),y:val(44)},offset:{x:val(45),y:val(46)},dashes});
+  }
+  return defs;
+ };
+ const dxfOpacity=raw=>raw>=0&&(raw>>>24)===2?(raw&255)/255:1;
  const hatchBoundaries=r=>{
   const pairs=r.pairs,loops=[];let i=pairs.findIndex(p=>p[0]===91);if(i<0)return loops;
   const total=Math.min(512,+pairs[i++][1]||0);
@@ -1284,17 +1300,20 @@ function parseDxfEntities(source){
    if(!pts?.length){
     warn('HATCH sin contorno compatible omitido');
     const paths=get(r,91,-1),vertices=r.pairs.filter(p=>p[0]===10).length;
-    diagnose('HATCH',{['rutas='+paths+', vértices='+vertices+', referencias='+association.refs.length+', entidades asociadas='+(Object.keys(association.types).join('/')||'ninguna')]:1});
+    diagnose('HATCH capa='+st.layer+' handle='+str(r,5,'?')+' patrón='+pattern,{['rutas='+paths+', vértices='+vertices+', referencias='+association.refs.length+', entidades asociadas='+(Object.keys(association.types).join('/')||'ninguna')+', códigos='+[...new Set(r.pairs.map(p=>p[0]))].join('/')]:1});
     continue;
    }
    const minx=Math.min(...pts.map(p=>p.x)),maxx=Math.max(...pts.map(p=>p.x)),miny=Math.min(...pts.map(p=>p.y)),maxy=Math.max(...pts.map(p=>p.y));
    const corners=new Set(pts.map(p=>p.x+','+p.y));
    const rectangular=loops.length===1&&pts.length===4&&minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(x+','+y));
    const hatchSpacingWorld=Math.hypot(get(r,45),get(r,46))||Math.max((maxx-minx+maxy-miny)/50,.01);
-   const appearance={hatchPattern:pattern,hatchOpacity:solid?1:.65,hatchSpacingWorld,hatchAngle:get(r,52,45),...st};
+   const gradient=get(r,450)===1,rgbGradient=r.pairs.filter(p=>p[0]===421).slice(0,2).map(p=>'#'+(Number(p[1])&0xffffff).toString(16).padStart(6,'0'));
+   const patternLines=solid?[]:hatchPatternDefinitions(r);
+   const appearance={...st,hatchPattern:pattern,hatchOpacity:st.cadOpacity??1,hatchSpacingWorld,hatchAngle:get(r,52,45),hatchPatternLines:patternLines,
+    hatchGradientColors:gradient&&rgbGradient.length?rgbGradient:null,hatchGradientAngle:get(r,460)*180/Math.PI,importedHatch:true};
    if(rectangular&&solid)out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},...appearance});
    else out.push({type:'polygon',pts,hatchLoops:loops,solidFill:solid,...appearance});
-   if(!solid)note('HATCH con trama visual aproximada');
+   if(!solid&&!patternLines.length)note('HATCH con trama visual aproximada');
   }
   else if(type==='ELLIPSE'){
    const a={x:get(r,10),y:get(r,20)},vx=get(r,11),vy=get(r,21),ratio=get(r,40),begin=get(r,41),end=get(r,42,Math.PI*2),length=Math.hypot(vx,vy);
