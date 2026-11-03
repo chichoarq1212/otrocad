@@ -166,7 +166,7 @@ function render(){
  if(printing)$('#dynamic').style.display='none';else updateDynamic();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
-function setTool(t){selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
+function setTool(t){$('#offsetInline')?.remove();if(t==='offset')clearSelection();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;let d=1e9;
@@ -324,11 +324,19 @@ function commitEntity(endPoint){
  save();applySelection([objects.length-1]);start=null;temp=null;render();updatePrompt();
 }
 function finishPoly(){if(poly.length<2){status.textContent='La polilínea necesita al menos dos puntos';return false}if(lockedLayers.has($('#layer').value)){status.textContent='La capa actual está bloqueada';return false}checkpoint();objects.push({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)});save();poly=[];start=null;temp=null;render();updatePrompt();status.textContent='Polilínea terminada';return true}
+function showOffsetInput(){
+ const existing=$('#offsetInline');if(existing)existing.remove();
+ const box=document.createElement('div');box.id='offsetInline';box.innerHTML='<label for="offsetInlineValue">Distancia OFFSET</label><input id="offsetInlineValue" type="number" min="0.001" step="any" inputmode="decimal"><button type="button">Aceptar</button><button type="button" aria-label="Cancelar desfase">×</button><span role="status"></span>';
+ stage.append(box);const input=box.querySelector('input'),buttons=box.querySelectorAll('button'),error=box.querySelector('[role=status]');input.value=offsetDistance;
+ const accept=()=>{const value=Number(input.value);if(!Number.isFinite(value)||value<=0){error.textContent='Ingresa una distancia positiva';return}offsetDistance=value;offsetDistancePreset=false;box.remove();stage.focus({preventScroll:true});status.textContent='OFFSET: toca el lado del desfase'};
+ buttons[0].onclick=accept;buttons[1].onclick=()=>{box.remove();clearSelection();render();status.textContent='OFFSET cancelado'};
+ input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopImmediatePropagation();accept()}else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();buttons[1].click()}});input.focus();input.select();status.textContent='OFFSET: ingresa la distancia';
+}
 function doOffset(q){
  if(selected<0){
   const hit=selectAt(q);applySelection(hit>=0?[hit]:[]);
   if(selected<0){status.textContent='Selecciona una entidad para OFFSET';return}
-  if(!offsetDistancePreset){const raw=prompt('Distancia de desfase','1');if(raw===null){clearSelection();return}const d=Number(raw);if(!Number.isFinite(d)||d<=0){clearSelection();status.textContent='Introduce una distancia positiva';return}offsetDistance=d}
+  if(!offsetDistancePreset){showOffsetInput();return}
   offsetDistancePreset=false;status.textContent='Indica el lado del desfase';return;
  }
  const s=objects[selected],d=offsetDistance,style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype},before=objects.length;
@@ -379,7 +387,7 @@ function handleTap(p){
  }
  if(tool==='select'){const hit=selectAt(q);applySelection(hit>=0?[hit]:[]);showProperties();render();return}
  if(tool==='pan'){return}
- if(tool==='offset'){doOffset(q);return}
+ if(tool==='offset'){if(!$('#offsetInline'))doOffset(q);return}
  if(tool==='poly'){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Polilínea: marca otro vértice o pulsa Enter';return}
  if(tool==='explode'){explodeAt(q);return}
  if(tool==='fillet'){
@@ -654,7 +662,7 @@ $('#cmd').addEventListener('input',updateCursorCommand);
 applyCanvasTheme(cadTheme);
 $('#canvasTheme').addEventListener('change',e=>applyCanvasTheme(e.target.value));$('#canvasTheme').value=cadTheme;
 $('#cmd').addEventListener('keydown',e=>{
- if(e.key==='Enter'||e.key===' '&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();e.stopPropagation();submitCommand();$('#cmd').blur()}
+ if(e.key==='Enter'||e.key===' '&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();e.stopImmediatePropagation();submitCommand();$('#cmd').blur()}
  else if(e.key==='Escape'){e.preventDefault();cancelCurrentAction();$('#cmd').blur();stage.focus({preventScroll:true})}
 });
 $('#cmdRun').addEventListener('click',()=>{submitCommand();$('#cmd').blur()});
@@ -800,7 +808,7 @@ function runCommand(raw){
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
-$('#cmd').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '&&$('#cmd').value.trim()===''){e.preventDefault();e.stopPropagation();submitCommand()}});
+
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>{const active=x===b;x.classList.toggle('active',active);x.setAttribute('aria-selected',String(active))});document.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!==b.dataset.tab)});
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
 const furnitureList=Array.isArray(window.otroCadFurnitureCatalog)?window.otroCadFurnitureCatalog:[];
