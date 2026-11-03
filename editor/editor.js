@@ -1400,7 +1400,7 @@ function parseDxfEntities(source){
   const name=unknownPaperBlocks.length===1&&unmatchedLayouts.length===1?unmatchedLayouts[0].name:(suffix?'Papel recuperado '+suffix:'Papel recuperado');
   paperBlockToLayout.set(blockName,name);
  }
- const activePaperLayout=paperBlockToLayout.get('*PAPER_SPACE')||(importedLayouts.length===1?importedLayouts[0].name:'Papel sin asociación');
+ const activePaperLayout=paperBlockToLayout.get('*PAPER_SPACE')||(importedLayouts.length===1?importedLayouts[0].name:(importedLayouts.length?'Papel sin asociación':'Layout1'));
  const entitySpace=r=>{
   const name=str(r,410,'').trim();
   if(name)return name.toLowerCase()==='model'?'Model':name;
