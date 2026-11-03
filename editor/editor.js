@@ -155,14 +155,59 @@ function strokeCadHatchPattern(s,allPoints){
  return rendered>0;
 }
 
+const CAD_TEXT_FONT_CATALOG=[
+ {id:'arial',label:'Arial',file:'arial.ttf',boldFile:'arialbd.ttf',italicFile:'ariali.ttf',boldItalicFile:'arialbi.ttf',family:'Arial, Helvetica, sans-serif'},
+ {id:'arial-narrow',label:'Arial Narrow',file:'arialn.ttf',boldFile:'arialnb.ttf',italicFile:'arialni.ttf',boldItalicFile:'arialnbi.ttf',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'bahnschrift',label:'Bahnschrift',file:'bahnschrift.ttf',boldFile:'bahnschrift.ttf',italicFile:'bahnschrift.ttf',boldItalicFile:'bahnschrift.ttf',family:'Bahnschrift, "Arial Narrow", Arial, sans-serif'},
+ {id:'book-antiqua',label:'Book Antiqua',file:'BKANT.TTF',boldFile:'ANTQUAB.TTF',italicFile:'ANTQUAI.TTF',boldItalicFile:'ANTQUABI.TTF',family:'"Book Antiqua", Palatino, serif'},
+ {id:'calibri',label:'Calibri',file:'calibri.ttf',boldFile:'calibrib.ttf',italicFile:'calibrii.ttf',boldItalicFile:'calibriz.ttf',family:'Calibri, "Segoe UI", Arial, sans-serif'},
+ {id:'cambria',label:'Cambria',file:'cambria.ttf',boldFile:'cambriab.ttf',italicFile:'cambriai.ttf',boldItalicFile:'cambriaz.ttf',family:'Cambria, Georgia, serif'},
+ {id:'candara',label:'Candara',file:'candara.ttf',boldFile:'candarab.ttf',italicFile:'candarai.ttf',boldItalicFile:'candaraz.ttf',family:'Candara, Calibri, Arial, sans-serif'},
+ {id:'century-gothic',label:'Century Gothic',file:'gothic.ttf',boldFile:'gothicb.ttf',italicFile:'gothici.ttf',boldItalicFile:'gothicbi.ttf',family:'"Century Gothic", Arial, sans-serif'},
+ {id:'comic-sans',label:'Comic Sans MS',file:'comic.ttf',boldFile:'comicbd.ttf',italicFile:'comic.ttf',boldItalicFile:'comicbd.ttf',family:'"Comic Sans MS", cursive, sans-serif'},
+ {id:'consolas',label:'Consolas',file:'consola.ttf',boldFile:'consolab.ttf',italicFile:'consolai.ttf',boldItalicFile:'consolaz.ttf',family:'Consolas, "Courier New", monospace'},
+ {id:'courier-new',label:'Courier New',file:'cour.ttf',boldFile:'courbd.ttf',italicFile:'couri.ttf',boldItalicFile:'courbi.ttf',family:'"Courier New", Courier, monospace'},
+ {id:'franklin-gothic',label:'Franklin Gothic Medium',file:'framd.ttf',boldFile:'framd.ttf',italicFile:'framd.ttf',boldItalicFile:'framd.ttf',family:'"Franklin Gothic Medium", Arial, sans-serif'},
+ {id:'garamond',label:'Garamond',file:'gara.ttf',boldFile:'garabd.ttf',italicFile:'garait.ttf',boldItalicFile:'garabi.ttf',family:'Garamond, Georgia, serif'},
+ {id:'georgia',label:'Georgia',file:'georgia.ttf',boldFile:'georgiab.ttf',italicFile:'georgiai.ttf',boldItalicFile:'georgiaz.ttf',family:'Georgia, "Times New Roman", serif'},
+ {id:'impact',label:'Impact',file:'impact.ttf',boldFile:'impact.ttf',italicFile:'impact.ttf',boldItalicFile:'impact.ttf',family:'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif'},
+ {id:'lucida-console',label:'Lucida Console',file:'lucon.ttf',boldFile:'lucon.ttf',italicFile:'lucon.ttf',boldItalicFile:'lucon.ttf',family:'"Lucida Console", Consolas, monospace'},
+ {id:'palatino',label:'Palatino Linotype',file:'pala.ttf',boldFile:'palab.ttf',italicFile:'palai.ttf',boldItalicFile:'palabi.ttf',family:'"Palatino Linotype", Palatino, serif'},
+ {id:'segoe-ui',label:'Segoe UI',file:'segoeui.ttf',boldFile:'segoeuib.ttf',italicFile:'segoeuii.ttf',boldItalicFile:'segoeuiz.ttf',family:'"Segoe UI", Arial, sans-serif'},
+ {id:'tahoma',label:'Tahoma',file:'tahoma.ttf',boldFile:'tahomabd.ttf',italicFile:'tahoma.ttf',boldItalicFile:'tahomabd.ttf',family:'Tahoma, Arial, sans-serif'},
+ {id:'times-new-roman',label:'Times New Roman',file:'times.ttf',boldFile:'timesbd.ttf',italicFile:'timesi.ttf',boldItalicFile:'timesbi.ttf',family:'"Times New Roman", Times, serif'},
+ {id:'trebuchet',label:'Trebuchet MS',file:'trebuc.ttf',boldFile:'trebucbd.ttf',italicFile:'trebucit.ttf',boldItalicFile:'trebucbi.ttf',family:'"Trebuchet MS", Arial, sans-serif'},
+ {id:'verdana',label:'Verdana',file:'verdana.ttf',boldFile:'verdanab.ttf',italicFile:'verdanai.ttf',boldItalicFile:'verdanaz.ttf',family:'Verdana, Geneva, sans-serif'},
+ {id:'shx-txt',label:'AutoCAD TXT (SHX)',file:'txt.shx',boldFile:'txt.shx',italicFile:'txt.shx',boldItalicFile:'txt.shx',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'shx-simplex',label:'AutoCAD Simplex (SHX)',file:'simplex.shx',boldFile:'simplex.shx',italicFile:'simplex.shx',boldItalicFile:'simplex.shx',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'shx-romans',label:'AutoCAD Romans (SHX)',file:'romans.shx',boldFile:'romans.shx',italicFile:'romans.shx',boldItalicFile:'romans.shx',family:'"Times New Roman", Georgia, serif'},
+ {id:'shx-romand',label:'AutoCAD RomanD (SHX)',file:'romand.shx',boldFile:'romand.shx',italicFile:'romand.shx',boldItalicFile:'romand.shx',family:'"Times New Roman", Georgia, serif'},
+ {id:'shx-iso',label:'AutoCAD ISO (SHX)',file:'iso.shx',boldFile:'iso.shx',italicFile:'iso.shx',boldItalicFile:'iso.shx',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'shx-isocp',label:'AutoCAD ISOCP (SHX)',file:'isocp.shx',boldFile:'isocp.shx',italicFile:'isocp.shx',boldItalicFile:'isocp.shx',family:'"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif'},
+ {id:'shx-gothic',label:'AutoCAD Gothic (SHX)',file:'gothice.shx',boldFile:'gothice.shx',italicFile:'gothice.shx',boldItalicFile:'gothice.shx',family:'Arial, Helvetica, sans-serif'},
+ {id:'shx-script',label:'AutoCAD Script (SHX)',file:'script.shx',boldFile:'script.shx',italicFile:'script.shx',boldItalicFile:'script.shx',family:'"Segoe Script", "Comic Sans MS", cursive'},
+ {id:'shx-complex',label:'AutoCAD Complex (SHX)',file:'complex.shx',boldFile:'complex.shx',italicFile:'complex.shx',boldItalicFile:'complex.shx',family:'"Times New Roman", Georgia, serif'},
+ {id:'shx-technic',label:'AutoCAD Technic (SHX)',file:'technic.shx',boldFile:'technic.shx',italicFile:'technic.shx',boldItalicFile:'technic.shx',family:'"Arial Narrow", Arial, sans-serif'}
+];
+function cadFontEntryForFile(file){
+ const base=String(file||'').replace(/\\/g,'/').split('/').pop().toLowerCase();
+ return CAD_TEXT_FONT_CATALOG.find(entry=>[entry.file,entry.boldFile,entry.italicFile,entry.boldItalicFile].some(name=>String(name||'').toLowerCase()===base))||null;
+}
+function cadFontVariantFile(entry,bold,italic){
+ if(bold&&italic)return entry.boldItalicFile||entry.boldFile||entry.file;
+ if(bold)return entry.boldFile||entry.file;
+ if(italic)return entry.italicFile||entry.file;
+ return entry.file;
+}
 function cadFontFamilyFromFile(file){
+ const entry=cadFontEntryForFile(file);if(entry)return entry.family;
  const base=String(file||'txt.shx').replace(/\\/g,'/').split('/').pop().toLowerCase();
- const name=base.replace(/\.(?:shx|ttf|otf)$/i,'');
- if(name.includes('impact'))return 'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif';
- if(/arialbd|bold/.test(name))return 'Arial, Helvetica, sans-serif';
- if(/romans|romand|times|serif/.test(name))return '"Times New Roman", Georgia, serif';
- if(/mono|courier/.test(name))return '"Courier New", monospace';
- if(/narrow|condensed|txt|simplex|iso/.test(name))return '"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif';
+ if(/impact/.test(base))return 'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif';
+ if(/arialn|narrow|condensed|txt|simplex|iso|technic/.test(base))return '"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif';
+ if(/arial|verdana|tahoma|segoe|gothic|framd/.test(base))return 'Arial, Helvetica, sans-serif';
+ if(/romans|romand|times|serif|complex/.test(base))return '"Times New Roman", Georgia, serif';
+ if(/mono|courier|consola|lucon/.test(base))return '"Courier New", monospace';
+ if(/script/.test(base))return '"Segoe Script", "Comic Sans MS", cursive';
  return 'Arial, Helvetica, sans-serif';
 }
 function wrapCadTextLines(value,maxWidth,measureText){
@@ -187,6 +232,39 @@ function wrapCadTextLines(value,maxWidth,measureText){
   if(line)out.push(line);
  }
  return out.length?out:[''];
+}
+function cadTextBoundsWorld(s){
+ if(!s||s.type!=='text'||!s.a||!ctx||typeof ctx.measureText!=='function')return [];
+ const height=Math.max(.001,Number(s.textHeightWorld||Number(s.textHeight||14)/Math.max(zoom,.001))),size=Math.max(.5,height*zoom);
+ const fontFile=String(s.textFontFile||'txt.shx'),fontFamily=s.textFontFamily||cadFontFamilyFromFile(fontFile);
+ const bold=Boolean(s.textFontBold)||/(?:bd|bold|bi)\.(?:ttf|otf)$/i.test(fontFile),italic=Boolean(s.textFontItalic)||/(?:italic|oblique|i|it|z|bi)\.(?:ttf|otf)$/i.test(fontFile);
+ ctx.save();ctx.font=(bold?'bold ':'')+(italic?'italic ':'')+size+'px '+fontFamily;
+ const value=String(s.text||'Texto'),mtext=Boolean(s.isMText)||Number(s.mtextWidthWorld||0)>0,widthFactor=Math.max(.05,Math.min(20,Number(s.textWidthFactor||s.textStyleWidthFactor)||1));
+ const lines=mtext&&Number(s.mtextWidthWorld)>0?wrapCadTextLines(value,Number(s.mtextWidthWorld)*zoom/widthFactor,t=>ctx.measureText(t).width):value.split('\n');
+ const widths=lines.map(line=>ctx.measureText(line).width),maxWidth=Math.max(1,...widths);
+ let renderWidthFactor=widthFactor;
+ const horizontal=Number(s.textHorizontalAlignment||0),vertical=Number(s.textVerticalAlignment||0);
+ if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=maxWidth*renderWidthFactor,target=Number(s.textFitWidthWorld)*zoom;if(natural>0)renderWidthFactor*=target/natural}
+ const lineHeight=size*1.2*(Number(s.mtextLineSpacingFactor)>0?Math.max(.5,Math.min(4,Number(s.mtextLineSpacingFactor))):1);
+ let xMin=0,xMax=maxWidth,yMin=0,yMax=lines.length*lineHeight;
+ if(mtext){
+  const boxWidth=Number(s.mtextWidthWorld)>0?Number(s.mtextWidthWorld)*zoom/widthFactor:maxWidth;
+  const attachment=Math.max(1,Math.min(9,Math.round(Number(s.mtextAttachment||1)))),column=(attachment-1)%3,row=Math.floor((attachment-1)/3);
+  xMin=column===0?0:column===1?-boxWidth/2:-boxWidth;xMax=xMin+boxWidth;
+  const totalHeight=Math.max(size,lines.length*lineHeight);yMin=row===0?0:row===1?-totalHeight/2:-totalHeight;yMax=yMin+totalHeight;
+ }else{
+  xMin=horizontal===1||horizontal===4?-maxWidth/2:horizontal===2?-maxWidth:0;xMax=xMin+maxWidth;
+  const baseTop=vertical===1?-size:vertical===2?-.5*size:vertical===3?0:-.8*size;
+  const baseBottom=vertical===1?0:vertical===2?.5*size:vertical===3?size:.2*size;
+  yMin=baseTop;yMax=(lines.length-1)*lineHeight+baseBottom;
+ }
+ const anchor=(!mtext&&(horizontal||vertical)&&horizontal!==3&&horizontal!==5&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
+ const anchorScreen=screen(anchor),theta=Number(s.textRotation||0)*Math.PI/180,c=Math.cos(theta),sn=Math.sin(theta),shear=Math.tan(Math.max(-80,Math.min(80,Number(s.textObliqueAngle||0)))*Math.PI/180),flipX=Number(s.textGenerationFlags||0)&2?-1:1,flipY=Number(s.textGenerationFlags||0)&4?-1:1;
+ const corners=[[xMin,yMin],[xMax,yMin],[xMax,yMax],[xMin,yMax]].map(([x,y])=>{
+  const lx=x*renderWidthFactor*flipX+shear*y,ly=y*flipY;
+  return world({x:anchorScreen.x+c*lx+sn*ly,y:anchorScreen.y-sn*lx+c*ly});
+ });
+ ctx.restore();return corners;
 }
 
 function drawEntity(s,sel=false,preview=false){
@@ -324,6 +402,7 @@ function selectAt(q){
   else if(s.type==='ellipse'){const rx=Math.abs(s.b.x-s.a.x),ry=Math.abs(s.b.y-s.a.y);if(rx&&ry){const normalized=Math.hypot((q.x-s.a.x)/rx,(q.y-s.a.y)/ry);d=Math.abs(normalized-1)*Math.min(rx,ry)}}
   else if(s.type==='arc'&&s.pts?.length>=3){const g=arcParams(s.pts);if(g){const p=screen(q),theta=Math.atan2(p.y-g.y,p.x-g.x),span=v=>(v+2*Math.PI)%(2*Math.PI),onArc=g.anticlockwise?span(g.a1-theta)<=span(g.a1-g.a3):span(theta-g.a1)<=span(g.a3-g.a1);d=onArc?Math.abs(Math.hypot(p.x-g.x,p.y-g.y)-g.r)/zoom:Math.min(distance(q,s.pts[0]),distance(q,s.pts[2]))}else for(let j=0;j<s.pts.length-1;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[j+1]))}
   else if(s.type==='circle')d=Math.abs(distance(q,s.a)-distance(s.a,s.b));
+  else if(s.type==='text'){const bounds=cadTextBoundsWorld(s);if(bounds.length===4){if(pointInPolygon(q,bounds))d=0;else for(let j=0;j<4;j++)d=Math.min(d,pointLineDistance(q,bounds[j],bounds[(j+1)%4]))}}
   else if(s.a&&s.b)d=pointLineDistance(q,s.a,s.b);else if(s.a)d=distance(q,s.a);
   if(d<best){best=d;found=i}
  }
@@ -386,21 +465,99 @@ function cancelGripDrag(){
  gripDrag=null;render();
 }
 
+function openTextEditor(index){
+ const targets=(Array.isArray(index)?index:[index]).filter(i=>objects[i]?.type==='text'),batchMode=targets.length>1,s=objects[targets[0]];if(!s){status.textContent='Selecciona primero uno o varios textos';return false}
+ const dlg=document.createElement('dialog');dlg.className='cad-utility-dialog cad-text-editor';
+ const fontOptions=CAD_TEXT_FONT_CATALOG.map(font=>'<option value="'+font.id+'">'+font.label+'</option>').join('');
+ dlg.innerHTML='<form method="dialog"><h3>Editor de texto CAD</h3><p>Modifica el contenido, la altura real del dibujo, la tipografía y la composición. Los cambios se guardan en el objeto seleccionado.</p>'+
+ '<label class="cad-text-content">Contenido<textarea id="cadTextValue" rows="4" spellcheck="false"></textarea></label>'+
+ '<div class="cad-text-grid"><label>Tipografía<select id="cadTextFont">'+fontOptions+'</select></label>'+
+ '<label>Altura ('+units+')<input id="cadTextHeight" type="number" min="0.001" step="any"></label>'+
+ '<label>Factor de ancho<input id="cadTextWidthFactor" type="number" min="0.05" max="20" step="0.05"></label>'+
+ '<label>Rotación (°)<input id="cadTextRotation" type="number" step="0.1"></label>'+
+ '<label>Inclinación (°)<input id="cadTextOblique" type="number" min="-80" max="80" step="0.5"></label>'+
+ '<label>Color<input id="cadTextColor" type="color"></label>'+
+ '<label>Alineación horizontal<select id="cadTextAlign"><option value="0">Izquierda</option><option value="1">Centro</option><option value="2">Derecha</option><option value="3">Alinear</option><option value="5">Ajustar</option></select></label>'+
+ '<label>Alineación vertical<select id="cadTextVertical"><option value="0">Línea base</option><option value="1">Inferior</option><option value="2">Centro</option><option value="3">Superior</option></select></label>'+
+ '<label>Ancho de MTEXT ('+units+')<input id="cadTextMTextWidth" type="number" min="0" step="any"></label>'+
+ '<label>Interlineado<input id="cadTextLineSpacing" type="number" min="0.5" max="4" step="0.05"></label>'+
+ '<label>Ancho para Alinear/Ajustar ('+units+')<input id="cadTextFitWidth" type="number" min="0" step="any"></label></div>'+
+ '<div class="cad-text-checks"><label><input id="cadTextBold" type="checkbox"> Negrita</label><label><input id="cadTextItalic" type="checkbox"> Cursiva</label><label><input id="cadTextIsMText" type="checkbox"> Texto multilínea (MTEXT)</label></div>'+
+ '<label>Posición del bloque MTEXT<select id="cadTextAttachment"><option value="1">Superior izquierda</option><option value="2">Superior centro</option><option value="3">Superior derecha</option><option value="4">Centro izquierda</option><option value="5">Centro</option><option value="6">Centro derecha</option><option value="7">Inferior izquierda</option><option value="8">Inferior centro</option><option value="9">Inferior derecha</option></select></label>'+
+ '<div class="cad-text-presets"><span>Alturas rápidas</span><button type="button" data-height-m="0.12">Pequeño</button><button type="button" data-height-m="0.18">Normal</button><button type="button" data-height-m="0.25">Mediano</button><button type="button" data-height-m="0.35">Título</button></div>'+
+ '<div class="cad-text-preview-label">VISTA PREVIA</div><div id="cadTextPreview" class="cad-text-preview"></div>'+
+ '<div class="cad-utility-error" id="cadTextError" role="alert"></div><div class="cad-utility-actions"><button type="button" id="cadTextCancel">Cancelar</button><button type="button" id="cadTextApply">Aplicar cambios</button></div></form>';
+ document.body.append(dlg);
+ const $d=id=>dlg.querySelector('#'+id),font=cadFontEntryForFile(s.textFontFile)||CAD_TEXT_FONT_CATALOG[0],value=String(s.text||'');
+ $d('cadTextValue').value=batchMode?'':value;$d('cadTextFont').value=font.id;if(batchMode){$d('cadTextValue').disabled=true;$d('cadTextValue').placeholder='Se conservará el contenido individual de los '+targets.length+' textos seleccionados.';}
+ $d('cadTextHeight').value=Number(s.textHeightWorld||Number(s.textHeight||14)/Math.max(zoom,.001));
+ $d('cadTextWidthFactor').value=Number(s.textWidthFactor||s.textStyleWidthFactor||1);
+ $d('cadTextRotation').value=Number(s.textRotation||0);$d('cadTextOblique').value=Number(s.textObliqueAngle||s.textStyleObliqueAngle||0);
+ $d('cadTextColor').value=/^#[0-9a-f]{6}$/i.test(s.color||'')?s.color:(colors[s.layer]||colors.General);
+ $d('cadTextAlign').value=String(Number(s.textHorizontalAlignment||0));$d('cadTextVertical').value=String(Number(s.textVerticalAlignment||0));
+ $d('cadTextMTextWidth').value=Number(s.mtextWidthWorld||0);$d('cadTextLineSpacing').value=Number(s.mtextLineSpacingFactor||1);
+ $d('cadTextFitWidth').value=Number(s.textFitWidthWorld||0);$d('cadTextBold').checked=Boolean(s.textFontBold)||/(?:bd|bold|bi)\.(?:ttf|otf)$/i.test(String(s.textFontFile||''));
+ $d('cadTextItalic').checked=Boolean(s.textFontItalic)||/(?:italic|oblique|i|it|z|bi)\.(?:ttf|otf)$/i.test(String(s.textFontFile||''));
+ $d('cadTextIsMText').checked=Boolean(s.isMText)||Number(s.mtextWidthWorld||0)>0||value.includes('\n');
+ $d('cadTextAttachment').value=String(Number(s.mtextAttachment||1));
+ const preview=$d('cadTextPreview'),previewUpdate=()=>{
+  const selectedFont=CAD_TEXT_FONT_CATALOG.find(item=>item.id===$d('cadTextFont').value)||CAD_TEXT_FONT_CATALOG[0];
+  preview.style.fontFamily=selectedFont.family;preview.style.fontWeight=$d('cadTextBold').checked?'700':'400';preview.style.fontStyle=$d('cadTextItalic').checked?'italic':'normal';
+  preview.style.fontSize=Math.max(12,Math.min(30,Number($d('cadTextHeight').value)*20||16))+'px';
+  preview.textContent=batchMode?'Vista previa del formato para '+targets.length+' textos':($d('cadTextValue').value||'Vista previa del texto');
+ };
+ ['cadTextFont','cadTextBold','cadTextItalic','cadTextHeight','cadTextValue'].forEach(id=>$d(id).addEventListener('input',previewUpdate));
+ dlg.querySelectorAll('[data-height-m]').forEach(button=>button.onclick=()=>{$d('cadTextHeight').value=(Number(button.dataset.heightM)*(units==='mm'?1000:units==='cm'?100:1)).toFixed(3);previewUpdate()});
+ $d('cadTextCancel').onclick=()=>dlg.close();
+ $d('cadTextApply').onclick=()=>{
+  const newText=$d('cadTextValue').value,height=Number($d('cadTextHeight').value),widthFactor=Number($d('cadTextWidthFactor').value),rotation=Number($d('cadTextRotation').value),oblique=Number($d('cadTextOblique').value),mtextWidth=Number($d('cadTextMTextWidth').value),lineSpacing=Number($d('cadTextLineSpacing').value),fitWidth=Number($d('cadTextFitWidth').value),error=$d('cadTextError');
+  if(!batchMode&&!newText.trim()){error.textContent='El contenido no puede quedar vacío.';return}
+  if(!Number.isFinite(height)||height<=0||!Number.isFinite(widthFactor)||widthFactor<.05||widthFactor>20||!Number.isFinite(rotation)||!Number.isFinite(oblique)||oblique< -80||oblique>80||!Number.isFinite(mtextWidth)||mtextWidth<0||!Number.isFinite(lineSpacing)||lineSpacing<.5||lineSpacing>4||!Number.isFinite(fitWidth)||fitWidth<0){error.textContent='Revisa altura, ancho, rotación, inclinación e interlineado.';return}
+  const selectedFont=CAD_TEXT_FONT_CATALOG.find(item=>item.id===$d('cadTextFont').value)||CAD_TEXT_FONT_CATALOG[0],bold=$d('cadTextBold').checked,italic=$d('cadTextItalic').checked,fontFile=cadFontVariantFile(selectedFont,bold,italic),isMText=$d('cadTextIsMText').checked||newText.includes('\n'),horizontal=Number($d('cadTextAlign').value),vertical=Number($d('cadTextVertical').value);
+  checkpoint();
+  for(const targetIndex of targets){
+   const target=objects[targetIndex];if(!target||target.type!=='text')continue;
+   if(!batchMode)target.text=newText;
+   target.textHeightWorld=height;delete target.textHeight;target.textWidthFactor=widthFactor;
+   if(!batchMode)target.textRotation=rotation;
+   target.textObliqueAngle=oblique;target.textFontFile=fontFile;target.textFontFamily=selectedFont.family;target.textFontBold=bold;target.textFontItalic=italic;
+   target.textStyleFixedHeight=0;target.textStyleWidthFactor=widthFactor;target.textStyleObliqueAngle=oblique;
+   target.textStyleName='OTROCAD_'+selectedFont.id.replace(/[^a-z0-9]+/gi,'_').toUpperCase()+(bold?'_B':'')+(italic?'_I':'');target.color=$d('cadTextColor').value;
+   if(!batchMode){
+    delete target.mtextRaw;delete target.mtextPlain;
+    if(isMText){target.isMText=true;target.mtextWidthWorld=mtextWidth;target.mtextAttachment=Number($d('cadTextAttachment').value);target.mtextLineSpacingFactor=lineSpacing;target.mtextPlain=newText;delete target.textAlignmentPoint;delete target.textFitWidthWorld}
+    else{delete target.isMText;delete target.mtextWidthWorld;delete target.mtextAttachment;delete target.mtextLineSpacingFactor;target.textHorizontalAlignment=horizontal;target.textVerticalAlignment=vertical;if((horizontal===3||horizontal===5)&&fitWidth>0){target.textFitWidthWorld=fitWidth;const angle=rotation*Math.PI/180;target.textAlignmentPoint={x:target.a.x+fitWidth*Math.cos(angle),y:target.a.y+fitWidth*Math.sin(angle)}}else{delete target.textFitWidthWorld;delete target.textAlignmentPoint}}
+   }
+  }
+  save();render();showProperties();status.textContent=(batchMode?'Formato aplicado a '+targets.length+' textos':'Texto actualizado')+' · '+selectedFont.label+' · altura '+height+' '+units;dlg.close();
+ };
+ dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();previewUpdate();$d('cadTextValue').focus();return true;
+}
+function editSelectedText(){
+ const ids=selectedItems().filter(i=>objects[i]?.type==='text');
+ if(!ids.length){status.textContent='Selecciona un texto o haz doble clic sobre él';return false}
+ return openTextEditor(ids.length===1?ids[0]:ids);
+}
 function showProperties(){
  const box=$('#properties'),content=$('#propContent'),ids=selectedItems();
- if(ids.length>1){box.classList.add('open');content.textContent=ids.length+' objetos seleccionados. Puedes moverlos, copiarlos o eliminarlos como conjunto.';return}
+ if(ids.length>1){box.classList.add('open');content.innerHTML=ids.length+' objetos seleccionados. Puedes moverlos, copiarlos o eliminarlos como conjunto.';const textIds=ids.filter(i=>objects[i]?.type==='text');if(textIds.length){const edit=document.createElement('button');edit.type='button';edit.textContent='Editar formato de '+textIds.length+' textos…';edit.style.width='100%';edit.style.marginTop='10px';edit.onclick=()=>openTextEditor(textIds);content.append(edit)}return}
  if(selected<0){content.textContent='Selecciona una entidad para editar sus propiedades.';return}
  const s=objects[selected];box.classList.add('open');content.innerHTML='';
  const addLabel=(txt,node)=>{const l=document.createElement('label');l.textContent=txt;content.append(l,node)};
  const color=document.createElement('input');color.type='color';color.value=/^#[0-9a-f]{6}$/i.test(s.color||'')?s.color:(colors[s.layer]||colors.General);addLabel('Color de línea',color);
  const weight=document.createElement('select');['0.13','0.18','0.25','0.35','0.50','0.70','1.00'].forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v+' mm';weight.append(o)});weight.value=String(s.lineweight||.25);addLabel('Grosor de línea',weight);
  const type=document.createElement('select');[['CONTINUOUS','Continua'],['DASHED','Discontinua']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;type.append(o)});type.value=s.linetype||'CONTINUOUS';addLabel('Tipo de línea',type);
- let textInput=null,heightInput=null;
- if(s.type==='text'){textInput=document.createElement('input');textInput.type='text';textInput.value=s.text||'';addLabel('Contenido',textInput);heightInput=document.createElement('input');heightInput.type='number';heightInput.min='0.001';heightInput.step='0.01';heightInput.value=Number(s.textHeightWorld||Number(s.textHeight||14)/zoom).toFixed(3);addLabel('Altura ('+units+')',heightInput)}
+ let heightInput=null;
+ if(s.type==='text'){
+  const edit=document.createElement('button');edit.type='button';edit.textContent='Editar contenido y tipografía…';edit.style.width='100%';edit.style.margin='8px 0';edit.onclick=()=>openTextEditor(selected);content.append(edit);
+  heightInput=document.createElement('input');heightInput.type='number';heightInput.min='0.001';heightInput.step='any';heightInput.value=Number(s.textHeightWorld||Number(s.textHeight||14)/Math.max(zoom,.001));addLabel('Altura del texto ('+units+')',heightInput);
+  const info=document.createElement('small');info.textContent='Fuente: '+String(s.textFontFile||'txt.shx')+' · doble clic sobre el texto para editarlo';content.append(info);
+ }
  const coordInputs=[];
  if(s.a&&s.b){[['X inicial',s.a.x],['Y inicial',s.a.y],['X final',s.b.x],['Y final',s.b.y]].forEach(([k,v])=>{const inp=document.createElement('input');inp.type='number';inp.step='0.001';inp.value=Number(v).toFixed(3);addLabel(k,inp);coordInputs.push([k,inp])})}
- const apply=document.createElement('button');apply.textContent='Aplicar propiedades';apply.onclick=()=>{checkpoint();s.color=color.value;s.lineweight=Number(weight.value);s.linetype=type.value;if(textInput){s.text=textInput.value;const height=Number(heightInput.value);if(Number.isFinite(height)&&height>0){s.textHeightWorld=height;delete s.textHeight}}coordInputs.forEach(([k,inp])=>{const v=Number(inp.value);if(!Number.isFinite(v))return;if(k==='X inicial')s.a.x=v;if(k==='Y inicial')s.a.y=v;if(k==='X final')s.b.x=v;if(k==='Y final')s.b.y=v});save();render();status.textContent='Propiedades actualizadas'};content.append(apply);
+ const apply=document.createElement('button');apply.textContent='Aplicar propiedades';apply.onclick=()=>{checkpoint();s.color=color.value;s.lineweight=Number(weight.value);s.linetype=type.value;if(heightInput){const height=Number(heightInput.value);if(Number.isFinite(height)&&height>0){s.textHeightWorld=height;delete s.textHeight}}coordInputs.forEach(([k,inp])=>{const v=Number(inp.value);if(!Number.isFinite(v))return;if(k==='X inicial')s.a.x=v;if(k==='Y inicial')s.a.y=v;if(k==='X final')s.b.x=v;if(k==='Y final')s.b.y=v});save();render();showProperties();status.textContent='Propiedades actualizadas'};content.append(apply);
 }
+
 function selectionForUtility(){return selectedItems().filter(i=>objects[i]&&!hiddenLayers.has(objects[i].layer)&&!lockedLayers.has(objects[i].layer))}
 function showArrayDialog(){
  const ids=selectionForUtility();if(!ids.length){status.textContent='Matriz: selecciona primero uno o varios objetos';alert('Selecciona primero uno o varios objetos para crear la matriz.');return}
@@ -522,7 +679,7 @@ function handleTap(p){
  }
  if(tool==='text'){
   const value=prompt('Texto de la anotación','');if(value===null)return;if(!value.trim()){status.textContent='No se creó un texto vacío';return}
-  const unitFactor=units==='mm'?1000:units==='cm'?100:1;checkpoint();objects.push({type:'text',a:clone(q),text:value,textHeightWorld:.25*unitFactor,...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);render();status.textContent='Texto creado';return;
+  const unitFactor=units==='mm'?1000:units==='cm'?100:1;checkpoint();objects.push({type:'text',a:clone(q),text:value,textHeightWorld:.25*unitFactor,textStyleName:'OTROCAD_ARIAL',textFontFile:'arial.ttf',textFontFamily:'Arial, Helvetica, sans-serif',textWidthFactor:1,textStyleWidthFactor:1,textFontBold:false,textFontItalic:false,...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);render();status.textContent='Texto creado';return;
  }
  if(tool==='furniture'){
   if(!activeFurniture){status.textContent='Elige un símbolo en BLOQUES';return}
@@ -596,7 +753,7 @@ function handleTap(p){
     transformEntityGeometry(src,mirror,axisAligned);
    }else if(tool==='scale'){
     const factor=Math.hypot(dx,dy),scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});
-    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);if(src.hatchLoops)src.hatchLoops=src.hatchLoops.map(loop=>loop.map(scale));
+    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);if(src.hatchLoops)src.hatchLoops=src.hatchLoops.map(loop=>loop.map(scale));if(src.type==='text'){src.textHeightWorld=Number(src.textHeightWorld||.4)*factor;if(Number(src.mtextWidthWorld)>0)src.mtextWidthWorld*=factor;if(Number(src.textFitWidthWorld)>0)src.textFitWidthWorld*=factor;if(src.textAlignmentPoint)src.textAlignmentPoint=scale(src.textAlignmentPoint)}
    }
   }
   if(tool==='copy')applySelection(created);else applySelection(targets);
@@ -609,9 +766,9 @@ function handleTap(p){
 }
 function transformEntityGeometry(s,transform,axisAligned){
  if(s.type==='rect'&&!axisAligned&&s.a&&s.b){const a=s.a,b=s.b;s.pts=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}].map(transform);s.type='polygon';delete s.a;delete s.b;return}
- if(s.a)s.a=transform(s.a);if(s.b)s.b=transform(s.b);if(s.pts)s.pts=s.pts.map(transform);if(s.hatchLoops)s.hatchLoops=s.hatchLoops.map(loop=>loop.map(transform));
+ const oldAnchor=s.a?clone(s.a):null,oldRotation=Number(s.textRotation||0);if(s.a)s.a=transform(s.a);if(s.b)s.b=transform(s.b);if(s.pts)s.pts=s.pts.map(transform);if(s.hatchLoops)s.hatchLoops=s.hatchLoops.map(loop=>loop.map(transform));if(s.textAlignmentPoint)s.textAlignmentPoint=transform(s.textAlignmentPoint);if(s.type==='text'&&oldAnchor){const rad=oldRotation*Math.PI/180,baseEnd=transform({x:oldAnchor.x+Math.cos(rad),y:oldAnchor.y+Math.sin(rad)}),newAnchor=s.a||transform(oldAnchor);s.textRotation=Math.atan2(baseEnd.y-newAnchor.y,baseEnd.x-newAnchor.x)*180/Math.PI}
 }
-function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy});if(s.hatchLoops)s.hatchLoops.forEach(loop=>loop.forEach(p=>{p.x+=dx;p.y+=dy}))}
+function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.textAlignmentPoint){s.textAlignmentPoint.x+=dx;s.textAlignmentPoint.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy});if(s.hatchLoops)s.hatchLoops.forEach(loop=>loop.forEach(p=>{p.x+=dx;p.y+=dy}))}
 function entitySegments(s){
  const pts=[];
  if(s.type==='line'||s.type==='dim'||s.type==='dimaligned'||s.type==='leader'){if(s.a&&s.b)pts.push([s.a,s.b]);return pts}
@@ -640,7 +797,8 @@ function selectByWindow(rect,windowMode){
  for(let i=0;i<objects.length;i++){
   const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;
   const segs=entitySegments(s),pts=[];
-  if(segs.length){for(const [a,b] of segs)pts.push(a,b)}
+  if(s.type==='text')pts.push(...cadTextBoundsWorld(s));
+  else if(segs.length){for(const [a,b] of segs)pts.push(a,b)}
   else {if(s.a)pts.push(s.a);if(s.b)pts.push(s.b);if(s.pts)pts.push(...s.pts)}
   if(!pts.length)continue;
   const fully=pts.every(p=>inSelectionRect(p,rect));
@@ -648,6 +806,11 @@ function selectByWindow(rect,windowMode){
   const vertexHit=pts.some(p=>inSelectionRect(p,rect));
   const edgeHit=segs.some(([a,b])=>segmentHitsRect(a,b,rect));
   const center={x:(rect.left+rect.right)/2,y:(rect.bottom+rect.top)/2};
+  if(s.type==='text'){
+   const bounds=cadTextBoundsWorld(s),rectCorners=[{x:rect.left,y:rect.bottom},{x:rect.right,y:rect.bottom},{x:rect.right,y:rect.top},{x:rect.left,y:rect.top}],textEdgeHit=bounds.some((p,j)=>segmentHitsRect(p,bounds[(j+1)%bounds.length],rect)),rectCornerHit=rectCorners.some(p=>pointInPolygon(p,bounds));
+   if(vertexHit||textEdgeHit||rectCornerHit||pointInPolygon(center,bounds))hits.push(i);
+   continue;
+  }
   if(vertexHit||edgeHit||objectContainsPoint(s,center))hits.push(i);
  }
  return hits
@@ -880,6 +1043,7 @@ function pointerEnd(e){
  render();
 }
 canvas.addEventListener('pointerup',pointerEnd);canvas.addEventListener('pointercancel',pointerEnd);
+canvas.addEventListener('dblclick',e=>{const p=pointer(e),hit=selectAt(world(p));if(hit>=0&&objects[hit]?.type==='text'){e.preventDefault();applySelection([hit]);showProperties();openTextEditor(hit)}});
 canvas.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('contextmenu',e=>{
@@ -915,6 +1079,7 @@ document.addEventListener('keydown',e=>{
  if(e.key==='F9'){e.preventDefault();toggle('snapToggle');return}
  if(e.key==='F10'){e.preventDefault();toggle('polarToggle');return}
  if(e.key==='F3'){e.preventDefault();toggle('osnapToggle');return}
+ if(e.key==='F2'){e.preventDefault();editSelectedText();return}
  if(e.key==='Enter'){e.preventDefault();performEnterAction();return}
  if(e.key===' '&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();performEnterAction();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$(e.shiftKey?'#redo':'#undo').click();return}
@@ -953,6 +1118,8 @@ function runCommand(raw){
  if(c==='BG'||c==='BACKGROUND'||c==='CANVASCOLOR'){const name=(parts[1]||'').toLowerCase();if(CAD_THEMES[name])applyCanvasTheme(name);else status.textContent='BACKGROUND WHITE | BLACK | DARK | GRAPHITE | SLATE | BLUEGRAY';return}
  if(c==='HATCHPATTERN'){const p=parts[1];if(['ANSI31','CROSS','GRID','SOLID'].includes(p)){$('#hatchPattern').value=p;status.textContent='HATCHPATTERN '+p}else status.textContent='HATCHPATTERN ANSI31 | CROSS | GRID | SOLID';return}
  if(c==='PR'||c==='PROPERTIES'||c==='CTRL+1'){$('#properties').classList.toggle('open');showProperties();return}
+ if(['ED','TEXTEDIT','DDEDIT','EDITTEXT','STYLE','TEXTSTYLE'].includes(c)){editSelectedText();return}
+ if(c==='SELECTTEXT'||c==='QSELECTTEXT'){const ids=objects.map((o,i)=>o.type==='text'&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer)?i:-1).filter(i=>i>=0);applySelection(ids);showProperties();status.textContent=ids.length+' textos seleccionados · ejecuta ED para cambiar formato en conjunto';return}
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
  if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
@@ -966,7 +1133,7 @@ function runCommand(raw){
  if(c==='F'||c==='FILLET'){setTool('fillet');return}
  if(c==='DLI'||c==='DIMLINEAR'){setTool('dim');return}
  if(c==='DAL'||c==='DIMALIGNED'){setTool('dimaligned');return}
- const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
+ const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',T:'text',TEXT:'text',MTEXT:'text',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
@@ -976,6 +1143,7 @@ document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.data
 const furnitureList=Array.isArray(window.otroCadFurnitureCatalog)?window.otroCadFurnitureCatalog:[];
 for(const item of furnitureList){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('#blockChoice').append(option)}
 $('#insertFurniture').onclick=()=>{activeFurniture=furnitureList.find(item=>item.id===$('#blockChoice').value)||null;if(!activeFurniture){status.textContent='No se encontró el símbolo';return}setTool('furniture');status.textContent='Toca el punto de inserción · '+activeFurniture.name};
+$('#editTextBtn').onclick=editSelectedText;
 $('#arrayRect').onclick=showArrayDialog;
 $('#centerMark').onclick=()=>createCircleAnnotations('center');
 $('#centerLine').onclick=createCenterline;
@@ -1401,9 +1569,9 @@ function parseDxfEntities(source){
    const value=type==='MTEXT'?cleanMText(raw):raw;
    if(type==='MTEXT'&&/\\(?:[AaCcFfHhQqTtWw]|p|S)/.test(raw))note('MTEXT con formato visual aproximado');
    const styleName=str(r,7,'STANDARD')||'STANDARD',textStyle=textStyles.get(styleName.toUpperCase())||{name:styleName,fontFile:'txt.shx',bigFontFile:'',fixedHeight:0,widthFactor:1,obliqueAngle:0,generationFlags:0,lastHeight:0};
-   const entityHeight=get(r,40,0),height=entityHeight>1e-9?entityHeight:(textStyle.fixedHeight>1e-9?textStyle.fixedHeight:.4);
+   const entityHeight=get(r,40,0),height=entityHeight>1e-9?entityHeight:(textStyle.fixedHeight>1e-9?textStyle.fixedHeight:(textStyle.lastHeight>1e-9?textStyle.lastHeight:.4));
    const vx=get(r,11,1),vy=get(r,21,0),rotation=r.pairs.some(p=>p[0]===50)?get(r,50):(type==='MTEXT'?Math.atan2(vy,vx)*180/Math.PI:0);
-   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:height,textStyleName:styleName,textFontFile:textStyle.fontFile,textBigFontFile:textStyle.bigFontFile,textFontFamily:cadFontFamilyFromFile(textStyle.fontFile),textFontBold:/(?:bd|bold)/i.test(textStyle.fontFile),textFontItalic:/(?:italic|oblique)/i.test(textStyle.fontFile),textWidthFactor:type==='MTEXT'?textStyle.widthFactor:(get(r,41,textStyle.widthFactor)||textStyle.widthFactor),textObliqueAngle:type==='MTEXT'?textStyle.obliqueAngle:get(r,51,textStyle.obliqueAngle),textGenerationFlags:type==='MTEXT'?textStyle.generationFlags:get(r,71,textStyle.generationFlags),textStyleGenerationFlags:textStyle.generationFlags,textStyleFixedHeight:textStyle.fixedHeight,textStyleWidthFactor:textStyle.widthFactor,textStyleObliqueAngle:textStyle.obliqueAngle,...st};
+   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:height,textStyleName:styleName,textFontFile:textStyle.fontFile,textBigFontFile:textStyle.bigFontFile,textFontFamily:cadFontFamilyFromFile(textStyle.fontFile),textFontBold:/(?:bd|bold|bi)\.(?:ttf|otf)$/i.test(textStyle.fontFile),textFontItalic:/(?:italic|oblique|i|it|z|bi)\.(?:ttf|otf)$/i.test(textStyle.fontFile),textWidthFactor:type==='MTEXT'?textStyle.widthFactor:(get(r,41,textStyle.widthFactor)||textStyle.widthFactor),textObliqueAngle:type==='MTEXT'?textStyle.obliqueAngle:get(r,51,textStyle.obliqueAngle),textGenerationFlags:type==='MTEXT'?textStyle.generationFlags:get(r,71,textStyle.generationFlags),textStyleGenerationFlags:textStyle.generationFlags,textStyleFixedHeight:textStyle.fixedHeight,textStyleWidthFactor:textStyle.widthFactor,textStyleObliqueAngle:textStyle.obliqueAngle,...st};
    if(type!=='MTEXT'){
     item.textHorizontalAlignment=get(r,72,0);item.textVerticalAlignment=get(r,73,0);
     if(r.pairs.some(p=>p[0]===11)&&r.pairs.some(p=>p[0]===21)){item.textAlignmentPoint={x:get(r,11),y:get(r,21)};item.textFitWidthWorld=distance(item.a,item.textAlignmentPoint)}
@@ -1481,7 +1649,7 @@ function buildDxf(){
   const line=(p,q)=>add(0,'LINE',...common,100,'AcDbLine',10,p.x,20,p.y,30,0,11,q.x,21,q.y,31,0);
   const textEntity=(p,value,height,rotation=0,source={})=>{
     const valueText=String(value||'').replace(/\r/g,''),styleName=dxfTextStyleName(source),widthFactor=Number(source.textWidthFactor||1),oblique=Number(source.textObliqueAngle||0);
-    if(valueText.includes('\n')||Number(source.mtextWidthWorld)>0)add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,41,Number(source.mtextWidthWorld||0),44,Number(source.mtextLineSpacingFactor||1),71,Number(source.mtextAttachment||1),50,rotation,7,styleName,1,valueText.replace(/\n/g,'\\P'));
+    if(Boolean(source.isMText)||valueText.includes('\n')||Number(source.mtextWidthWorld)>0)add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,41,Number(source.mtextWidthWorld||0),44,Number(source.mtextLineSpacingFactor||1),71,Number(source.mtextAttachment||1),50,rotation,7,styleName,1,valueText.replace(/\n/g,'\\P'));
     else{add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,41,widthFactor,50,rotation,51,oblique,7,styleName,71,Number(source.textGenerationFlags||0),72,Number(source.textHorizontalAlignment||0),73,Number(source.textVerticalAlignment||0),1,valueText);if(source.textAlignmentPoint)add(11,source.textAlignmentPoint.x,21,source.textAlignmentPoint.y,31,0)}
    };
   if(['line','dim','dimaligned','leader'].includes(o.type)&&a&&b){line(a,b);if(o.type==='dim'||o.type==='dimaligned')textEntity({x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance(a,b).toFixed(2)+' '+units,12/zoom);if(o.type==='leader'&&o.text)textEntity(b,o.text,12/zoom)}
@@ -1537,7 +1705,7 @@ $('#pdf').onclick=()=>window.print();
 $('#propertiesBtn').onclick=()=>{$('#properties').classList.toggle('open');showProperties()};
 $('#zoomIn').onclick=()=>{zoom*=1.2;render()};$('#zoomOut').onclick=()=>{zoom/=1.2;render()};
 function boundsPoints(o){
- const pts=[];if(o.a)pts.push(o.a);if(o.b)pts.push(o.b);if(o.pts)pts.push(...o.pts);if(o.hatchLoops)for(const loop of o.hatchLoops)pts.push(...loop);
+ const pts=[];if(o.type==='text')pts.push(...cadTextBoundsWorld(o));if(o.a)pts.push(o.a);if(o.b)pts.push(o.b);if(o.pts)pts.push(...o.pts);if(o.hatchLoops)for(const loop of o.hatchLoops)pts.push(...loop);
  if(o.type==='circle'&&o.a&&o.b){const r=distance(o.a,o.b);pts.push({x:o.a.x-r,y:o.a.y-r},{x:o.a.x+r,y:o.a.y+r})}
  if(o.type==='ellipse'&&o.a&&o.b){const rx=Math.abs(o.b.x-o.a.x),ry=Math.abs(o.b.y-o.a.y);pts.push({x:o.a.x-rx,y:o.a.y-ry},{x:o.a.x+rx,y:o.a.y+ry})}
  if(o.type==='arc'&&o.pts?.length>=3){const g=arcParams(o.pts);if(g){const span=v=>(v+2*Math.PI)%(2*Math.PI);for(const t of [0,Math.PI/2,Math.PI,3*Math.PI/2]){const onArc=g.anticlockwise?span(g.a1-t)<=span(g.a1-g.a3):span(t-g.a1)<=span(g.a3-g.a1);if(onArc)pts.push(world({x:g.x+g.r*Math.cos(t),y:g.y+g.r*Math.sin(t)}))}}}

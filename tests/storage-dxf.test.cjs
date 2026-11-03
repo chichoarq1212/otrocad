@@ -38,7 +38,7 @@ assert.ok(demo.length > 100);
 for (const name of ['SALA','COMEDOR','COCINA','DORMITORIO 1','DORMITORIO 2','BAÑO']) assert.ok(demo.some(x=>x.type==='text' && x.text===name));
 for (const type of ['line','rect','arc','hatch','dim']) assert.ok(demo.some(x=>x.type===type));
 console.log('Demo checks passed: rooms and editable drawing entities');
-const textHelpers = source.slice(source.indexOf('function cadFontFamilyFromFile('), source.indexOf('\nfunction drawEntity('));
+const textHelpers = source.slice(source.indexOf('const CAD_TEXT_FONT_CATALOG='), source.indexOf('\nfunction drawEntity('));
 vm.runInContext(textHelpers,context);
 const parserCode = source.slice(source.indexOf('function parseDxfEntities(source){'), source.indexOf('\nasync function download('));
 vm.runInContext(parserCode,context);
@@ -64,17 +64,29 @@ const roundtrip=vm.runInContext('parseDxfEntities(roundtrip)',context);
 assert.equal(roundtrip[0].type,'arc');assert.equal(roundtrip[1].type,'ellipse');assert.equal(roundtrip.drawingUnits,'m');
 assert.ok(Math.abs(roundtrip[1].b.x-5)<1e-9);assert.ok(Math.abs(roundtrip[1].b.y-5)<1e-9);
 console.log('DXF round-trip checks passed: native arcs and aligned ellipses');
-const selectionScope = {objects:[],zoom:100,hiddenLayers:new Set(),lockedLayers:new Set(),screen:p=>({x:p.x*100,y:-p.y*100}),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
+const selectionScope = {objects:[],zoom:100,hiddenLayers:new Set(),lockedLayers:new Set(),screen:p=>({x:p.x*100,y:-p.y*100}),world:p=>({x:p.x/100,y:-p.y/100}),ctx:{save(){},restore(){},measureText:value=>({width:String(value).length*8})},pointInPolygon:(p,pts)=>{let inside=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];if(((a.y>p.y)!==(b.y>p.y))&&(p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y||1e-12)+a.x))inside=!inside}return inside},distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
 vm.createContext(selectionScope);
+vm.runInContext(source.slice(source.indexOf('const CAD_TEXT_FONT_CATALOG='),source.indexOf('\nfunction drawEntity(')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function arcParams('),source.indexOf('\nconst CAD_THEMES=')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function selectAt('),source.indexOf('function gripDescriptors(')),selectionScope);
+vm.runInContext(source.slice(source.indexOf('function entitySegments(s){'),source.indexOf('function lineIntersection(')),selectionScope);
+vm.runInContext(source.slice(source.indexOf('function inSelectionRect('),source.indexOf('function lineIntersection(')),selectionScope);
 selectionScope.objects=[{type:'arc',pts:[{x:1,y:0},{x:0,y:1},{x:-1,y:0}]}];
 assert.equal(vm.runInContext('selectAt({x:0,y:1})',selectionScope),0, 'Seleccionar un arco por su curva');
 assert.equal(vm.runInContext('selectAt({x:0,y:-1})',selectionScope),-1, 'No seleccionar el arco por la semicircunferencia opuesta');
 selectionScope.objects=[{type:'ellipse',a:{x:0,y:0},b:{x:2,y:1}}];
 assert.equal(vm.runInContext('selectAt({x:-2,y:0})',selectionScope),0, 'Seleccionar el lado negativo de la elipse');
 assert.equal(vm.runInContext('selectAt({x:0,y:0})',selectionScope),-1, 'No seleccionar toda el área interior');
-console.log('Selection checks passed: arcs and full ellipses');
+selectionScope.objects=[{type:'text',a:{x:1,y:2},text:'TEXTO EDITABLE',textHeightWorld:.25,textFontFile:'arial.ttf'}];
+const textBounds=vm.runInContext('cadTextBoundsWorld(objects[0])',selectionScope);
+assert.equal(textBounds.length,4,'El texto debe tener un área de selección visible');
+assert.equal(vm.runInContext('selectAt({x:1.5,y:2.08})',selectionScope),0,'Seleccionar texto por sus letras, no solo por su punto de inserción');
+assert.equal(vm.runInContext('selectAt({x:2.8,y:2})',selectionScope),-1,'No seleccionar fuera del texto');
+assert.deepEqual(Array.from(vm.runInContext('selectByWindow({left:1.2,right:1.8,bottom:1.98,top:2.18},false)',selectionScope)),[0],'La selección por cruce debe detectar texto dentro de la ventana');
+const fontCatalogCount=vm.runInContext('CAD_TEXT_FONT_CATALOG.length',selectionScope);
+assert.ok(fontCatalogCount>=30,'La biblioteca debe incluir tipografías de sistema y fuentes SHX CAD');
+assert.equal(vm.runInContext("cadFontFamilyFromFile('timesbd.ttf')",selectionScope),'"Times New Roman", Times, serif');
+console.log('Selection and text editor checks passed: glyph hit-testing, crossing window and native font catalog');
 selectionScope.world = p=>({x:p.x/100,y:-p.y/100});
 vm.runInContext(source.slice(source.indexOf('function boundsPoints(o){'),source.indexOf("\n$('#fit').onclick")),selectionScope);
 const circleBounds=selectionScope.boundsPoints({type:'circle',a:{x:0,y:0},b:{x:2,y:0}});
@@ -481,10 +493,11 @@ const textStyleFixture=[
  '0','MTEXT','8','Textos','7','TITULO','10','3','20','4','40','0.4','41','2.5','44','1.1','71','5','1','ALCANCE DEL PROYECTO',
  '0','MTEXT','8','Textos','7','TITULO','10','8','20','9','40','0.4','71','9','1','SIN ANCHO',
  '0','TEXT','8','Textos','7','ANOTACION','10','5','20','6','11','7','21','6','40','0.25','72','3','73','0','1','AJUSTADO',
+ '0','TEXT','8','Textos','7','ANOTACION','10','10','20','10','1','ALTURA HEREDADA',
  '0','ENDSEC','0','EOF'
 ].join('\n');
 const styledTexts=context.parseDxfEntities(textStyleFixture);
-assert.equal(styledTexts.length,4);
+assert.equal(styledTexts.length,5);
 assert.equal(styledTexts[0].textStyleName,'ANOTACION');
 assert.equal(styledTexts[0].textFontFile,'arial.ttf');
 assert.equal(styledTexts[0].textHeightWorld,.25,'Entity height must override style fixed height');
@@ -503,6 +516,7 @@ assert.equal(styledTexts[2].isMText,true,'An MTEXT with no reference width must 
 assert.equal(styledTexts[2].mtextWidthWorld,0);
 assert.equal(styledTexts[3].textHorizontalAlignment,3);
 assert.equal(styledTexts[3].textFitWidthWorld,2);
+assert.equal(styledTexts[4].textHeightWorld,.2,'STYLE group 42 last height should be used when TEXT group 40 is absent');
 const wrappedCadText=JSON.parse(JSON.stringify(vm.runInContext("wrapCadTextLines('ALCANCE DE ESTA PROPUESTA',100,value=>value.length*10)",context)));
 assert.deepEqual(wrappedCadText,['ALCANCE DE','ESTA','PROPUESTA'],'MTEXT must wrap to its stored reference width');
 context.objects=styledTexts;accept=true;
@@ -513,7 +527,7 @@ assert.match(styledDxf,/ANOTACION/);
 assert.match(styledDxf,/ALCANCE DEL PROYECTO/);
 context.styledDxf=styledDxf;
 const styledRoundtrip=vm.runInContext('parseDxfEntities(styledDxf)',context);
-assert.equal(styledRoundtrip.length,4);
+assert.equal(styledRoundtrip.length,5);
 assert.equal(styledRoundtrip[0].textFontFile,'arial.ttf');
 assert.equal(styledRoundtrip[0].textWidthFactor,1.2);
 assert.equal(styledRoundtrip[1].mtextWidthWorld,2.5);
@@ -521,4 +535,18 @@ assert.equal(styledRoundtrip[1].mtextAttachment,5);
 assert.equal(styledRoundtrip[2].isMText,true);
 assert.equal(styledRoundtrip[3].textHorizontalAlignment,3);
 assert.equal(styledRoundtrip[3].textAlignmentPoint.x,7);
+assert.equal(styledRoundtrip[4].textHeightWorld,.2);
 console.log('CAD text fidelity checks passed: STYLE table, font fallback, height, width factor, oblique, MTEXT wrapping and DXF round-trip');
+
+
+// Edited single-line MTEXT must remain MTEXT and preserve the selected native font.
+context.objects=[{type:'text',a:{x:0,y:0},text:'MTEXT EDITADO',isMText:true,mtextWidthWorld:0,mtextAttachment:1,mtextLineSpacingFactor:1,textHeightWorld:.18,textStyleName:'OTROCAD_ARIAL_B',textFontFile:'arialbd.ttf',textFontFamily:'Arial, Helvetica, sans-serif',textFontBold:true,textWidthFactor:1,textStyleWidthFactor:1,textStyleFixedHeight:0,textStyleObliqueAngle:0,layer:'Textos',color:'#ffffff'}];
+downloaded=null;accept=true;handlers.get('#dxf').onclick();
+assert.match(downloaded.content,/\r\nMTEXT\r\n/,'Single-line MTEXT should not be downgraded to TEXT');
+assert.match(downloaded.content,/arialbd\.ttf/);
+context.editedMtextDxf=downloaded.content;
+const editedMtextRoundtrip=vm.runInContext('parseDxfEntities(editedMtextDxf)',context);
+assert.equal(editedMtextRoundtrip[0].isMText,true);
+assert.equal(editedMtextRoundtrip[0].textFontFile,'arialbd.ttf');
+assert.equal(editedMtextRoundtrip[0].text,'MTEXT EDITADO');
+console.log('Edited MTEXT export checks passed: MTEXT identity and selected font survive DXF round-trip');
