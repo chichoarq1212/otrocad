@@ -718,6 +718,23 @@ const inactiveViewport=vm.runInContext("effectivePaperViewports({name:'P-01',sou
 assert.equal(inactiveViewport[0].offViewportRecovered,true,'La vista inactiva se informa y se recupera solo para previsualización');
 console.log('Incomplete VIEWPORT recovery checks passed: zero-size, no viewport and inactive viewport');
 
+const damagedDxfViewport=[
+ '0','SECTION','2','OBJECTS','0','LAYOUT','100','AcDbLayout','1','P-01','71','1','0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','LINE','410','Model','10','0','20','0','11','18','21','12',
+ '0','VIEWPORT','410','P-01','67','1','69','2','68','0','10','0','20','0','40','0','41','0',
+ '0','TEXT','410','P-01','67','1','10','435','20','280','40','4','1','PROGRAMA PROPUESTO',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const parsedIncompleteViewport=context.parseDxfEntities(damagedDxfViewport);
+assert.equal(parsedIncompleteViewport.layoutViewports.length,1,'Importar viewport de papel incluso si ancho, alto y estado son cero');
+assert.equal(parsedIncompleteViewport.layoutViewports[0].width,0);
+assert.equal(parsedIncompleteViewport.layoutViewports[0].height,0);
+assert.equal(parsedIncompleteViewport.layoutViewports[0].status,0);
+assert.equal(parsedIncompleteViewport.layoutViewports[0].layout,'P-01');
+console.log('Viewport import preservation passed: zero-width and disabled paper viewports remain available for visual recovery');
+
+
 
 
 // Regression: localStorage quota must not prevent NEW when IndexedDB can retain the old drawing.
