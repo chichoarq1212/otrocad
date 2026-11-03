@@ -718,6 +718,17 @@ const inactiveViewport=vm.runInContext("effectivePaperViewports({name:'P-01',sou
 assert.equal(inactiveViewport[0].offViewportRecovered,true,'La vista inactiva se informa y se recupera solo para previsualización');
 console.log('Incomplete VIEWPORT recovery checks passed: zero-size, no viewport and inactive viewport');
 
+const manuallyPlaced=vm.runInContext("effectivePaperViewports({name:'P-03',source:'imported',paperWidth:594,paperHeight:420,viewportFit:'manual',manualView:{center:{x:12.25,y:34.5},viewHeight:16.4}})",paperPreviewScope);
+assert.equal(manuallyPlaced.length,1,'La vista elegida desde Modelo reemplaza solo la representación provisional del Layout');
+assert.equal(manuallyPlaced[0].manual,true);
+assert.equal(manuallyPlaced[0].viewCenter.x,12.25);
+assert.equal(manuallyPlaced[0].viewCenter.y,34.5);
+assert.equal(manuallyPlaced[0].viewHeight,16.4);
+assert.equal(manuallyPlaced[0].paperRegionEstimated,true,'El encuadre de la hoja sigue indicado como estimado');
+assert.equal(paperPreviewScope.layoutViewportRecords[0].viewHeight,18,'Los datos importados no se alteran al personalizar una hoja');
+console.log('Manual Layout view checks passed: independent model framing, non-destructive and exact selected view height');
+
+
 const damagedDxfViewport=[
  '0','SECTION','2','OBJECTS','0','LAYOUT','100','AcDbLayout','1','P-01','71','1','0','ENDSEC',
  '0','SECTION','2','ENTITIES',
