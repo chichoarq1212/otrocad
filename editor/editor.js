@@ -73,15 +73,19 @@ async function protectDrawingBeforeReplacement(){
  const snapshot=cadRecoverySnapshot();
  let text;
  try{text=JSON.stringify(snapshot)}catch(error){alert('No se pudo preparar la copia del dibujo actual. No se cambió nada.');return false}
+ let backedUpLocally=false;
  try{
   localStorage.setItem('otrocad-drawing-previous',text);
-  return true;
+  backedUpLocally=true;
  }catch(error){console.warn('Respaldo en localStorage no disponible; probando IndexedDB:',error)}
+ // Keep a separate durable recovery point so a subsequent Undo checkpoint
+ // on the new drawing cannot overwrite the prior imported project.
  try{
   await cadRecoveryWrite('previous',snapshot);
   status.textContent='Dibujo anterior protegido en almacenamiento ampliado del navegador';
   return true;
- }catch(error){console.warn('Tampoco se pudo guardar la copia en IndexedDB:',error)}
+ }catch(error){console.warn('No se pudo guardar una segunda copia en IndexedDB:',error)}
+ if(backedUpLocally)return true;
  // A download plus explicit acknowledgement is the last resort; never silently discard a plan.
  try{
   await download('otrocad-respaldo-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json',text,'application/json');
