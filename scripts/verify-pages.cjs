@@ -42,3 +42,10 @@ if(!iOSManifest.icons.some(x=>x.src==='icon-192.png')||!iOSManifest.icons.some(x
 const cadJS=fs.readFileSync(path.join(root,'editor/editor.js'),'utf8');
 if(!cadJS.includes('findGripAt(p,e.pointerType')||!cadJS.includes('snapPoint(world(p),gripDrag.index)'))throw Error('iOS touch grip improvements missing');
 console.log('iOS Apple touch icon, home screen install and CAD grip support verified');
+const homeHTML=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const iOSPageHTML=fs.readFileSync(path.join(root,'ios/index.html'),'utf8');
+const guideCTA=homeHTML.match(/<a[^>]*id="iosGuideButton"[^>]*href="\.\/ios\/#instalar"[^>]*>([\s\S]*?)<\/a>/);
+if(!guideCTA||!guideCTA[1].includes('Da clic aquí')||!guideCTA[1].includes('Guía para iOS'))throw Error('Botón visible de guía iOS no disponible en el inicio');
+if(!iOSPageHTML.includes('id="instalar"'))throw Error('El botón iOS apunta a una sección de instalación inexistente');
+console.log('Visible iOS landing CTA opens the correct installation instructions');
+
