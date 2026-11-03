@@ -912,7 +912,36 @@ function parseDxfEntities(source){
  const get=(r,c,d=0)=>{const p=r.pairs.find(x=>x[0]===c);if(!p)return d;const n=Number(p[1]);return Number.isFinite(n)?n:d};
  const all=(r,c)=>r.pairs.filter(x=>x[0]===c).map(x=>Number(x[1]));
  const str=(r,c,d='')=>r.pairs.find(x=>x[0]===c)?.[1]??d;
- const style=r=>{const layer=str(r,8,'General'),aci=get(r,62,7),trueColor=get(r,420,-1),aciColors={1:'#ff3333',2:'#ffff33',3:'#33cc33',4:'#33ffff',5:'#3366ff',6:'#ff33ff',7:'#dce8f5',8:'#808080',9:'#b0b0b0'};return {layer,color:trueColor>=0?'#'+trueColor.toString(16).padStart(6,'0'):aciColors[aci]||colors[layer]||colors.General,lineweight:get(r,370,25)/100,linetype:str(r,6,'CONTINUOUS')==='DASHED'?'DASHED':'CONTINUOUS'}};
+ // AutoCAD's ACI palette: 10–249 are 24 hues × 10 brightness/saturation steps;
+ // 250–255 are true grayscale. 7 adapts to light/dark drawing backgrounds.
+ const aciColor=index=>{
+  if(index===7)return '#dce8f5';
+  const basic={1:'#ff0000',2:'#ffff00',3:'#00ff00',4:'#00ffff',5:'#0000ff',6:'#ff00ff',8:'#808080',9:'#c0c0c0',250:'#000000',251:'#656565',252:'#666666',253:'#999999',254:'#cccccc',255:'#ffffff'};
+  if(basic[index])return basic[index];
+  if(index<10||index>249)return null;
+  const group=Math.floor((index-10)/10),shade=(index-10)%10,v=[255,255,165,165,127,127,76,76,38,38][shade],sat=shade%2?.5:1;
+  const h=group*15/60,c=v*sat,x=c*(1-Math.abs(h%2-1)),m=v-c;
+  const rgb=h<1?[c,x,0]:h<2?[x,c,0]:h<3?[0,c,x]:h<4?[0,x,c]:h<5?[x,0,c]:[c,0,x];
+  return '#'+rgb.map(v=>Math.floor(v+m+1e-8).toString(16).padStart(2,'0')).join('');
+ };
+ const layerStyles=new Map();let inTables=false,inLayerTable=false;
+ for(const record of records){
+  if(record.type==='SECTION'){inTables=str(record,2).toUpperCase()==='TABLES';inLayerTable=false;continue}
+  if(record.type==='ENDSEC'){inTables=false;inLayerTable=false;continue}
+  if(!inTables)continue;
+  if(record.type==='TABLE'){inLayerTable=str(record,2).toUpperCase()==='LAYER';continue}
+  if(record.type==='ENDTAB'){inLayerTable=false;continue}
+  if(inLayerTable&&record.type==='LAYER'){
+   const aci=Math.abs(get(record,62,7)),rgb=get(record,420,-1),name=str(record,2,'0');
+   layerStyles.set(name,{color:rgb>=0?'#'+(rgb&0xffffff).toString(16).padStart(6,'0'):aciColor(aci),linetype:str(record,6,'CONTINUOUS'),lineweight:get(record,370,25)});
+  }
+ }
+ const style=r=>{
+  const layer=str(r,8,'0'),ly=layerStyles.get(layer)||{},aci=get(r,62,256),trueColor=get(r,420,-1),lineweight=get(r,370,-1),linetype=str(r,6,'BYLAYER');
+  const byBlock=aci===0;
+  const color=trueColor>=0?'#'+(trueColor&0xffffff).toString(16).padStart(6,'0'):(aci>=1&&aci<=255?aciColor(aci):ly.color)||colors[layer]||colors.General;
+  return {layer,color,cadByBlock:byBlock,lineweight:(lineweight>=0?lineweight:(ly.lineweight>=0?ly.lineweight:25))/100,linetype:linetype==='BYLAYER'?(ly.linetype||'CONTINUOUS'):linetype};
+ };
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
  const out=[],warnings={},notes={},diagnostics={};let inEntities=false,activeAttributeGroup=null;
@@ -1095,7 +1124,7 @@ function parseDxfEntities(source){
  };
  const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId,insertStyle)=>{
   const item={...sourceItem,groupId},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
-  if(sourceItem.layer==='0'&&insertStyle){item.layer=insertStyle.layer;item.color=insertStyle.color}
+  if(insertStyle&&(sourceItem.layer==='0'||sourceItem.cadByBlock)){if(sourceItem.layer==='0')item.layer=insertStyle.layer;if(sourceItem.layer==='0'||sourceItem.cadByBlock)item.color=insertStyle.color;item.cadByBlock=false}
   let points=null;
   if(sourceItem.type==='circle'&&nonUniform&&sourceItem.a&&sourceItem.b){
    const center=sourceItem.a,r=distance(center,sourceItem.b);points=Array.from({length:49},(_,i)=>{const t=i/48*Math.PI*2;return transformPoint({x:center.x+r*Math.cos(t),y:center.y+r*Math.sin(t)})});
