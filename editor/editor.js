@@ -5,10 +5,10 @@ let lastCommand='',cursorCommandEl=null,contextMenuEl=null,activeFurniture=null;
 function newGroupId(){return 'bloque-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}
 let rightClickMode='context',rightClickDuringCommand='enter';
 try{const prefs=JSON.parse(localStorage.getItem('otrocad-mouse-preferences')||'{}');if(['context','repeat'].includes(prefs.mode))rightClickMode=prefs.mode;if(['enter','context'].includes(prefs.active))rightClickDuringCommand=prefs.active}catch(e){}
-let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,osEnd=true,osMid=true,osCenter=true,osQuadrant=false,osIntersection=false,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,offsetDistancePreset=false,printing=false,units='m',gridStep=1,polarStep=15,snapRadius=12,hiddenLayers=new Set(),lockedLayers=new Set();
+let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,osEnd=true,osMid=true,osCenter=true,osQuadrant=false,osIntersection=false,osNearest=false,osParallel=false,osPerpendicular=false,parallelDirection=null,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,offsetDistancePreset=false,printing=false,units='m',gridStep=1,polarStep=15,snapRadius=12,hiddenLayers=new Set(),lockedLayers=new Set();
 try{const savedUnits=localStorage.getItem('otrocad-units');if(['m','cm','mm'].includes(savedUnits))units=savedUnits}catch(e){}
-try{const p=JSON.parse(localStorage.getItem('otrocad-drafting')||'{}');if(typeof p.gridOn==='boolean')gridOn=p.gridOn;if(typeof p.orthoOn==='boolean')orthoOn=p.orthoOn;if(typeof p.snapOn==='boolean')snapOn=p.snapOn;if(typeof p.osnapOn==='boolean')osnapOn=p.osnapOn;if(typeof p.osEnd==='boolean')osEnd=p.osEnd;if(typeof p.osMid==='boolean')osMid=p.osMid;if(typeof p.osCenter==='boolean')osCenter=p.osCenter;if(typeof p.osQuadrant==='boolean')osQuadrant=p.osQuadrant;if(typeof p.osIntersection==='boolean')osIntersection=p.osIntersection;if(typeof p.polarOn==='boolean')polarOn=p.polarOn;if(typeof p.crossOn==='boolean')crossOn=p.crossOn;if(Number.isFinite(p.gridStep)&&p.gridStep>0)gridStep=p.gridStep;if(Number.isFinite(p.polarStep)&&p.polarStep>=1&&p.polarStep<=90)polarStep=p.polarStep;if(Number.isFinite(p.snapRadius)&&p.snapRadius>=2&&p.snapRadius<=40)snapRadius=p.snapRadius}catch(e){}
-function saveDraftPreferences(){try{localStorage.setItem('otrocad-drafting',JSON.stringify({gridOn,orthoOn,snapOn,osnapOn,osEnd,osMid,osCenter,osQuadrant,osIntersection,polarOn,crossOn,gridStep,polarStep,snapRadius}))}catch(e){}}
+try{const p=JSON.parse(localStorage.getItem('otrocad-drafting')||'{}');if(typeof p.gridOn==='boolean')gridOn=p.gridOn;if(typeof p.orthoOn==='boolean')orthoOn=p.orthoOn;if(typeof p.snapOn==='boolean')snapOn=p.snapOn;if(typeof p.osnapOn==='boolean')osnapOn=p.osnapOn;if(typeof p.osEnd==='boolean')osEnd=p.osEnd;if(typeof p.osMid==='boolean')osMid=p.osMid;if(typeof p.osCenter==='boolean')osCenter=p.osCenter;if(typeof p.osQuadrant==='boolean')osQuadrant=p.osQuadrant;if(typeof p.osIntersection==='boolean')osIntersection=p.osIntersection;if(typeof p.osNearest==='boolean')osNearest=p.osNearest;if(typeof p.osParallel==='boolean')osParallel=p.osParallel;if(typeof p.osPerpendicular==='boolean')osPerpendicular=p.osPerpendicular;if(typeof p.polarOn==='boolean')polarOn=p.polarOn;if(typeof p.crossOn==='boolean')crossOn=p.crossOn;if(Number.isFinite(p.gridStep)&&p.gridStep>0)gridStep=p.gridStep;if(Number.isFinite(p.polarStep)&&p.polarStep>=1&&p.polarStep<=90)polarStep=p.polarStep;if(Number.isFinite(p.snapRadius)&&p.snapRadius>=2&&p.snapRadius<=40)snapRadius=p.snapRadius}catch(e){}
+function saveDraftPreferences(){try{localStorage.setItem('otrocad-drafting',JSON.stringify({gridOn,orthoOn,snapOn,osnapOn,osEnd,osMid,osCenter,osQuadrant,osIntersection,osNearest,osParallel,osPerpendicular,polarOn,crossOn,gridStep,polarStep,snapRadius}))}catch(e){}}
 const colors={General:'#dce8f5',Muros:'#56b7e8',Cotas:'#f3c83e',Detalles:'#c69cff',Topografía:'#70d6a3',Vialidad:'#ff9b6b'};
 function resolveCadColor(s,lightBackground=false){
  const base=String((!lightBackground&&s.colorDark)||s.color||colors[s.layer]||colors.General).toLowerCase();
@@ -66,6 +66,16 @@ function snapCandidate(p){
   for(const s of objects){if(hiddenLayers.has(s.layer)||!['line','poly','polygon','rect'].includes(s.type))continue;for(const [a,b] of entitySegments(s)){if(pointLineDistance(p,a,b)<=radius){near.push([a,b]);if(near.length>=256)break}}if(near.length>=256)break}
   for(let i=0;i<near.length;i++)for(let j=i+1;j<near.length;j++){const hit=lineIntersection(near[i][0],near[i][1],near[j][0],near[j][1],true);if(hit){const d=distance(p,hit);if(d<limit){limit=d;best={point:{x:hit.x,y:hit.y},type:'INTERSECCIÓN'}}}}
  }
+ if(typeof osPerpendicular!=='undefined'&&osPerpendicular&&typeof start!=='undefined'&&start){
+  for(const shape of objects){if(hiddenLayers.has(shape.layer)||!['line','poly','polygon','rect'].includes(shape.type))continue;for(const [a,b] of entitySegments(shape)){const dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((start.x-a.x)*dx+(start.y-a.y)*dy)/den;if(t<0||t>1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'PERPENDICULAR'}}}}
+ }
+ if(typeof osNearest!=='undefined'&&osNearest&&!best){
+  for(const shape of objects){if(hiddenLayers.has(shape.layer))continue;
+   if(shape.type==='circle'&&shape.a&&shape.b){const r=distance(shape.a,shape.b),d=distance(p,shape.a);if(d>1e-12){const point={x:shape.a.x+(p.x-shape.a.x)*r/d,y:shape.a.y+(p.y-shape.a.y)*r/d},delta=distance(p,point);if(delta<limit){limit=delta;best={point,type:'MÁS CERCANO'}}}continue}
+   if(!['line','poly','polygon','rect','leader','dim','dimaligned'].includes(shape.type))continue;
+   for(const [a,b] of entitySegments(shape)){const dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den)),point={x:a.x+t*dx,y:a.y+t*dy},delta=distance(p,point);if(delta<limit){limit=delta;best={point,type:'MÁS CERCANO'}}}
+  }
+ }
  return best;
 }
 function snapPoint(p){
@@ -81,6 +91,10 @@ function constrain(p){
  if(!base)return p;
  let dx=p.x-base.x,dy=p.y-base.y;
  if(orthoOn){if(Math.abs(dx)>=Math.abs(dy))dy=0;else dx=0}
+ else if(typeof osParallel!=='undefined'&&osParallel&&osnapOn&&['line','poly'].includes(tool)){
+  for(const item of objects){if(item.type!=='line'||hiddenLayers.has(item.layer))continue;const length=distance(item.a,item.b);if(length>1e-9&&pointLineDistance(p,item.a,item.b)<=snapRadius/zoom){parallelDirection={x:(item.b.x-item.a.x)/length,y:(item.b.y-item.a.y)/length};break}}
+  if(parallelDirection){const d=dx*parallelDirection.x+dy*parallelDirection.y,cross=Math.abs(dx*parallelDirection.y-dy*parallelDirection.x);if(Math.hypot(dx,dy)>1e-9&&cross/Math.hypot(dx,dy)<Math.sin(5*Math.PI/180)){dx=d*parallelDirection.x;dy=d*parallelDirection.y;status.textContent='PARALELO · línea de referencia'}}
+ }
  else if(polarOn){const len=Math.hypot(dx,dy),a=Math.round(Math.atan2(dy,dx)/(polarStep*Math.PI/180))*(polarStep*Math.PI/180);dx=len*Math.cos(a);dy=len*Math.sin(a)}
  return round({x:base.x+dx,y:base.y+dy});
 }
@@ -134,7 +148,7 @@ function showDraftSettings(){
  <label><input id="setOsnap" type="checkbox" ${osnapOn?'checked':''}> Referencias F3</label>
  <label><input id="setCross" type="checkbox" ${crossOn?'checked':''}> Cruceta</label>
  </div>
- <fieldset style="border:1px solid #536a80;border-radius:6px;display:grid;gap:7px"><legend>Referencias a objetos · OSNAP</legend><label><input id="setOsEnd" type="checkbox" ${osEnd?'checked':''}> Punto final (Endpoint)</label><label><input id="setOsMid" type="checkbox" ${osMid?'checked':''}> Punto medio (Midpoint)</label><label><input id="setOsCenter" type="checkbox" ${osCenter?'checked':''}> Centro (Center)</label><label><input id="setOsQuadrant" type="checkbox" ${osQuadrant?'checked':''}> Cuadrante (Quadrant)</label><label><input id="setOsIntersection" type="checkbox" ${osIntersection?'checked':''}> Intersección de segmentos</label></fieldset>
+ <fieldset style="border:1px solid #536a80;border-radius:6px;display:grid;gap:7px"><legend>Referencias a objetos · OSNAP</legend><label><input id="setOsEnd" type="checkbox" ${osEnd?'checked':''}> Punto final (Endpoint)</label><label><input id="setOsMid" type="checkbox" ${osMid?'checked':''}> Punto medio (Midpoint)</label><label><input id="setOsCenter" type="checkbox" ${osCenter?'checked':''}> Centro (Center)</label><label><input id="setOsQuadrant" type="checkbox" ${osQuadrant?'checked':''}> Cuadrante (Quadrant)</label><label><input id="setOsIntersection" type="checkbox" ${osIntersection?'checked':''}> Intersección de segmentos</label><label><input id="setOsNearest" type="checkbox" ${osNearest?'checked':''}> Punto más cercano (Nearest)</label><label><input id="setOsParallel" type="checkbox" ${osParallel?'checked':''}> Paralelo (Parallel)</label><label><input id="setOsPerpendicular" type="checkbox" ${osPerpendicular?'checked':''}> Perpendicular</label></fieldset>
  <fieldset style="border:1px solid #536a80;border-radius:6px;display:grid;gap:9px"><legend>Mouse · Botón derecho</legend><label>Cuando no hay un comando activo<select id="setRightClickMode" style="width:100%;padding:7px;background:#0e1722;color:white"><option value="context">Mostrar menú contextual</option><option value="repeat">Repetir última acción</option></select></label><label>Durante un comando<select id="setRightClickActive" style="width:100%;padding:7px;background:#0e1722;color:white"><option value="enter">Funcionar como Enter</option><option value="context">Mostrar menú contextual</option></select></label><small style="color:#aebed2">Si eliges repetir, Shift + clic derecho abre el menú contextual.</small></fieldset>
  <label>Unidades de dibujo <select id="setUnits" style="width:100%;padding:7px;background:#0e1722;color:white"><option value="m">Metros (m)</option><option value="cm">Centímetros (cm)</option><option value="mm">Milímetros (mm)</option></select></label>
  <label>Espaciado de rejilla <input id="setGridStep" type="number" min="0.001" step="0.1" value="${gridStep}" style="width:100%;padding:7px;background:#0e1722;color:white"></label>
@@ -145,7 +159,7 @@ function showDraftSettings(){
  document.body.append(dlg);dlg.querySelector('#setUnits').value=units;dlg.querySelector('#setRightClickMode').value=rightClickMode;dlg.querySelector('#setRightClickActive').value=rightClickDuringCommand;
  dlg.querySelector('#cancelSettings').onclick=()=>dlg.close();
  dlg.querySelector('#applySettings').onclick=()=>{
-  gridOn=dlg.querySelector('#setGrid').checked;snapOn=dlg.querySelector('#setSnap').checked;orthoOn=dlg.querySelector('#setOrtho').checked;polarOn=dlg.querySelector('#setPolar').checked;osnapOn=dlg.querySelector('#setOsnap').checked;osEnd=dlg.querySelector('#setOsEnd').checked;osMid=dlg.querySelector('#setOsMid').checked;osCenter=dlg.querySelector('#setOsCenter').checked;osQuadrant=dlg.querySelector('#setOsQuadrant').checked;osIntersection=dlg.querySelector('#setOsIntersection').checked;crossOn=dlg.querySelector('#setCross').checked;
+  gridOn=dlg.querySelector('#setGrid').checked;snapOn=dlg.querySelector('#setSnap').checked;orthoOn=dlg.querySelector('#setOrtho').checked;polarOn=dlg.querySelector('#setPolar').checked;osnapOn=dlg.querySelector('#setOsnap').checked;osEnd=dlg.querySelector('#setOsEnd').checked;osMid=dlg.querySelector('#setOsMid').checked;osCenter=dlg.querySelector('#setOsCenter').checked;osQuadrant=dlg.querySelector('#setOsQuadrant').checked;osIntersection=dlg.querySelector('#setOsIntersection').checked;osNearest=dlg.querySelector('#setOsNearest').checked;osParallel=dlg.querySelector('#setOsParallel').checked;osPerpendicular=dlg.querySelector('#setOsPerpendicular').checked;crossOn=dlg.querySelector('#setCross').checked;
   units=dlg.querySelector('#setUnits').value;gridStep=Math.max(.001,Number(dlg.querySelector('#setGridStep').value)||1);polarStep=Math.max(1,Math.min(90,Number(dlg.querySelector('#setPolarStep').value)||15));snapRadius=Math.max(2,Math.min(40,Number(dlg.querySelector('#setSnapRadius').value)||12));
   for(const [id,on] of [['gridToggle',gridOn],['snapToggle',snapOn],['orthoToggle',orthoOn],['polarToggle',polarOn],['osnapToggle',osnapOn],['crossToggle',crossOn]])updateToggle('#'+id,on);rightClickMode=dlg.querySelector('#setRightClickMode').value;rightClickDuringCommand=dlg.querySelector('#setRightClickActive').value;try{localStorage.setItem('otrocad-mouse-preferences',JSON.stringify({mode:rightClickMode,active:rightClickDuringCommand}))}catch(e){}saveDraftPreferences();save();dlg.close();status.textContent='Drafting Settings aplicado · botón derecho configurado';render();
  };
@@ -166,7 +180,7 @@ function render(){
  if(printing)$('#dynamic').style.display='none';else updateDynamic();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
-function setTool(t){$('#offsetInline')?.remove();if(t==='offset')clearSelection();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
+function setTool(t){parallelDirection=null;$('#offsetInline')?.remove();if(t==='offset')clearSelection();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(hiddenLayers.has(s.layer)||lockedLayers.has(s.layer))continue;let d=1e9;
@@ -324,10 +338,10 @@ function commitEntity(endPoint){
  save();applySelection([objects.length-1]);start=null;temp=null;render();updatePrompt();
 }
 function finishPoly(){if(poly.length<2){status.textContent='La polilínea necesita al menos dos puntos';return false}if(lockedLayers.has($('#layer').value)){status.textContent='La capa actual está bloqueada';return false}checkpoint();objects.push({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)});save();poly=[];start=null;temp=null;render();updatePrompt();status.textContent='Polilínea terminada';return true}
-function showOffsetInput(){
+function showOffsetInput(anchor){
  const existing=$('#offsetInline');if(existing)existing.remove();
  const box=document.createElement('div');box.id='offsetInline';box.innerHTML='<label for="offsetInlineValue">Distancia OFFSET</label><input id="offsetInlineValue" type="number" min="0.001" step="any" inputmode="decimal"><button type="button">Aceptar</button><button type="button" aria-label="Cancelar desfase">×</button><span role="status"></span>';
- stage.append(box);const input=box.querySelector('input'),buttons=box.querySelectorAll('button'),error=box.querySelector('[role=status]');input.value=offsetDistance;
+ stage.append(box);const p=screen(anchor);box.style.left=Math.max(4,Math.min(stage.clientWidth-190,p.x+14))+'px';box.style.top=Math.max(4,Math.min(stage.clientHeight-50,p.y+14))+'px';const input=box.querySelector('input'),buttons=box.querySelectorAll('button'),error=box.querySelector('[role=status]');input.value=offsetDistance;
  const accept=()=>{const value=Number(input.value);if(!Number.isFinite(value)||value<=0){error.textContent='Ingresa una distancia positiva';return}offsetDistance=value;offsetDistancePreset=false;box.remove();stage.focus({preventScroll:true});status.textContent='OFFSET: toca el lado del desfase'};
  buttons[0].onclick=accept;buttons[1].onclick=()=>{box.remove();clearSelection();render();status.textContent='OFFSET cancelado'};
  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopImmediatePropagation();accept()}else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();buttons[1].click()}});input.focus();input.select();status.textContent='OFFSET: ingresa la distancia';
@@ -336,7 +350,7 @@ function doOffset(q){
  if(selected<0){
   const hit=selectAt(q);applySelection(hit>=0?[hit]:[]);
   if(selected<0){status.textContent='Selecciona una entidad para OFFSET';return}
-  if(!offsetDistancePreset){showOffsetInput();return}
+  if(!offsetDistancePreset){showOffsetInput(q);return}
   offsetDistancePreset=false;status.textContent='Indica el lado del desfase';return;
  }
  const s=objects[selected],d=offsetDistance,style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype},before=objects.length;
