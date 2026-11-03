@@ -283,7 +283,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   button.setAttribute('aria-label',collapsed?'Mostrar herramientas CAD':'Ocultar herramientas CAD');
  }
  button.addEventListener('click',()=>setCollapsed(!document.body.classList.contains('cad-ribbon-collapsed')));
- groups.addEventListener('click',event=>{if(media.matches && event.target.closest('button[data-tool]')) setCollapsed(true)});
+ groups.addEventListener('click',event=>{if(media.matches && event.target.closest('button')) setCollapsed(true)});
  function onModeChange(){setCollapsed(media.matches);setBottomOpen(false)}
  if(media.addEventListener) media.addEventListener('change',onModeChange); else media.addListener(onModeChange);
  onModeChange();
