@@ -206,6 +206,10 @@ css.textContent=
  '.civil-dialog canvas{display:block;width:100%;height:min(62vh,560px);min-height:260px;background:#101d2b;border:1px solid #c5d5ec;border-radius:8px;touch-action:none}'+
  '.civil-dialog .civil-note{font-size:12px;color:#5c7192}'+
  '.civil-dialog button,.civil-dialog select{border:1px solid #b9cbe7;border-radius:6px;padding:7px 10px;background:#fff;color:#173665}'+
+ '#groups .civil-tool{white-space:normal;line-height:1.15;min-width:78px}'+
+ '#groups .civil-tool .civil-label{display:block;max-width:98px;font-size:11px;line-height:1.16;text-align:center;white-space:normal;color:inherit}'+
+ '#groups .civil-tool .ico svg{display:block;width:28px;height:28px;stroke:#80caff;stroke-linecap:round;stroke-linejoin:round}'+
+ '#groups .civil-tool .ico svg .cad-node{fill:#ffcf23;stroke:#ffcf23}'+
  '.civil-dialog .civil-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}'+
  '@media(max-width:650px){.civil-dialog{width:96vw;max-width:96vw}.civil-dialog .civil-body{padding:8px}.civil-dialog canvas{height:54vh;min-height:220px}}';
 document.head.append(css);
@@ -216,36 +220,64 @@ function addGroup(title){
  const group=document.createElement('div');group.className='toolgroup';group.dataset.panel='civil';group.hidden=true;
  const label=document.createElement('span');label.className='group-title';label.textContent=title;group.append(label);groups.append(group);panelGroups.push(group);return group;
 }
+// Reusable professional CAD pictograms: blue technical geometry and yellow grips.
+const civilIconPaths={
+ csv:'<path d="M5 3h10l4 4v14H5zM15 3v4h4M8 11h8M8 15h8M8 19h5"/><path d="M12 8v11" stroke-dasharray="1 3"/><circle class="cad-node" cx="8" cy="11" r="1.2"/>',
+ landxml:'<path d="M4 4h11l5 5v11H4zM15 4v5h5"/><path d="m9 11-3 3 3 3m6-6 3 3-3 3"/><circle class="cad-node" cx="12" cy="14" r="1.1"/>',
+ label:'<path d="m3 20 7-7m0 0 3-2"/><path d="M13 4h7v8h-7zM15 10l1.6-4 1.4 4M15.5 9h2.1"/><circle class="cad-node" cx="10" cy="13" r="1.5"/>',
+ export:'<path d="M5 3h11l4 4v14H5zM16 3v4h4"/><path d="M12 9v9m-3-3 3 3 3-3"/><circle class="cad-node" cx="12" cy="18" r="1"/>',
+ tin:'<path d="m3 19 6-14 5 8 7-5M3 19l11-6 7 6M9 5l12 14M3 19l18 0"/><circle class="cad-node" cx="3" cy="19" r="1.35"/><circle class="cad-node" cx="9" cy="5" r="1.35"/><circle class="cad-node" cx="21" cy="8" r="1.35"/>',
+ contours:'<path d="M2 18c5-8 8 1 13-7 2-3 5-4 7-4M2 13c5-8 8 1 13-7 2-3 5-4 7-4M2 23c5-8 8 1 13-7 2-3 5-4 7-4"/><circle class="cad-node" cx="15" cy="11" r="1.2"/>',
+ slope:'<path d="M3 20h18M5 18l14-14M5 18v-6m0 6h6"/><path d="m12 9 4 4M15 8l-1 1"/><circle class="cad-node" cx="19" cy="4" r="1.3"/>',
+ view3d:'<path d="m12 2 9 5v10l-9 5-9-5V7zM12 12l9-5M12 12 3 7M12 12v10"/><circle class="cad-node" cx="12" cy="12" r="1.3"/>',
+ alignment:'<path d="M3 20 9 4l6 7 6-7"/><path d="M3 20h6m10-16h2"/><circle class="cad-node" cx="9" cy="4" r="1.5"/><circle class="cad-node" cx="15" cy="11" r="1.5"/>',
+ stations:'<path d="M2 17 9 6l6 8 7-9M4 17l3 2m0-8 4 3m4 0 3 3m0-9 3 2"/><circle class="cad-node" cx="9" cy="6" r="1.25"/><circle class="cad-node" cx="15" cy="14" r="1.25"/>',
+ grade:'<path d="M3 20h18M3 20 20 5M20 5v15"/><path d="M9 17v-3h4"/><circle class="cad-node" cx="20" cy="5" r="1.35"/>',
+ profile:'<path d="M3 3v18h18M5 17l4-5 3 2 4-8 5 4"/><path d="M9 12v9M16 6v15" stroke-dasharray="2 3"/><circle class="cad-node" cx="16" cy="6" r="1.35"/>',
+ section:'<path d="M3 7h18M12 3v18M4 17l4-5 4 2 4-5 4 5"/><path d="m9 4 3-2 3 2"/><circle class="cad-node" cx="12" cy="14" r="1.2"/>',
+ volume:'<path d="M4 10 12 5l8 5v9l-8 4-8-4zM4 10l8 5 8-5M12 15v8"/><path d="M4 14h16" stroke-dasharray="2 2"/><circle class="cad-node" cx="12" cy="15" r="1.15"/>',
+ clear:'<path d="M6 7h12M9 4h6M8 7l1 14h6l1-14M11 10v7m3-7v7"/><circle class="cad-node" cx="12" cy="4" r="1.2"/>'
+};
 function addButton(group,label,icon,handler,title){
- const b=document.createElement('button');b.type='button';b.title=title||label;
- const mark=document.createElement('span');mark.className='ico';mark.textContent=icon||'◇';
- b.append(mark,document.createTextNode(label));
+ const b=document.createElement('button');b.type='button';b.className='civil-tool';b.title=title||label;
+ const mark=document.createElement('span');mark.className='ico';
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('class','cad-icon');svg.setAttribute('viewBox','0 0 24 24');
+ svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.8');
+ svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');
+ svg.setAttribute('aria-hidden','true');
+ // Only developer-owned icon paths are rendered, never CSV/XML or user content.
+ svg.innerHTML=civilIconPaths[icon]||civilIconPaths.tin;
+ mark.append(svg);
+ const caption=document.createElement('span');caption.className='civil-label';caption.textContent=label;
+ b.append(mark,caption);
  b.addEventListener('click',()=>{try{handler()}catch(error){console.error(error);alert(error.message||String(error))}});
  group.append(b);return b;
 }
+
 tab.addEventListener('click',()=>{
  tabs.querySelectorAll('[data-tab]').forEach(b=>{const active=b===tab;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active))});
  groups.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!=='civil');
 });
 const pointsGroup=addGroup('PUNTOS Y LEVANTAMIENTO');
-addButton(pointsGroup,'Importar CSV / XYZ','⇧',()=>fileInput.click(),'Importar puntos X,Y,Z desde CSV, TXT o XYZ');
-addButton(pointsGroup,'Importar LandXML','⌁',()=>fileInput.click(),'Importar puntos CgPoint o Pnts desde LandXML');
-addButton(pointsGroup,'Etiquetar cotas','Aa',labelPoints,'Crear etiquetas de identificación y elevación');
-addButton(pointsGroup,'Exportar puntos','⇩',exportPoints,'Descargar puntos topográficos como CSV');
+addButton(pointsGroup,'Importar CSV / XYZ','csv',()=>fileInput.click(),'Importar puntos X,Y,Z desde CSV, TXT o XYZ');
+addButton(pointsGroup,'Importar LandXML','landxml',()=>fileInput.click(),'Importar puntos CgPoint o Pnts desde LandXML');
+addButton(pointsGroup,'Etiquetar cotas','label',labelPoints,'Crear etiquetas de identificación y elevación');
+addButton(pointsGroup,'Exportar puntos','export',exportPoints,'Descargar puntos topográficos como CSV');
 const surfaceGroup=addGroup('SUPERFICIES Y TERRENO');
-addButton(surfaceGroup,'Crear superficie TIN','△',createTin,'Triangulación Delaunay desde puntos XYZ');
-addButton(surfaceGroup,'Curvas de nivel','≋',createContours,'Generar curvas de nivel desde la superficie activa');
-addButton(surfaceGroup,'Mapa de pendientes','∠',slopeAnalysis,'Clasificar pendientes por porcentaje');
-addButton(surfaceGroup,'Visor 3D','◈',openSurface3D,'Visualizar la superficie en perspectiva 3D interactiva');
+addButton(surfaceGroup,'Crear superficie TIN','tin',createTin,'Triangulación Delaunay desde puntos XYZ');
+addButton(surfaceGroup,'Curvas de nivel','contours',createContours,'Generar curvas de nivel desde la superficie activa');
+addButton(surfaceGroup,'Mapa de pendientes','slope',slopeAnalysis,'Clasificar pendientes por porcentaje');
+addButton(surfaceGroup,'Visor 3D','view3d',openSurface3D,'Visualizar la superficie en perspectiva 3D interactiva');
 const designGroup=addGroup('DISEÑO LINEAL');
-addButton(designGroup,'Definir alineamiento','╱',markAlignment,'Marcar una línea o polilínea seleccionada como alineamiento');
-addButton(designGroup,'Progresivas','PK',createStations,'Generar estacado y etiquetas de progresivas sobre el alineamiento');
-addButton(designGroup,'Pendiente del eje','∠',alignmentGrade,'Calcular la pendiente entre los extremos del alineamiento');
-addButton(designGroup,'Perfil longitudinal','⌁',longitudinalProfile,'Extraer perfil de terreno sobre el alineamiento');
-addButton(designGroup,'Sección transversal','⊥',crossSection,'Extraer una sección transversal en una abscisa');
+addButton(designGroup,'Definir alineamiento','alignment',markAlignment,'Marcar una línea o polilínea seleccionada como alineamiento');
+addButton(designGroup,'Progresivas','stations',createStations,'Generar estacado y etiquetas de progresivas sobre el alineamiento');
+addButton(designGroup,'Pendiente del eje','grade',alignmentGrade,'Calcular la pendiente entre los extremos del alineamiento');
+addButton(designGroup,'Perfil longitudinal','profile',longitudinalProfile,'Extraer perfil de terreno sobre el alineamiento');
+addButton(designGroup,'Sección transversal','section',crossSection,'Extraer una sección transversal en una abscisa');
 const analysisGroup=addGroup('CÁLCULO Y CONTROL');
-addButton(analysisGroup,'Volumen vs. cota','▱',volumeAnalysis,'Calcular corte y relleno respecto a un plano horizontal');
-addButton(analysisGroup,'Borrar análisis','×',clearAnalysis,'Eliminar TIN, curvas y análisis generados sin borrar puntos');
+addButton(analysisGroup,'Volumen vs. cota','volume',volumeAnalysis,'Calcular corte y relleno respecto a un plano horizontal');
+addButton(analysisGroup,'Borrar análisis','clear',clearAnalysis,'Eliminar TIN, curvas y análisis generados sin borrar puntos');
 function numberValue(v){const n=Number(String(v??'').trim().replace(',','.'));return Number.isFinite(n)?n:NaN}
 function parsePointText(text){
  const lines=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!s.startsWith('#')&&!s.startsWith('//'));
