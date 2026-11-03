@@ -1082,6 +1082,7 @@ function parseDxfEntities(source){
    if(pieces.importWarnings?.length)warn('INSERT con entidades no compatibles');
   }
   else if(type==='DIMENSION'){
+   if(Number(arguments[1]||0)>=5){warn('DIMENSION con anidación excesiva omitida');continue}
    const geometry=blockRecords.get(str(r,2).toUpperCase());
    if(!geometry?.length){warn('DIMENSION sin geometría gráfica omitida');continue}
    const pieces=parseBlockItems(geometry,Number(arguments[1]||0));
