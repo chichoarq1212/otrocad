@@ -14,7 +14,7 @@ assert.equal(context.findGripAt({x:24,y:0},false),null,'mouse hit target must st
 const touchGrip=context.findGripAt({x:24,y:0},true);
 assert.ok(touchGrip&&touchGrip.index===0&&touchGrip.key==='a','a 24px finger offset should still select the grip on iPhone');
 const snap=extract('function snapCandidate(p,excludedIndex=-1){','function constrain(p){');
-Object.assign(context,{osnapOn:true,osEnd:true,osMid:false,osCenter:false,osQuadrant:false,osIntersection:false,osGeom:false,osInsertion:false,osTangent:false,osExtension:false,osApparent:false,osPerpendicular:false,osNearest:true,hiddenLayers:new Set(),zoom:1,snapRadius:14,snapOn:false,gridStep:1,activeSnap:null,start:null,entitySegments:()=>[],pointLineDistance:()=>100,lineIntersection:()=>null});
+Object.assign(context,{osnapOn:true,osEnd:false,osMid:false,osCenter:false,osQuadrant:false,osIntersection:false,osGeom:false,osInsertion:false,osTangent:false,osExtension:false,osApparent:false,osPerpendicular:false,osNearest:true,hiddenLayers:new Set(),zoom:1,snapRadius:14,snapOn:false,gridStep:1,activeSnap:null,start:null,entitySegments:(s)=>s.a&&s.b?[[s.a,s.b]]:[],pointLineDistance:()=>100,lineIntersection:()=>null});
 vm.runInContext(snap+'\nthis.snapPoint=snapPoint;',context);
 const ordinary=context.snapPoint({x:5,y:1});
 assert.equal(ordinary.x,5);assert.equal(ordinary.y,0,'ordinary OSNAP nearest should still snap to a selected line');
