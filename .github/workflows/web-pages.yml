@@ -48,9 +48,14 @@ jobs:
       - name: Validar JavaScript y pruebas de grips
         run: |
           node --check editor/editor.js
+          node --check editor/civil3d.js
           node --check editor/demo/vivienda.js
           node --check sw.js
+          node --check tests/civil3d.test.cjs
+          node --check tests/dxf-import-regression.test.cjs
           node --check tests/grips.test.cjs
+          node tests/civil3d.test.cjs
+          node tests/dxf-import-regression.test.cjs
           node tests/grips.test.cjs
           node tests/cad-precision.test.cjs
           node tests/storage-dxf.test.cjs
