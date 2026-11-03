@@ -38,6 +38,8 @@ assert.ok(demo.length > 100);
 for (const name of ['SALA','COMEDOR','COCINA','DORMITORIO 1','DORMITORIO 2','BAÑO']) assert.ok(demo.some(x=>x.type==='text' && x.text===name));
 for (const type of ['line','rect','arc','hatch','dim']) assert.ok(demo.some(x=>x.type===type));
 console.log('Demo checks passed: rooms and editable drawing entities');
+const textHelpers = source.slice(source.indexOf('function cadFontFamilyFromFile('), source.indexOf('\nfunction drawEntity('));
+vm.runInContext(textHelpers,context);
 const parserCode = source.slice(source.indexOf('function parseDxfEntities(source){'), source.indexOf('\nasync function download('));
 vm.runInContext(parserCode,context);
 const dxf = ['0','SECTION','2','BLOCKS','0','LINE','10','99','20','99','11','100','21','100','0','ENDSEC',
@@ -474,7 +476,7 @@ const textStyleFixture=[
  '0','STYLE','2','TITULO','3','impact.ttf','4','','40','0.4','41','1.1','50','0','71','0','42','0.4',
  '0','ENDTAB','0','ENDSEC',
  '0','SECTION','2','ENTITIES',
- '0','TEXT','8','Textos','7','ANOTACION','10','1','20','2','40','0.25','41','1.2','51','12','1','ANOTACIÓN',
+ '0','TEXT','8','Textos','7','ANOTACION','10','1','20','2','40','0.25','41','1.2','51','12','71','2','1','ANOTACIÓN',
  '0','MTEXT','8','Textos','7','TITULO','10','3','20','4','40','0.4','41','2.5','44','1.1','71','5','1','ALCANCE DEL PROYECTO',
  '0','ENDSEC','0','EOF'
 ].join('\n');
@@ -485,6 +487,8 @@ assert.equal(styledTexts[0].textFontFile,'arial.ttf');
 assert.equal(styledTexts[0].textHeightWorld,.25,'Entity height must override style fixed height');
 assert.equal(styledTexts[0].textWidthFactor,1.2);
 assert.equal(styledTexts[0].textObliqueAngle,12);
+assert.equal(styledTexts[0].textGenerationFlags,2);
+assert.equal(styledTexts[0].textStyleGenerationFlags,0);
 assert.equal(styledTexts[1].textStyleName,'TITULO');
 assert.equal(styledTexts[1].textFontFile,'impact.ttf');
 assert.ok(styledTexts[1].textFontFamily.includes('Impact'));
