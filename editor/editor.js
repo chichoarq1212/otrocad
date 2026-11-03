@@ -120,7 +120,7 @@ function drawEntity(s,sel=false,preview=false){
  else if(s.type==='ellipse'){ctx.beginPath();ctx.ellipse(a.x,a.y,Math.abs(b.x-a.x),Math.abs(b.y-a.y),0,0,Math.PI*2);ctx.stroke()}
  else if(s.type==='polygon'){ctx.beginPath();s.pts.forEach((p,i)=>{const v=screen(p);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath();ctx.stroke()}
  else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
- else if(s.type==='text'){ctx.font=(s.textHeightWorld?Math.max(1,Number(s.textHeightWorld)*zoom):Number(s.textHeight||14))+'px system-ui';ctx.fillText(s.text||'Texto',a.x,a.y)}
+ else if(s.type==='text'){const size=s.textHeightWorld?Math.max(1,Number(s.textHeightWorld)*zoom):Number(s.textHeight||14);ctx.font=size+'px system-ui';ctx.translate(a.x,a.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);String(s.text||'Texto').split('\n').forEach((line,i)=>ctx.fillText(line,0,i*size*1.2))}
  ctx.restore();
 }
 function drawGrid(w,h){
@@ -910,7 +910,13 @@ function parseDxfEntities(source){
    else if(length>0&&ratio>0&&end>begin){const pts=Array.from({length:65},(_,i)=>{const t=begin+(end-begin)*i/64;return{x:a.x+vx*Math.cos(t)-vy*ratio*Math.sin(t),y:a.y+vy*Math.cos(t)+vx*ratio*Math.sin(t)}});out.push({type:'poly',pts,...st});warn('elipses rotadas o parciales simplificadas')}
    else warn('elipses no válidas omitidas');
   }
-  else if(type==='TEXT'||type==='MTEXT'){if(type==='MTEXT')warn('formato de texto múltiple simplificado');if(get(r,50)!==0)warn('rotación de texto omitida');out.push({type:'text',a:{x:get(r,10),y:get(r,20)},text:str(r,1,''),textHeightWorld:get(r,40,0.4),...st})}
+  else if(type==='TEXT'||type==='MTEXT'){
+   const raw=type==='MTEXT'?r.pairs.filter(p=>p[0]===3||p[0]===1).map(p=>p[1]).join(''):str(r,1,'');
+   if(type==='MTEXT'&&/[{}]|\\\\[A-Za-z]/.test(raw.replace(/\\\\P/g,'')))warn('formato de texto múltiple simplificado');
+   const value=raw.replace(/\\\\P/g,'\\n').replace(/\\\\~/g,' '),vx=get(r,11,1),vy=get(r,21,0);
+   const rotation=r.pairs.some(p=>p[0]===50)?get(r,50):(type==='MTEXT'?Math.atan2(vy,vx)*180/Math.PI:0);
+   out.push({type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:get(r,40,0.4),...st})
+  }
   else warn(type+' omitido');
  }
  out.importWarnings=Object.entries(warnings).map(([name,count])=>count+' '+name);
@@ -948,9 +954,9 @@ function buildDxf(){
   const a=o.a,b=o.b,layer=dxfLayer(o),color=String(o.color||colors[layer]||colors.General),rgb=/^#[0-9a-f]{6}$/i.test(color)?parseInt(color.slice(1),16):0xffffff;
   const common=[100,'AcDbEntity',8,layer,370,Math.round(Number(o.lineweight||.25)*100),6,o.linetype==='DASHED'?'DASHED':'CONTINUOUS',420,rgb];
   const line=(p,q)=>add(0,'LINE',...common,100,'AcDbLine',10,p.x,20,p.y,30,0,11,q.x,21,q.y,31,0);
-  const textEntity=(p,value,height)=>add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,1,String(value||'').replace(/[\r\n]+/g,' '));
+  const textEntity=(p,value,height,rotation=0)=>{const valueText=String(value||'').replace(/\r/g,'');if(valueText.includes('\n'))add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,50,rotation,1,valueText.replace(/\n/g,'\\P'));else add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,50,rotation,1,valueText)};
   if(['line','dim','dimaligned','leader'].includes(o.type)&&a&&b){line(a,b);if(o.type==='dim'||o.type==='dimaligned')textEntity({x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance(a,b).toFixed(2)+' '+units,12/zoom);if(o.type==='leader'&&o.text)textEntity(b,o.text,12/zoom)}
-  else if(o.type==='text'&&a)textEntity(a,o.text,o.textHeightWorld||Number(o.textHeight||14)/zoom);
+  else if(o.type==='text'&&a)textEntity(a,o.text,o.textHeightWorld||Number(o.textHeight||14)/zoom,o.textRotation||0);
   else if(o.type==='circle'&&a&&b)add(0,'CIRCLE',...common,100,'AcDbCircle',10,a.x,20,a.y,30,0,40,distance(a,b));
   else if(o.type==='arc'&&arcGeometry(o.pts)){const g=arcGeometry(o.pts);add(0,'ARC',...common,100,'AcDbCircle',10,g.x,20,g.y,30,0,40,g.r,100,'AcDbArc',50,g.start,51,g.end)}
   else if(o.type==='ellipse'&&a&&b&&a.x!==b.x&&a.y!==b.y){const rx=Math.abs(b.x-a.x),ry=Math.abs(b.y-a.y),horizontal=rx>=ry;add(0,'ELLIPSE',...common,100,'AcDbEllipse',10,a.x,20,a.y,30,0,11,horizontal?rx:0,21,horizontal?0:ry,31,0,40,Math.min(rx,ry)/Math.max(rx,ry),41,0,42,Math.PI*2)}
