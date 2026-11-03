@@ -20,6 +20,7 @@ assert.match(wasmSource, /writes_real_ac1032_dwg_and_reads_it_back/);
 assert.match(editor, /engine\.dwg_to_dxf_failsafe\(input\)/);
 assert.match(editor, /El archivo DWG original no se modificará/);
 assert.match(editor, /DWG recuperado parcialmente tras un error de lectura/);
+assert.match(editor, /RECUPERACIÓN PARCIAL/);
 assert.match(wasmSource, /DwgReadOptions::failsafe\(\)/);
 assert.match(wasmSource, /pub fn dwg_to_dxf_failsafe/);
 assert.match(wasmSource, /failsafe_recovers_a_normal_ac1032_drawing/);
