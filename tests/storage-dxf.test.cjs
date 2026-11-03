@@ -177,7 +177,7 @@ const minsertFixture=[
  '0','LINE','10','0','20','0','11','1','21','0',
  '0','ENDBLK','0','ENDSEC',
  '0','SECTION','2','ENTITIES',
- '0','INSERT','2','UNIT','10','10','20','20','70','2','71','2','44','5','45','3',
+ '0','MINSERT','2','UNIT','10','10','20','20','70','2','71','2','44','5','45','3',
  '0','ENDSEC','0','EOF'
 ].join('\n');
 const minserted=context.parseDxfEntities(minsertFixture).filter(x=>x.type==='line');
