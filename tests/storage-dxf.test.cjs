@@ -876,7 +876,7 @@ assert.match(source,/indexedDB\.open\('otrocad-import-cache',1\)/,'Persist impor
 assert.match(source,/function persistImportCache\(\)/);
 assert.match(source,/function restoreImportCache\(\)/);
 assert.match(source,/void restoreImportCache\(\)/,'Restore the cached report and DXF when the editor starts');
-assert.match(source,/void persistImportCache\(\)/,'Save the report and converted DXF after import');
+assert.match(source,/await persistImportCache\(\)/,'Wait for the report and converted DXF to be saved before import completes');
 assert.match(editorHtml,/id="importReport"[^>]*hidden/);
 assert.match(editorHtml,/id="copyImportReport"[^>]*hidden/);
 assert.match(editorHtml,/id="convertedDxf"[^>]*hidden/);
