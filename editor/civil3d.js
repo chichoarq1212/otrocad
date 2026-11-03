@@ -17,10 +17,11 @@ const math={
   const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
   const span=Math.max(maxX-minX,maxY-minY,1e-6),cx=(minX+maxX)/2,cy=(minY+maxY)/2;
   const n=points.length;
-  const all=points.concat([
-   {x:cx-24*span,y:cy-12*span,z:0},
-   {x:cx,y:cy+24*span,z:0},
-   {x:cx+24*span,y:cy-12*span,z:0}
+  const localPoints=points.map(p=>({x:p.x-cx,y:p.y-cy,z:p.z,id:p.id}));
+  const all=localPoints.concat([
+   {x:-24*span,y:-12*span,z:0},
+   {x:0,y:24*span,z:0},
+   {x:24*span,y:-12*span,z:0}
   ]);
   const orient=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
   const circle=tri=>{
@@ -78,8 +79,9 @@ const math={
   const key=(p,tol)=>Math.round(p.x/tol)+':'+Math.round(p.y/tol);
   const join=(segments)=>{
    if(!segments.length)return[];
-   const extent=Math.max(1,...segments.flatMap(s=>[Math.abs(s[0].x),Math.abs(s[0].y),Math.abs(s[1].x),Math.abs(s[1].y)]));
-   const tol=Math.max(1e-8,extent*1e-9),links=new Map(),used=new Set();
+   const coords=segments.flatMap(s=>s),xs=coords.map(p=>p.x),ys=coords.map(p=>p.y);
+   const extent=Math.max(1,Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys));
+   const tol=Math.max(1e-8,extent*1e-8),links=new Map(),used=new Set();
    segments.forEach((seg,i)=>{for(let end=0;end<2;end++){const k=key(seg[end],tol);if(!links.has(k))links.set(k,[]);links.get(k).push({i,end})}});
    const extend=(path,atStart)=>{
     let guard=0;
@@ -347,7 +349,7 @@ function createContours(){
  const interval=numberValue(prompt('Intervalo de curvas de nivel ('+api.getUnits()+')',suggested.toFixed(2)));
  if(!(interval>0))return;
  const lines=math.contourLines(surface.triangles,interval),items=[],majorEvery=5;
- const extent=Math.max(1,...surface.triangles.flatMap(t=>t.pts).map(p=>Math.max(Math.abs(p.x),Math.abs(p.y)))),labelHeight=Math.max(.05,extent*.0007);
+ const contourPoints=surface.triangles.flatMap(t=>t.pts),xs=contourPoints.map(p=>p.x),ys=contourPoints.map(p=>p.y),extent=Math.max(1,Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys)),labelHeight=Math.max(.1,extent*.002);
  lines.forEach((entry,index)=>{
   const major=index%majorEvery===0,color=major?'#e4b94c':'#4da7d7';
   for(const path of entry.paths){
@@ -412,7 +414,9 @@ function createStations(){
  const alignment=requireAlignment(),length=pathLength(alignment.pts),factor=drawingToMeters();
  const intervalMeters=numberValue(prompt('Intervalo de progresivas (metros)', '10'));if(!(intervalMeters>0))return;
  const interval=intervalMeters/factor,extent=Math.max(1,...alignment.pts.map(p=>Math.max(Math.abs(p.x),Math.abs(p.y))));
- const size=Math.max(interval*.035,extent*.0008),height=Math.max(.05,size*.62),items=[];
+ const xs=alignment.pts.map(p=>p.x),ys=alignment.pts.map(p=>p.y),span=Math.max(1,Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys));
+ const size=Math.max(interval*.035,span*.0008),height=Math.max(.05,size*.62),items=[];
+ if(length/interval>5000)throw Error('El intervalo generaría más de 5000 progresivas; aumenta la separación.');
  const stations=[];for(let station=0;station<length;station+=interval)stations.push(station);stations.push(length);
  stations.forEach(station=>{
   const at=pointAtStation(alignment.pts,station),normal={x:-at.tangent.y,y:at.tangent.x};
