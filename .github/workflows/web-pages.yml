@@ -5,6 +5,10 @@ on:
     branches: ["main"]
     paths:
       - "editor/**"
+      - "ios/**"
+      - "apple-touch-icon.png"
+      - "icon-192.png"
+      - "icon-512.png"
       - "descargas/**"
       - "tutorial/**"
       - "herramientas/**"
@@ -21,6 +25,10 @@ on:
     branches: ["main"]
     paths:
       - "editor/**"
+      - "ios/**"
+      - "apple-touch-icon.png"
+      - "icon-192.png"
+      - "icon-512.png"
       - "descargas/**"
       - "tutorial/**"
       - "herramientas/**"
@@ -58,6 +66,7 @@ jobs:
           node tests/mobile-civil-toolbar.test.cjs
           node tests/dxf-import-regression.test.cjs
           node tests/grips.test.cjs
+          node tests/ios-touch.test.cjs
           node tests/cad-precision.test.cjs
           node tests/storage-dxf.test.cjs
           node tests/dwg-integration.test.cjs
