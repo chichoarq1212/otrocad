@@ -38,3 +38,19 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: dist
+      - name: Confirm iOS site is accessible via GitHub Pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://chichoarq1212.github.io/otrocad/ios/"
+          for attempt in $(seq 1 12); do
+            code=$(curl --location --silent --show-error --max-time 20 -w '%{http_code}' -o /tmp/otrocad-ios-page "$URL?check=$GITHUB_SHA-$attempt" || true)
+            if [ "$code" = "200" ] && grep -Fq 'OtroCAD en tu iPhone' /tmp/otrocad-ios-page; then
+              echo "iOS site available: $URL"
+              exit 0
+            fi
+            echo "iOS page not live yet (HTTP $code), attempt $attempt/12"
+            if [ "$attempt" -lt 12 ]; then sleep 10; fi
+          done
+          echo "::error::GitHub Pages does not serve the iOS site. Check Settings > Pages > Deploy from a branch > gh-pages / (root)."
+          exit 1
