@@ -507,6 +507,30 @@ function cadLayoutScaleHint(layout){
  }
  return null;
 }
+function cadPaperMissingViewportArea(layout){
+ const pw=Math.max(30,Number(layout.paperWidth)||420),ph=Math.max(30,Number(layout.paperHeight)||297);
+ const margin=Math.max(8,Math.min(22,Number(layout.margin)||10));
+ // Most architectural sheets reserve the right-hand column for notes and schedules.
+ // Use existing paper text coordinates to locate that area; never move those annotations.
+ const rightTexts=objects.filter(o=>o.cadLayout===layout.name&&o.type==='text'&&o.a&&Number.isFinite(o.a.x)&&
+    o.a.x>pw*.58&&o.a.x<pw*.96&&o.a.y>ph*.12&&o.a.y<ph*.89)
+  .map(o=>o.a.x).sort((a,b)=>a-b);
+ const divider=rightTexts.length?Math.max(pw*.53,Math.min(pw*.78,rightTexts[0]-margin)):pw*.69;
+ const left=Math.max(margin,pw*.035),right=Math.max(left+pw*.25,divider-margin*.4);
+ const bottom=Math.max(margin,ph*.135),top=Math.max(bottom+ph*.38,ph*.865);
+ return {center:{x:(left+right)/2,y:(bottom+top)/2},width:right-left,height:top-bottom,estimated:true};
+}
+function cadPaperViewportUsable(v,layout){
+ if(!(Number(v.width)>1e-8&&Number(v.height)>1e-8))return false;
+ const pw=Math.max(30,Number(layout.paperWidth)||420),ph=Math.max(30,Number(layout.paperHeight)||297);
+ const x=Number(v.center?.x),y=Number(v.center?.y);
+ if(!Number.isFinite(x)||!Number.isFinite(y))return false;
+ // Reject degenerate/off-sheet viewports from damaged conversion metadata.
+ const minx=x-Number(v.width)/2,maxx=x+Number(v.width)/2,miny=y-Number(v.height)/2,maxy=y+Number(v.height)/2;
+ const intersectW=Math.max(0,Math.min(maxx,pw)-Math.max(minx,0));
+ const intersectH=Math.max(0,Math.min(maxy,ph)-Math.max(miny,0));
+ return intersectW>Math.min(Number(v.width)*.15,pw*.07)&&intersectH>Math.min(Number(v.height)*.15,ph*.07);
+}
 function modelPaperViewportEstimate(vp,layout){
  const ext=modelExtentsForPaper(),height=Number(vp.height||0),width=Number(vp.width||0);
  if(!(height>0&&width>0))return null;
@@ -521,21 +545,41 @@ function modelPaperViewportEstimate(vp,layout){
   centerEstimated:!hasCenter,heightEstimated:true,originalViewHeight:vp.viewHeight};
 }
 function effectivePaperViewports(layout){
- const configured=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
- if(configured.length){
-  const ext=modelExtentsForPaper();
-  return configured.slice(0,20).map(v=>{
-   if(!Number.isFinite(Number(v.viewHeight))||Number(v.viewHeight)<=1e-8)return modelPaperViewportEstimate(v,layout);
-   const center=v.viewCenter||{},validCenter=Number.isFinite(Number(center.x))&&Number.isFinite(Number(center.y));
-   // Some converters preserve the native view height but drop groups 12/22.
-   // Keep the authentic scale and recover ONLY the missing center, with a visible warning.
-   if(v.viewCenterKnown===false||!validCenter)
-    return {...v,viewCenter:ext.center,estimated:true,centerEstimated:true,heightEstimated:false,estimateSource:'centro geométrico provisional (altura original conservada)'};
-   return v;
+ const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.id!==1):[];
+ const ext=modelExtentsForPaper(),fallbackArea=cadPaperMissingViewportArea(layout);
+ if(imported.length){
+  const active=imported.filter(v=>v.status!==0);
+  const candidates=active.length?active:imported; // All recovered VIEWPORTs might be marked inactive by a converter.
+  return candidates.slice(0,20).map(v=>{
+   const validPaperArea=cadPaperViewportUsable(v,layout);
+   const recoveryArea=validPaperArea?null:fallbackArea;
+   const paperView=recoveryArea?{...v,center:recoveryArea.center,width:recoveryArea.width,height:recoveryArea.height}:v;
+   let result;
+   if(!Number.isFinite(Number(paperView.viewHeight))||Number(paperView.viewHeight)<=1e-8){
+    result=modelPaperViewportEstimate(paperView,layout);
+   }else{
+    const center=paperView.viewCenter||{},validCenter=Number.isFinite(Number(center.x))&&Number.isFinite(Number(center.y));
+    result=paperView.viewCenterKnown===false||!validCenter
+     ?{...paperView,viewCenter:ext.center,estimated:true,centerEstimated:true,heightEstimated:false,estimateSource:'centro geométrico provisional (altura original conservada)'}
+     :paperView;
+   }
+   if(!result)return null;
+   if(recoveryArea)result={...result,estimated:true,paperRegionEstimated:true,
+     estimateSource:result.estimateSource||'región libre de anotaciones de la hoja'};
+   if(v.status===0)result={...result,estimated:true,offViewportRecovered:true};
+   return result;
   }).filter(Boolean);
  }
- if(layout.source!=='new'&&layout.viewportFit!=='all')return [];
- const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
+ if(layout.source!=='new'&&layout.viewportFit!=='all'){
+  // A converted AutoCAD sheet can retain its border and title block but lose all
+  // VIEWPORT objects. Show a clearly labeled, non-destructive *screen-only* recovery
+  // when there is usable model geometry, rather than silently leaving the sheet blank.
+  if(!objects.some(o=>(o.cadLayout||'Model')==='Model'))return [];
+  const implied={layout:layout.name,id:2,status:1,...fallbackArea,viewCenterKnown:false,viewHeight:0};
+  const provisional=modelPaperViewportEstimate(implied,layout);
+  return provisional?[{...provisional,generated:true,estimated:true,paperRegionEstimated:true,viewportMissing:true}]:[];
+ }
+ const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin);
  const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);
  const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
  return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
@@ -552,6 +596,10 @@ function describePaperLayoutState(layout,viewports){
   if(withHeight.length)lines.push('VISTA PROVISIONAL: faltaba la altura del VIEWPORT; se utilizó '+withHeight[0].estimateSource+'. La escala original no está verificada.');
   if(estimated.some(v=>v.centerEstimated))lines.push('CENTRO PROVISIONAL: el conversor no preservó la ubicación de la vista; se usó el centro geométrico del Modelo sin modificar la geometría.');
  }
+ const recoveredArea=viewports.filter(v=>v.paperRegionEstimated);
+ if(recoveredArea.length)lines.push('VENTANA RECUPERADA: el DWG convertido no conservó la posición o tamaño de la ventana gráfica. Se colocó una vista provisional en el área libre de la lámina, sin cambiar el original.');
+ if(viewports.some(v=>v.viewportMissing))lines.push('La conversión no entregó ninguna ventana gráfica; esta vista no representa un VIEWPORT original.');
+ if(viewports.some(v=>v.offViewportRecovered))lines.push('Un VIEWPORT figura desactivado en los datos importados. Se muestra provisionalmente para revisión.');
  if(layout.source!=='new'&&paperCount===0)
   lines.push('No se recuperaron entidades propias del espacio Papel para esta presentación.');
  if(layout.source!=='new'&&viewports.length&&!objects.some(x=>(x.cadLayout||'Model')==='Model'))
