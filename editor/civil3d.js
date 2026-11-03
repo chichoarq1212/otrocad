@@ -191,6 +191,39 @@ const math={
   return{cut,fill,net:fill-cut,area};
  }
 };
+// Export a true triangulated surface (not just contour lines) as LandXML 1.2.
+// LandXML uses northing, easting, elevation, and metric meters for these coordinates.
+math.exportTinLandXml=function(triangles,unit='m'){
+ const toMeter=({m:1,cm:.01,mm:.001})[unit];
+ if(!Number.isFinite(toMeter))throw Error('Unidad de dibujo no compatible con LandXML.');
+ const points=[],pointIds=new Map(),faces=[];
+ const coordinate=v=>String(Number((v*toMeter).toPrecision(15)));
+ for(const object of triangles||[]){
+  const vertices=object&&object.pts||object;
+  if(!Array.isArray(vertices)||vertices.length!==3)continue;
+  if(!vertices.every(p=>p&&Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y))&&Number.isFinite(Number(p.z))))continue;
+  const a=vertices[0],b=vertices[1],c=vertices[2];
+  if(Math.abs((b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x))<1e-12)continue;
+  const ids=vertices.map(p=>{
+   const x=Number(p.x),y=Number(p.y),z=Number(p.z),key=[x,y,z].join('|');
+   if(!pointIds.has(key)){
+    const id=points.length+1;pointIds.set(key,id);
+    points.push('<P id="'+id+'">'+coordinate(y)+' '+coordinate(x)+' '+coordinate(z)+'</P>');
+   }
+   return pointIds.get(key);
+  });
+  if(new Set(ids).size===3)faces.push('<F>'+ids.join(' ')+'</F>');
+ }
+ if(points.length<3||!faces.length)throw Error('No hay una superficie TIN válida para exportar a LandXML.');
+ return [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  '<LandXML xmlns="http://www.landxml.org/schema/LandXML-1.2" version="1.2" language="Spanish">',
+  '<Units><Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter" temperatureUnit="celsius" pressureUnit="milliBars"/></Units>',
+  '<Surfaces><Surface name="OtroCAD_TIN" state="existing"><Definition surfType="TIN">',
+  '<Pnts>',...points,'</Pnts><Faces>',...faces,'</Faces>',
+  '</Definition></Surface></Surfaces></LandXML>'
+ ].join('\\n');
+};
 window.OtroCadCivilMath=math;
 const api=window.OtroCadCivilAPI;
 const tabs=document.getElementById('tabs'),groups=document.getElementById('groups');
@@ -266,6 +299,7 @@ addButton(pointsGroup,'Etiquetar cotas','label',labelPoints,'Crear etiquetas de 
 addButton(pointsGroup,'Exportar puntos','export',exportPoints,'Descargar puntos topográficos como CSV');
 const surfaceGroup=addGroup('SUPERFICIES Y TERRENO');
 addButton(surfaceGroup,'Crear superficie TIN','tin',createTin,'Triangulación Delaunay desde puntos XYZ');
+addButton(surfaceGroup,'Exportar TIN LandXML','export',exportSurfaceLandXml,'Descargar superficie triangulada con vértices y caras en LandXML 1.2 (metros)');
 addButton(surfaceGroup,'Curvas de nivel','contours',createContours,'Generar curvas de nivel desde la superficie activa');
 addButton(surfaceGroup,'Mapa de pendientes','slope',slopeAnalysis,'Clasificar pendientes por porcentaje');
 addButton(surfaceGroup,'Visor 3D','view3d',openSurface3D,'Visualizar la superficie en perspectiva 3D interactiva');
@@ -358,6 +392,12 @@ function surfaceData(){
  const id=ids.includes(activeSurfaceId)?activeSurfaceId:(ids[ids.length-1]||'');
  const triangles=all.filter(o=>!id||o.civilSurfaceId===id);
  return triangles.length?{id,triangles}:null;
+}
+function exportSurfaceLandXml(){
+ const surface=surfaceData();if(!surface)throw Error('Primero crea una superficie TIN con puntos XYZ.');
+ const xml=math.exportTinLandXml(surface.triangles,api.getUnits());
+ downloadText('otrocad-superficie-tin.xml',xml,'application/xml;charset=utf-8');
+ api.setStatus('Superficie TIN exportada a LandXML 1.2 · lista para importar en software compatible');
 }
 function terrainSamples(){
  const explicit=pointObjects().map(p=>({x:p.a.x,y:p.a.y,z:Number(p.z),id:p.civilPointId}));
