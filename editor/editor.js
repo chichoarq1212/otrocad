@@ -992,7 +992,7 @@ function parseDxfEntities(source){
     if(type===4){
      const vertices=(xc,yc)=>{const xs=edge.filter(p=>p[0]===xc).map(p=>+p[1]),ys=edge.filter(p=>p[0]===yc).map(p=>+p[1]);return xs.map((x,q)=>({x,y:ys[q]})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y))};
      part=vertices(11,21);if(part.length<2)part=vertices(10,20);
-     warn('HATCH con borde SPLINE aproximado');
+     note('HATCH con borde SPLINE aproximado');
     }
     if(!part.length)warn('HATCH con borde no compatible');
     append(pts,part);
@@ -1030,8 +1030,8 @@ function parseDxfEntities(source){
   if(points){
    const solidHatch=sourceItem.type==='hatch'&&sourceItem.hatchPattern==='SOLID'&&Number(sourceItem.hatchOpacity??.18)===1;
    item.type=solidHatch?'polygon':'poly';item.pts=points;if(solidHatch)item.solidFill=true;delete item.a;delete item.b;
-   if(sourceItem.type==='ellipse')warn('elipses rotadas aproximadas');
-   if(sourceItem.type==='hatch'&&!solidHatch)warn('HATCH rotado convertido a contorno');
+   if(sourceItem.type==='ellipse')note('elipses rotadas aproximadas');
+   if(sourceItem.type==='hatch'&&!solidHatch)note('HATCH rotado convertido a contorno');
   }else{
    if(sourceItem.a)item.a=transformPoint(sourceItem.a);
    if(sourceItem.b)item.b=transformPoint(sourceItem.b);
@@ -1062,14 +1062,14 @@ function parseDxfEntities(source){
   }
   else if(type==='LINE')out.push({type:'line',a:{x:get(r,10),y:get(r,20)},b:{x:get(r,11),y:get(r,21)},...st});
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
-  else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))warn('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
+  else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
   else if(type==='POLYLINE'){
    const flags=get(r,70,0),vertices=polylineVertices.get(r)||[];
    if(flags&(8|16|64)){warn('polilíneas 3D o malla no compatibles omitidas');continue}
    if(vertices.length<2){warn('POLYLINE sin vértices omitida');continue}
    const closed=Boolean(flags&1),pts=buildPolylinePoints(vertices,closed);
    if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st});
-   if(vertices.some(v=>Math.abs(v.bulge)>1e-9))warn('polilíneas curvas aproximadas');
+   if(vertices.some(v=>Math.abs(v.bulge)>1e-9))note('polilíneas curvas aproximadas');
   }
   else if(type==='ARC'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40),a1=get(r,50)*Math.PI/180,a2=get(r,51)*Math.PI/180,span=(a2-a1+Math.PI*2)%(Math.PI*2);if(rad>0&&span>0){const pts=[a1,a1+span/2,a1+span].map(t=>({x:a.x+rad*Math.cos(t),y:a.y+rad*Math.sin(t)}));out.push({type:'arc',pts,...st})}else warn('arcos no válidos omitidos')}
   else if(type==='INSERT'||type==='MINSERT'){
@@ -1100,7 +1100,21 @@ function parseDxfEntities(source){
    if(pieces.importWarnings?.length){warn('DIMENSION con elementos gráficos no compatibles');diagnose('DIMENSION',pieces.importWarningCounts);diagnose('DIMENSION',pieces.importDiagnostics)}
   }
   else if(type==='HATCH'){
-   const loops=hatchBoundaries(r),solid=get(r,70)===1,pattern=solid?'SOLID':str(r,2,'ANSI31'),pts=loops[0];
+   const loops=hatchBoundaries(r),solid=get(r,70)===1,pattern=solid?'SOLID':str(r,2,'ANSI31');
+   if(!loops.length){
+    // Some DWG->DXF writers retain vertex pairs but omit the HATCH path markers.
+    // Recover only a real non-collinear contour; never fabricate one from a bounding box.
+    const vertices=[];for(let i=0;i<r.pairs.length-1;i++){
+     if(r.pairs[i][0]===10&&r.pairs[i+1][0]===20){
+      const x=Number(r.pairs[i][1]),y=Number(r.pairs[i+1][1]);
+      if(Number.isFinite(x)&&Number.isFinite(y)&&(!vertices.length||Math.hypot(x-vertices.at(-1).x,y-vertices.at(-1).y)>1e-9))vertices.push({x,y});
+     }
+    }
+    if(vertices.length>3&&distance(vertices[0],vertices.at(-1))<1e-9)vertices.pop();
+    const area=vertices.reduce((sum,p,i)=>{const q=vertices[(i+1)%vertices.length];return sum+p.x*q.y-q.x*p.y},0);
+    if(vertices.length>=3&&Math.abs(area)>1e-8){loops.push(vertices);note('HATCH con borde reconstruido desde vértices DXF')}
+   }
+   const pts=loops[0];
    if(!pts?.length){warn('HATCH sin contorno compatible omitido');continue}
    const minx=Math.min(...pts.map(p=>p.x)),maxx=Math.max(...pts.map(p=>p.x)),miny=Math.min(...pts.map(p=>p.y)),maxy=Math.max(...pts.map(p=>p.y));
    const corners=new Set(pts.map(p=>p.x+','+p.y));
@@ -1115,7 +1129,7 @@ function parseDxfEntities(source){
    const a={x:get(r,10),y:get(r,20)},vx=get(r,11),vy=get(r,21),ratio=get(r,40),begin=get(r,41),end=get(r,42,Math.PI*2),length=Math.hypot(vx,vy);
    const full=Math.abs((end-begin)-2*Math.PI)<1e-6,aligned=Math.abs(vx)<1e-9||Math.abs(vy)<1e-9;
    if(length>0&&ratio>0&&ratio<=1&&full&&aligned){const rx=Math.abs(vx)+Math.abs(vy)*ratio,ry=Math.abs(vy)+Math.abs(vx)*ratio;out.push({type:'ellipse',a,b:{x:a.x+rx,y:a.y+ry},...st})}
-   else if(length>0&&ratio>0&&end>begin){const pts=Array.from({length:65},(_,i)=>{const t=begin+(end-begin)*i/64;return{x:a.x+vx*Math.cos(t)-vy*ratio*Math.sin(t),y:a.y+vy*Math.cos(t)+vx*ratio*Math.sin(t)}});out.push({type:'poly',pts,...st});warn('elipses rotadas o parciales simplificadas')}
+   else if(length>0&&ratio>0&&end>begin){const pts=Array.from({length:65},(_,i)=>{const t=begin+(end-begin)*i/64;return{x:a.x+vx*Math.cos(t)-vy*ratio*Math.sin(t),y:a.y+vy*Math.cos(t)+vx*ratio*Math.sin(t)}});out.push({type:'poly',pts,...st});note('elipses rotadas o parciales simplificadas')}
    else warn('elipses no válidas omitidas');
   }
   else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'||type==='ATTDEF'){
@@ -1137,7 +1151,7 @@ function parseDxfEntities(source){
   }
   else if(type==='SPLINE'){
    const fitX=all(r,11),fitY=all(r,21),controlX=all(r,10),controlY=all(r,20),xs=fitX.length>=2?fitX:controlX,ys=fitY.length>=2?fitY:controlY,pts=xs.map((x,i)=>({x,y:ys[i]??0}));
-   if(pts.length>=2){out.push({type:'poly',pts,...st});warn(fitX.length>=2?'SPLINE aproximada por puntos de ajuste':'SPLINE aproximada por puntos de control')}else warn('SPLINE sin puntos compatibles omitida');
+   if(pts.length>=2){out.push({type:'poly',pts,...st});note(fitX.length>=2?'SPLINE aproximada por puntos de ajuste':'SPLINE aproximada por puntos de control')}else warn('SPLINE sin puntos compatibles omitida');
   }
   else if(type==='LEADER'){
    const xs=all(r,10),ys=all(r,20),pts=xs.map((x,i)=>({x,y:ys[i]??0}));
