@@ -413,7 +413,7 @@ function stationLabel(value){
 function createStations(){
  const alignment=requireAlignment(),length=pathLength(alignment.pts),factor=drawingToMeters();
  const intervalMeters=numberValue(prompt('Intervalo de progresivas (metros)', '10'));if(!(intervalMeters>0))return;
- const interval=intervalMeters/factor,extent=Math.max(1,...alignment.pts.map(p=>Math.max(Math.abs(p.x),Math.abs(p.y))));
+ const interval=intervalMeters/factor;
  const xs=alignment.pts.map(p=>p.x),ys=alignment.pts.map(p=>p.y),span=Math.max(1,Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys));
  const size=Math.max(interval*.035,span*.0008),height=Math.max(.05,size*.62),items=[];
  if(length/interval>5000)throw Error('El intervalo generaría más de 5000 progresivas; aumenta la separación.');
