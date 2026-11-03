@@ -378,6 +378,122 @@ function showDraftSettings(){
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
 }
 function updatePrompt(){promptEl.textContent=tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
+
+function isVisibleModelEntity(s){
+ return (s.cadLayout||'Model')==='Model'&&!hiddenLayers.has(s.layer)&&!(hideModelAnnotations&&s.type==='text');
+}
+function paperLayoutsSafe(){
+ return Array.isArray(layouts)?layouts.filter(x=>x&&typeof x.name==='string'&&x.name&&x.name!=='Model'):[];
+}
+function saveLayoutState(){
+ try{localStorage.setItem('otrocad-layout-state',JSON.stringify({layouts:paperLayoutsSafe(),viewports:layoutViewportRecords,activeLayout,hideModelAnnotations}))}catch(e){console.warn('No se pudieron guardar los layouts:',e)}
+}
+function refreshLayoutTabs(){
+ const tabs=$('#layoutTabs');if(!tabs)return;tabs.textContent='';
+ const add=(name,label)=>{
+  const button=document.createElement('button');button.type='button';button.textContent=label;button.className='cad-layout-tab'+(activeLayout===name?' active':'');button.setAttribute('aria-current',activeLayout===name?'page':'false');
+  button.onclick=()=>switchCadLayout(name);tabs.append(button)
+ };
+ add('Model','▦ Modelo');
+ paperLayoutsSafe().forEach(x=>add(x.name,'▤ '+x.name));
+ const settings=$('#paperSetup');if(settings){settings.hidden=activeLayout==='Model';settings.title='Configurar tamaño de hoja y encuadre de '+activeLayout}
+ const annotations=$('#toggleAnnotations');if(annotations){annotations.hidden=activeLayout!=='Model';annotations.textContent=hideModelAnnotations?'Textos: ocultos':'Textos: visibles';annotations.setAttribute('aria-pressed',String(hideModelAnnotations))}
+ document.body.classList.toggle('cad-paper-active',activeLayout!=='Model');
+}
+function switchCadLayout(name){
+ if(name!=='Model'&&!paperLayoutsSafe().some(x=>x.name===name))return false;
+ activeLayout=name;clearSelection();tool='select';start=null;temp=null;poly=[];arcPoints=[];modifyTarget=-1;modifyTargets=[];drag=null;
+ document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool==='select'));
+ if($('#properties'))$('#properties').classList.remove('open');
+ refreshLayoutTabs();saveLayoutState();updatePrompt();render();
+ status.textContent=name==='Model'?'Modelo · geometría a escala real':'Presentación '+name+' · hoja de impresión; para editar la geometría regresa a Modelo';
+ return true;
+}
+function createCadLayout(){
+ const suggested='Layout'+(paperLayoutsSafe().length+1);
+ const name=prompt('Nombre de la presentación',suggested);if(name===null)return;
+ const clean=name.trim().slice(0,48);
+ if(!clean||clean.toLowerCase()==='model'||paperLayoutsSafe().some(l=>l.name.toLowerCase()===clean.toLowerCase())){alert('Escribe un nombre de presentación distinto de los existentes.');return}
+ layouts.push({name:clean,paperWidth:420,paperHeight:297,margin:10,source:'new',viewportFit:'all'});
+ switchCadLayout(clean);
+}
+function modelExtentsForPaper(){
+ const p=objects.filter(o=>(o.cadLayout||'Model')==='Model').flatMap(boundsPoints);
+ if(!p.length)return {center:{x:0,y:0},width:10,height:10};
+ const xs=p.map(v=>v.x),ys=p.map(v=>v.y),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
+ return{center:{x:(minx+maxx)/2,y:(miny+maxy)/2},width:Math.max(maxx-minx,.001),height:Math.max(maxy-miny,.001)};
+}
+function effectivePaperViewports(layout){
+ const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
+ if(imported.length)return imported.slice(0,20);
+ const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
+ const modelHeight=Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
+ return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
+}
+function renderPaperLayout(){
+ const layout=paperLayoutsSafe().find(x=>x.name===activeLayout);if(!layout){activeLayout='Model';render();return}
+ const w=canvas.clientWidth,h=canvas.clientHeight;
+ const pw=Math.max(30,Number(layout.paperWidth)||420),ph=Math.max(30,Number(layout.paperHeight)||297);
+ const pad=printing?0:Math.max(22,Math.min(50,w*.06));
+ const scale=Math.max(.00001,Math.min((w-pad*2)/pw,(h-pad*2)/ph)),paperW=pw*scale,paperH=ph*scale,x0=(w-paperW)/2,y0=(h-paperH)/2;
+ const paperPoint=p=>({x:x0+Number(p.x)*scale,y:y0+(ph-Number(p.y))*scale});
+ ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':'#dfe6f1';ctx.fillRect(0,0,w,h);
+ ctx.save();if(!printing){ctx.shadowColor='#24354c55';ctx.shadowBlur=18;ctx.shadowOffsetY=5}
+ ctx.fillStyle='#fff';ctx.fillRect(x0,y0,paperW,paperH);ctx.restore();
+ ctx.save();ctx.beginPath();ctx.rect(x0,y0,paperW,paperH);ctx.clip();
+ const vps=effectivePaperViewports(layout);
+ for(const vp of vps){
+  const center=paperPoint(vp.center),vw=Number(vp.width)*scale,vh=Number(vp.height)*scale;
+  if(!Number.isFinite(vw)||!Number.isFinite(vh)||vw<=0||vh<=0)continue;
+  ctx.save();ctx.beginPath();ctx.rect(center.x-vw/2,center.y-vh/2,vw,vh);ctx.clip();
+  const drawingScale=vh/Math.max(1e-9,Number(vp.viewHeight)||1),viewCenter=vp.viewCenter||{x:0,y:0};
+  layoutRenderTransform={tx:center.x-Number(viewCenter.x||0)*drawingScale,ty:center.y+Number(viewCenter.y||0)*drawingScale,scale:drawingScale};
+  if(Number(vp.twist)){ctx.translate(center.x,center.y);ctx.rotate(-Number(vp.twist)*Math.PI/180);ctx.translate(-center.x,-center.y)}
+  for(const o of objects)if((o.cadLayout||'Model')==='Model'&&o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
+  for(const o of objects)if((o.cadLayout||'Model')==='Model'&&!o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
+  layoutRenderTransform=null;ctx.restore();
+  if(!printing){ctx.save();ctx.strokeStyle='#3b8be1';ctx.lineWidth=1;ctx.setLineDash([5,4]);ctx.strokeRect(center.x-vw/2,center.y-vh/2,vw,vh);ctx.restore()}
+ }
+ layoutRenderTransform={tx:x0,ty:y0+paperH,scale};
+ for(const o of objects)if(o.cadLayout===activeLayout&&o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
+ for(const o of objects)if(o.cadLayout===activeLayout&&!o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
+ layoutRenderTransform=null;ctx.restore();
+ if(!printing){
+  ctx.save();const margin=Math.max(0,Math.min(Number(layout.margin)||0,Math.min(pw,ph)/4))*scale;
+  ctx.strokeStyle='#9eacbe';ctx.setLineDash([4,4]);ctx.strokeRect(x0+margin,y0+margin,Math.max(0,paperW-2*margin),Math.max(0,paperH-2*margin));ctx.setLineDash([]);
+  ctx.fillStyle='#193f77';ctx.font='bold 12px system-ui';ctx.fillText(layout.name+' · '+Math.round(pw)+' × '+Math.round(ph)+' mm',x0+5,Math.max(14,y0-8));ctx.restore();
+ }
+ $('#dynamic').style.display='none';
+}
+function showCadPaperSettings(){
+ const layout=paperLayoutsSafe().find(l=>l.name===activeLayout);if(!layout)return;
+ const sizes=[['A4',297,210],['A3',420,297],['A2',594,420],['A1',841,594],['A0',1189,841],['Carta',279.4,215.9],['Oficio',355.6,215.9]];
+ const dialog=document.createElement('dialog');dialog.className='cad-utility-dialog cad-paper-settings';
+ dialog.innerHTML='<form method="dialog"><h3>Configuración de presentación</h3><p>Define el formato de hoja y la ventana del modelo. Las entidades originales no se desplazan ni se eliminan.</p>'+
+ '<label>Formato de papel<select id="paperSize">'+sizes.map(x=>'<option value="'+x[0]+'">'+x[0]+'</option>').join('')+'<option value="custom">Personalizado</option></select></label>'+
+ '<label>Orientación<select id="paperOrientation"><option value="landscape">Horizontal</option><option value="portrait">Vertical</option></select></label>'+
+ '<label>Ancho (mm)<input id="paperWidth" type="number" min="30" max="2000" step="0.1"></label>'+
+ '<label>Alto (mm)<input id="paperHeight" type="number" min="30" max="2000" step="0.1"></label>'+
+ '<label>Margen guía (mm)<input id="paperMargin" type="number" min="0" max="100" step="1"></label>'+
+ '<label>Ventana de dibujo<select id="paperFit"><option value="imported">Conservar VIEWPORT importados</option><option value="all">Encuadrar todo el modelo</option></select></label>'+
+ '<p id="paperWarning" role="status"></p><div class="cad-utility-actions"><button type="button" id="paperCancel">Cancelar</button><button type="button" id="paperApply">Aplicar</button></div></form>';
+ document.body.append(dialog);
+ const byId=id=>dialog.querySelector('#'+id);
+ byId('paperWidth').value=layout.paperWidth||420;byId('paperHeight').value=layout.paperHeight||297;byId('paperMargin').value=layout.margin??10;
+ byId('paperFit').value=layout.viewportFit==='all'?'all':'imported';
+ const found=sizes.find(p=>Math.abs(Math.max(layout.paperWidth,layout.paperHeight)-p[1])<1&&Math.abs(Math.min(layout.paperWidth,layout.paperHeight)-p[2])<1);
+ byId('paperSize').value=found?found[0]:'custom';byId('paperOrientation').value=layout.paperWidth>=layout.paperHeight?'landscape':'portrait';
+ const resizeFromPreset=()=>{const preset=sizes.find(p=>p[0]===byId('paperSize').value);if(!preset)return;const vertical=byId('paperOrientation').value==='portrait';byId('paperWidth').value=vertical?preset[2]:preset[1];byId('paperHeight').value=vertical?preset[1]:preset[2]};
+ byId('paperSize').onchange=resizeFromPreset;byId('paperOrientation').onchange=resizeFromPreset;
+ byId('paperCancel').onclick=()=>dialog.close();
+ byId('paperApply').onclick=()=>{
+  const pw=Number(byId('paperWidth').value),ph=Number(byId('paperHeight').value),margin=Number(byId('paperMargin').value);
+  if(!Number.isFinite(pw)||!Number.isFinite(ph)||pw<30||ph<30||pw>2000||ph>2000||!Number.isFinite(margin)||margin<0||margin>=Math.min(pw,ph)/3){byId('paperWarning').textContent='Revisa las medidas y los márgenes de impresión.';return}
+  layout.paperWidth=pw;layout.paperHeight=ph;layout.margin=margin;layout.viewportFit=byId('paperFit').value;
+  saveLayoutState();render();status.textContent='Hoja '+layout.name+' · '+pw+' × '+ph+' mm';dialog.close();
+ };
+ dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+}
 function render(){
  if(activeLayout!=='Model'){renderPaperLayout();return}
  const finish=$('#finish-poly');finish.hidden=tool!=='poly'||poly.length===0;finish.disabled=poly.length<2;
