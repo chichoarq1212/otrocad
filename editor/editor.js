@@ -402,7 +402,7 @@ function refreshLayoutTabs(){
 }
 function switchCadLayout(name){
  if(name!=='Model'&&!paperLayoutsSafe().some(x=>x.name===name))return false;
- activeLayout=name;clearSelection();tool='select';start=null;temp=null;poly=[];arcPoints=[];modifyTarget=-1;modifyTargets=[];drag=null;
+ activeLayout=name;clearSelection();tool='select';start=null;temp=null;poly=[];arcPoints=[];modifyTarget=-1;modifyTargets=[];drag=null;selectionStart=null;selectionBox=null;selectionClickAnchor=null;gripDrag=null;activeSnap=null;
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool==='select'));
  if($('#properties'))$('#properties').classList.remove('open');
  refreshLayoutTabs();saveLayoutState();updatePrompt();render();
