@@ -154,6 +154,41 @@ function strokeCadHatchPattern(s,allPoints){
  ctx.setLineDash([]);
  return rendered>0;
 }
+
+function cadFontFamilyFromFile(file){
+ const base=String(file||'txt.shx').replace(/\\/g,'/').split('/').pop().toLowerCase();
+ const name=base.replace(/\.(?:shx|ttf|otf)$/i,'');
+ if(name.includes('impact'))return 'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif';
+ if(/arialbd|bold/.test(name))return 'Arial, Helvetica, sans-serif';
+ if(/romans|romand|times|serif/.test(name))return '"Times New Roman", Georgia, serif';
+ if(/mono|courier/.test(name))return '"Courier New", monospace';
+ if(/narrow|condensed|txt|simplex|iso/.test(name))return '"Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif';
+ return 'Arial, Helvetica, sans-serif';
+}
+function wrapCadTextLines(value,maxWidth,measureText){
+ const paragraphs=String(value??'').replace(/\r/g,'').split('\n'),out=[];
+ const measure=typeof measureText==='function'?measureText:()=>0;
+ for(const paragraph of paragraphs){
+  const words=paragraph.match(/\S+/g)||[];
+  if(!words.length){out.push('');continue}
+  let line='';
+  for(const word of words){
+   const candidate=line?line+' '+word:word;
+   if(line&&maxWidth>0&&measure(candidate)>maxWidth){out.push(line);line=word}else line=candidate;
+   if(maxWidth>0&&line&&measure(line)>maxWidth){
+    let part='';
+    for(const char of Array.from(line)){
+     const next=part+char;
+     if(part&&measure(next)>maxWidth){out.push(part);part=char}else part=next;
+    }
+    line=part;
+   }
+  }
+  if(line)out.push(line);
+ }
+ return out.length?out:[''];
+}
+
 function drawEntity(s,sel=false,preview=false){
  ctx.save();const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
  const a=s.a&&screen(s.a),b=s.b&&screen(s.b);
@@ -186,7 +221,33 @@ function drawEntity(s,sel=false,preview=false){
   if(!s.importedHatch||sel||preview)ctx.stroke();
  }
  else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
- else if(s.type==='text'){const size=s.textHeightWorld?Math.max(1,Number(s.textHeightWorld)*zoom):Number(s.textHeight||14);ctx.font=size+'px system-ui';ctx.translate(a.x,a.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);String(s.text||'Texto').split('\n').forEach((line,i)=>ctx.fillText(line,0,i*size*1.2))}
+ else if(s.type==='text'){
+  const size=Math.max(.5,s.textHeightWorld?Number(s.textHeightWorld)*zoom:Number(s.textHeight||14));
+  const fontFile=String(s.textFontFile||'txt.shx'),fontFamily=s.textFontFamily||cadFontFamilyFromFile(fontFile);
+  const fontBold=Boolean(s.textFontBold)||/(?:bd|bold)/i.test(fontFile),fontItalic=Boolean(s.textFontItalic)||/(?:italic|oblique)/i.test(fontFile);
+  ctx.font=(fontBold?'bold ':'')+(fontItalic?'italic ':'')+size+'px '+fontFamily;
+  const value=String(s.text||'Texto'),mtext=Boolean(s.isMText)||Number(s.mtextWidthWorld||0)>0,widthFactor=Math.max(.05,Math.min(20,Number(s.textWidthFactor)||1));
+  const oblique=Math.max(-80,Math.min(80,Number(s.textObliqueAngle||0)))*Math.PI/180,flags=Number(s.textGenerationFlags||0);
+  const horizontal=Number(s.textHorizontalAlignment||0),vertical=Number(s.textVerticalAlignment||0);let renderWidthFactor=widthFactor;
+  if(!mtext&&(horizontal===3||horizontal===5)&&Number(s.textFitWidthWorld)>0){const natural=ctx.measureText(value).width*renderWidthFactor,target=Number(s.textFitWidthWorld)*zoom;if(natural>0)renderWidthFactor*=target/natural}
+  const anchor=(!mtext&&(horizontal||vertical)&&horizontal!==3&&horizontal!==5&&s.textAlignmentPoint)?s.textAlignmentPoint:s.a;
+  ctx.translate(anchor.x,anchor.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);
+  ctx.transform(renderWidthFactor*(flags&2?-1:1),0,Math.tan(oblique),flags&4?-1:1,0,0);
+  const lineHeight=size*1.2*(Number(s.mtextLineSpacingFactor)>0?Math.max(.5,Math.min(4,Number(s.mtextLineSpacingFactor))):1);
+  if(mtext){
+   const requestedWidth=Number(s.mtextWidthWorld||0)*zoom/widthFactor;
+   const lines=requestedWidth>0?wrapCadTextLines(value,requestedWidth,t=>ctx.measureText(t).width):value.split('\n');
+   const boxWidth=requestedWidth>0?requestedWidth:Math.max(0,...lines.map(line=>ctx.measureText(line).width));
+   const attachment=Math.max(1,Math.min(9,Math.round(Number(s.mtextAttachment||1)))),column=(attachment-1)%3,row=Math.floor((attachment-1)/3);
+   ctx.textAlign=column===0?'left':column===1?'center':'right';ctx.textBaseline='top';
+   const x=column===0?0:column===1?boxWidth/2:boxWidth,totalHeight=lines.length*lineHeight,y=row===0?0:row===1?-totalHeight/2:-totalHeight;
+   lines.forEach((line,i)=>ctx.fillText(line,x,y+i*lineHeight));
+  }else{
+   ctx.textAlign=horizontal===1||horizontal===4?'center':horizontal===2?'right':'left';
+   ctx.textBaseline=vertical===1?'bottom':vertical===2?'middle':vertical===3?'top':'alphabetic';
+   value.split('\n').forEach((line,i)=>ctx.fillText(line,0,i*lineHeight));
+  }
+ }
  ctx.restore();
 }
 function drawGrid(w,h){
@@ -978,19 +1039,23 @@ function parseDxfEntities(source){
   const rgb=h<1?[c,x,0]:h<2?[x,c,0]:h<3?[0,c,x]:h<4?[0,x,c]:h<5?[x,0,c]:[c,0,x];
   return '#'+rgb.map(v=>Math.floor(v+m+1e-8).toString(16).padStart(2,'0')).join('');
  };
- const layerStyles=new Map();let inTables=false,inLayerTable=false;
- for(const record of records){
-  if(record.type==='SECTION'){inTables=str(record,2).toUpperCase()==='TABLES';inLayerTable=false;continue}
-  if(record.type==='ENDSEC'){inTables=false;inLayerTable=false;continue}
-  if(!inTables)continue;
-  if(record.type==='TABLE'){inLayerTable=str(record,2).toUpperCase()==='LAYER';continue}
-  if(record.type==='ENDTAB'){inLayerTable=false;continue}
-  if(inLayerTable&&record.type==='LAYER'){
-   const aci=Math.abs(get(record,62,7)),rgb=get(record,420,-1),name=str(record,2,'0');
-   layerStyles.set(name,{color:rgb>=0?'#'+(rgb&0xffffff).toString(16).padStart(6,'0'):aciColor(aci),linetype:str(record,6,'CONTINUOUS'),lineweight:get(record,370,25),opacity:dxfOpacity(get(record,440,-1))});
+ const layerStyles=new Map(),textStyles=new Map();let inTables=false,inLayerTable=false,inTextStyleTable=false;
+  for(const record of records){
+   if(record.type==='SECTION'){inTables=str(record,2).toUpperCase()==='TABLES';inLayerTable=false;inTextStyleTable=false;continue}
+   if(record.type==='ENDSEC'){inTables=false;inLayerTable=false;inTextStyleTable=false;continue}
+   if(!inTables)continue;
+   if(record.type==='TABLE'){const tableName=str(record,2).toUpperCase();inLayerTable=tableName==='LAYER';inTextStyleTable=tableName==='STYLE';continue}
+   if(record.type==='ENDTAB'){inLayerTable=false;inTextStyleTable=false;continue}
+   if(inLayerTable&&record.type==='LAYER'){
+    const aci=Math.abs(get(record,62,7)),rgb=get(record,420,-1),name=str(record,2,'0');
+    layerStyles.set(name,{color:rgb>=0?'#'+(rgb&0xffffff).toString(16).padStart(6,'0'):aciColor(aci),linetype:str(record,6,'CONTINUOUS'),lineweight:get(record,370,25),opacity:dxfOpacity(get(record,440,-1))});
+   }
+   if(inTextStyleTable&&record.type==='STYLE'){
+    const name=str(record,2,'STANDARD'),fontFile=str(record,3,'txt.shx');
+    textStyles.set(name.toUpperCase(),{name,fontFile,bigFontFile:str(record,4,''),fixedHeight:get(record,40,0),widthFactor:get(record,41,1)||1,obliqueAngle:get(record,50,0),generationFlags:get(record,71,0),lastHeight:get(record,42,0)});
+   }
   }
- }
- const style=r=>{
+  const style=r=>{
   const layer=str(r,8,'0'),ly=layerStyles.get(layer)||{},aci=get(r,62,256),trueColor=get(r,420,-1),lineweight=get(r,370,-1),linetype=str(r,6,'BYLAYER');
   const byBlock=aci===0;
   const color=trueColor>=0?'#'+(trueColor&0xffffff).toString(16).padStart(6,'0'):(aci>=1&&aci<=255?aciColor(aci):ly.color)||colors[layer]||colors.General;
@@ -1217,15 +1282,22 @@ function parseDxfEntities(source){
   }
   if(sourceItem.hatchLoops)item.hatchLoops=sourceItem.hatchLoops.map(loop=>loop.map(transformPoint));
   if(sourceItem.type==='text'){
-   const angle=Number(sourceItem.textRotation||0)*Math.PI/180,dx=Math.cos(angle)*scaleX,dy=Math.sin(angle)*scaleY;
-   item.textRotation=(Math.atan2(dy,dx)+rotation)*180/Math.PI;
-   item.textHeightWorld=Number(sourceItem.textHeightWorld||.4)*Math.sqrt(Math.abs(scaleX*scaleY));
+   const angle=Number(sourceItem.textRotation||0)*Math.PI/180,baselineScale=Math.hypot(Math.cos(angle)*scaleX,Math.sin(angle)*scaleY),verticalScale=Math.hypot(Math.sin(angle)*scaleX,Math.cos(angle)*scaleY);
+   item.textRotation=(Math.atan2(Math.sin(angle)*scaleY,Math.cos(angle)*scaleX)+rotation)*180/Math.PI;
+   item.textHeightWorld=Number(sourceItem.textHeightWorld||.4)*verticalScale;
+   item.textWidthFactor=Number(sourceItem.textWidthFactor||1)*baselineScale/Math.max(verticalScale,1e-9);
+   if(Number(sourceItem.mtextWidthWorld)>0)item.mtextWidthWorld=Number(sourceItem.mtextWidthWorld)*baselineScale;
+   if(Number(sourceItem.textFitWidthWorld)>0)item.textFitWidthWorld=Number(sourceItem.textFitWidthWorld)*baselineScale;
+   if(sourceItem.textAlignmentPoint)item.textAlignmentPoint=transformPoint(sourceItem.textAlignmentPoint);
   }
   return item;
  };
  const blockLines=[];for(const [key,items] of blockRecords){const base=blockBases.get(key)||{x:0,y:0};blockLines.push('0','BLOCK','2',key,'10',String(base.x),'20',String(base.y));for(const item of items)blockLines.push('0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]]));blockLines.push('0','ENDBLK')}
  const blockSection=['0','SECTION','2','BLOCKS',...blockLines,'0','ENDSEC'];
- const parseBlockItems=(items,depth=0)=>parseDxfEntities([...blockSection,'0','SECTION','2','ENTITIES',...items.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n'),depth+1);
+  const styleTableSection=['0','SECTION','2','TABLES','0','TABLE','2','STYLE'];
+  for(const textStyle of textStyles.values())styleTableSection.push('0','STYLE','2',textStyle.name,'3',textStyle.fontFile,'4',textStyle.bigFontFile,'40',textStyle.fixedHeight,'41',textStyle.widthFactor,'50',textStyle.obliqueAngle,'71',textStyle.generationFlags,'42',textStyle.lastHeight);
+  styleTableSection.push('0','ENDTAB','0','ENDSEC');
+  const parseBlockItems=(items,depth=0)=>parseDxfEntities([...styleTableSection,...blockSection,'0','SECTION','2','ENTITIES',...items.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n'),depth+1);
  const header=records.find(r=>r.type==='SECTION'&&str(r,2).toUpperCase()==='HEADER');const unitIndex=header?.pairs.findIndex(p=>p[0]===9&&p[1]==='$INSUNITS')??-1;const unitCode=unitIndex>=0?Number(header.pairs[unitIndex+1]?.[1]):0;const unitMap={4:'mm',5:'cm',6:'m'};if(unitCode&&!unitMap[unitCode])warn('unidades DXF no admitidas; valores sin convertir');out.drawingUnits=unitMap[unitCode]||null;
  for(const r of records){
   if(r.type==='SECTION'){inEntities=str(r,2).toUpperCase()==='ENTITIES';continue}
@@ -1328,10 +1400,16 @@ function parseDxfEntities(source){
    const raw=type==='MTEXT'?r.pairs.filter(p=>p[0]===3||p[0]===1).map(p=>p[1]).join(''):str(r,1,'');
    const value=type==='MTEXT'?cleanMText(raw):raw;
    if(type==='MTEXT'&&/\\(?:[AaCcFfHhQqTtWw]|p|S)/.test(raw))note('MTEXT con formato visual aproximado');
-   const vx=get(r,11,1),vy=get(r,21,0);
-   const rotation=r.pairs.some(p=>p[0]===50)?get(r,50):(type==='MTEXT'?Math.atan2(vy,vx)*180/Math.PI:0);
-   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:get(r,40,0.4),...st};
-   if(type==='MTEXT'){item.mtextRaw=raw;item.mtextPlain=value}
+   const styleName=str(r,7,'STANDARD')||'STANDARD',textStyle=textStyles.get(styleName.toUpperCase())||{name:styleName,fontFile:'txt.shx',bigFontFile:'',fixedHeight:0,widthFactor:1,obliqueAngle:0,generationFlags:0,lastHeight:0};
+   const entityHeight=get(r,40,0),height=entityHeight>1e-9?entityHeight:(textStyle.fixedHeight>1e-9?textStyle.fixedHeight:.4);
+   const vx=get(r,11,1),vy=get(r,21,0),rotation=r.pairs.some(p=>p[0]===50)?get(r,50):(type==='MTEXT'?Math.atan2(vy,vx)*180/Math.PI:0);
+   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:height,textStyleName:styleName,textFontFile:textStyle.fontFile,textBigFontFile:textStyle.bigFontFile,textFontFamily:cadFontFamilyFromFile(textStyle.fontFile),textFontBold:/(?:bd|bold)/i.test(textStyle.fontFile),textFontItalic:/(?:italic|oblique)/i.test(textStyle.fontFile),textWidthFactor:type==='MTEXT'?textStyle.widthFactor:(get(r,41,textStyle.widthFactor)||textStyle.widthFactor),textObliqueAngle:type==='MTEXT'?textStyle.obliqueAngle:get(r,51,textStyle.obliqueAngle),textGenerationFlags:type==='MTEXT'?textStyle.generationFlags:get(r,71,textStyle.generationFlags),textStyleGenerationFlags:textStyle.generationFlags,textStyleFixedHeight:textStyle.fixedHeight,textStyleWidthFactor:textStyle.widthFactor,textStyleObliqueAngle:textStyle.obliqueAngle,...st};
+   if(type!=='MTEXT'){
+    item.textHorizontalAlignment=get(r,72,0);item.textVerticalAlignment=get(r,73,0);
+    if(r.pairs.some(p=>p[0]===11)&&r.pairs.some(p=>p[0]===21)){item.textAlignmentPoint={x:get(r,11),y:get(r,21)};item.textFitWidthWorld=distance(item.a,item.textAlignmentPoint)}
+   }else{
+    item.isMText=true;item.mtextRaw=raw;item.mtextPlain=value;item.mtextWidthWorld=Math.max(0,get(r,41,0));item.mtextAttachment=Math.max(1,Math.min(9,Math.round(get(r,71,1))));item.mtextLineSpacingFactor=get(r,44,1);item.mtextLineSpacingStyle=get(r,73,1);
+   }
    if(type==='ATTRIB'&&activeAttributeGroup)item.groupId=activeAttributeGroup;
    out.push(item);
   }
@@ -1387,17 +1465,28 @@ function buildDxf(){
  add(0,'LTYPE',100,'AcDbSymbolTableRecord',100,'AcDbLinetypeTableRecord',2,'DASHED',70,0,3,'Dashed',72,65,73,2,40,.75,49,.5,74,0,49,-.25,74,0);
  add(0,'ENDTAB');
  const layers=[...new Set(['0',...objects.map(dxfLayer)])];
- add(0,'TABLE',2,'LAYER',5,'ABCE',100,'AcDbSymbolTable',70,layers.length);
- layers.forEach(layer=>add(0,'LAYER',100,'AcDbSymbolTableRecord',100,'AcDbLayerTableRecord',2,layer,70,0,62,7,6,'CONTINUOUS'));
- add(0,'ENDTAB',0,'ENDSEC',0,'SECTION',2,'ENTITIES');
+  add(0,'TABLE',2,'LAYER',5,'ABCE',100,'AcDbSymbolTable',70,layers.length);
+  layers.forEach(layer=>add(0,'LAYER',100,'AcDbSymbolTableRecord',100,'AcDbLayerTableRecord',2,layer,70,0,62,7,6,'CONTINUOUS'));
+  add(0,'ENDTAB');
+  const dxfTextStyleName=o=>String(o.textStyleName||'STANDARD').replace(/[\x00-\x1f<>/\\":;?*|=]/g,'_').slice(0,255)||'STANDARD';
+  const textStyleMap=new Map();
+  for(const o of objects.filter(item=>item.type==='text')){const name=dxfTextStyleName(o);if(!textStyleMap.has(name))textStyleMap.set(name,{fontFile:o.textFontFile||'txt.shx',bigFontFile:o.textBigFontFile||'',fixedHeight:Number(o.textStyleFixedHeight)||0,widthFactor:Number(o.textStyleWidthFactor)||1,obliqueAngle:Number(o.textStyleObliqueAngle)||0,generationFlags:Number(o.textStyleGenerationFlags??o.textGenerationFlags)||0,lastHeight:Number(o.textHeightWorld)||.2})}
+  if(!textStyleMap.has('STANDARD'))textStyleMap.set('STANDARD',{fontFile:'txt.shx',bigFontFile:'',fixedHeight:0,widthFactor:1,obliqueAngle:0,generationFlags:0,lastHeight:.2});
+  add(0,'TABLE',2,'STYLE',5,'ABCF',100,'AcDbSymbolTable',70,textStyleMap.size);
+  for(const [name,style] of textStyleMap)add(0,'STYLE',100,'AcDbSymbolTableRecord',100,'AcDbTextStyleTableRecord',2,name,70,0,40,style.fixedHeight,41,style.widthFactor,50,style.obliqueAngle,71,style.generationFlags,42,style.lastHeight,3,style.fontFile,4,style.bigFontFile);
+  add(0,'ENDTAB',0,'ENDSEC',0,'SECTION',2,'ENTITIES');
  objects.forEach(o=>{
   const a=o.a,b=o.b,layer=dxfLayer(o),color=String(o.color||colors[layer]||colors.General),rgb=/^#[0-9a-f]{6}$/i.test(color)?parseInt(color.slice(1),16):0xffffff;
   const common=[100,'AcDbEntity',8,layer,370,Math.round(Number(o.lineweight||.25)*100),6,o.linetype==='DASHED'?'DASHED':'CONTINUOUS',420,rgb];
   const line=(p,q)=>add(0,'LINE',...common,100,'AcDbLine',10,p.x,20,p.y,30,0,11,q.x,21,q.y,31,0);
-  const textEntity=(p,value,height,rotation=0)=>{const valueText=String(value||'').replace(/\r/g,'');if(valueText.includes('\n'))add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,50,rotation,1,valueText.replace(/\n/g,'\\P'));else add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,50,rotation,1,valueText)};
+  const textEntity=(p,value,height,rotation=0,source={})=>{
+    const valueText=String(value||'').replace(/\r/g,''),styleName=dxfTextStyleName(source),widthFactor=Number(source.textWidthFactor||1),oblique=Number(source.textObliqueAngle||0);
+    if(valueText.includes('\n')||Number(source.mtextWidthWorld)>0)add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,41,Number(source.mtextWidthWorld||0),44,Number(source.mtextLineSpacingFactor||1),71,Number(source.mtextAttachment||1),50,rotation,7,styleName,1,valueText.replace(/\n/g,'\\P'));
+    else{add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,41,widthFactor,50,rotation,51,oblique,7,styleName,71,Number(source.textGenerationFlags||0),72,Number(source.textHorizontalAlignment||0),73,Number(source.textVerticalAlignment||0),1,valueText);if(source.textAlignmentPoint)add(11,source.textAlignmentPoint.x,21,source.textAlignmentPoint.y,31,0)}
+   };
   if(['line','dim','dimaligned','leader'].includes(o.type)&&a&&b){line(a,b);if(o.type==='dim'||o.type==='dimaligned')textEntity({x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance(a,b).toFixed(2)+' '+units,12/zoom);if(o.type==='leader'&&o.text)textEntity(b,o.text,12/zoom)}
   else if(o.type==='point'&&a)add(0,'POINT',...common,100,'AcDbPoint',10,a.x,20,a.y,30,0);
-  else if(o.type==='text'&&a){if(o.mtextRaw&&o.text===o.mtextPlain)add(0,'MTEXT',...common,100,'AcDbMText',10,a.x,20,a.y,30,0,40,o.textHeightWorld||.4,50,o.textRotation||0,1,o.mtextRaw);else textEntity(a,o.text,o.textHeightWorld||Number(o.textHeight||14)/zoom,o.textRotation||0)}
+  else if(o.type==='text'&&a){if(o.mtextRaw&&o.text===o.mtextPlain)add(0,'MTEXT',...common,100,'AcDbMText',10,a.x,20,a.y,30,0,40,o.textHeightWorld||.4,41,Number(o.mtextWidthWorld||0),44,Number(o.mtextLineSpacingFactor||1),71,Number(o.mtextAttachment||1),50,o.textRotation||0,7,dxfTextStyleName(o),1,o.mtextRaw);else textEntity(a,o.text,o.textHeightWorld||Number(o.textHeight||14)/zoom,o.textRotation||0,o)}
   else if(o.type==='circle'&&a&&b)add(0,'CIRCLE',...common,100,'AcDbCircle',10,a.x,20,a.y,30,0,40,distance(a,b));
   else if(o.type==='arc'&&arcGeometry(o.pts)){const g=arcGeometry(o.pts);add(0,'ARC',...common,100,'AcDbCircle',10,g.x,20,g.y,30,0,40,g.r,100,'AcDbArc',50,g.start,51,g.end)}
   else if(o.type==='ellipse'&&a&&b&&a.x!==b.x&&a.y!==b.y){const rx=Math.abs(b.x-a.x),ry=Math.abs(b.y-a.y),horizontal=rx>=ry;add(0,'ELLIPSE',...common,100,'AcDbEllipse',10,a.x,20,a.y,30,0,11,horizontal?rx:0,21,horizontal?0:ry,31,0,40,Math.min(rx,ry)/Math.max(rx,ry),41,0,42,Math.PI*2)}
