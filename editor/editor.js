@@ -426,6 +426,9 @@ function modelExtentsForPaper(){
 function effectivePaperViewports(layout){
  const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.width>0&&v.height>0&&v.status!==0&&v.id!==1):[];
  if(imported.length)return imported.slice(0,20);
+ // Imported sheets without a recovered viewport must not display an invented model view.
+ // New sheets and the explicit "Encadrar todo el modelo" option can generate a view.
+ if(layout.source!=='new'&&layout.viewportFit!=='all')return [];
  const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin),ext=modelExtentsForPaper();
  const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
  return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
