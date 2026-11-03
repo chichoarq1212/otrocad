@@ -118,7 +118,7 @@ function drawEntity(s,sel=false,preview=false){
  else if(s.type==='circle'){ctx.beginPath();ctx.arc(a.x,a.y,distance(a,b),0,Math.PI*2);ctx.stroke()}
  else if(s.type==='rect'||s.type==='hatch'){const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y);ctx.strokeRect(x,y,w,h);if(s.type==='hatch'){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.lineWidth=.8;const spacing=Math.max(5,Math.min(60,Number(s.hatchSpacing||10)));const pattern=s.hatchPattern||'ANSI31';if(pattern==='SOLID'){ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??.18)));ctx.fillRect(x,y,w,h)}else{const lines=(reverse)=>{for(let k=-h-w;k<w+h*2;k+=spacing){ctx.beginPath();if(reverse){ctx.moveTo(x+k,y);ctx.lineTo(x+k-h,y+h)}else{ctx.moveTo(x+k,y);ctx.lineTo(x+k+h,y+h)}ctx.stroke()}};lines(false);if(pattern==='CROSS')lines(true);if(pattern==='GRID'){for(let k=0;k<w;k+=spacing){ctx.beginPath();ctx.moveTo(x+k,y);ctx.lineTo(x+k,y+h);ctx.stroke()}for(let k=0;k<h;k+=spacing){ctx.beginPath();ctx.moveTo(x,y+k);ctx.lineTo(x+w,y+k);ctx.stroke()}}}ctx.restore()}}
  else if(s.type==='ellipse'){ctx.beginPath();ctx.ellipse(a.x,a.y,Math.abs(b.x-a.x),Math.abs(b.y-a.y),0,0,Math.PI*2);ctx.stroke()}
- else if(s.type==='polygon'){ctx.beginPath();s.pts.forEach((p,i)=>{const v=screen(p);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath();ctx.stroke()}
+ else if(s.type==='polygon'){ctx.beginPath();s.pts.forEach((p,i)=>{const v=screen(p);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath();if(s.solidFill&&!preview)ctx.fill();ctx.stroke()}
  else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
  else if(s.type==='text'){const size=s.textHeightWorld?Math.max(1,Number(s.textHeightWorld)*zoom):Number(s.textHeight||14);ctx.font=size+'px system-ui';ctx.translate(a.x,a.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);String(s.text||'Texto').split('\n').forEach((line,i)=>ctx.fillText(line,0,i*size*1.2))}
  ctx.restore();
@@ -883,6 +883,8 @@ function parseDxfEntities(source){
  const all=(r,c)=>r.pairs.filter(x=>x[0]===c).map(x=>Number(x[1]));
  const str=(r,c,d='')=>r.pairs.find(x=>x[0]===c)?.[1]??d;
  const style=r=>{const layer=str(r,8,'General'),aci=get(r,62,7),trueColor=get(r,420,-1),aciColors={1:'#ff3333',2:'#ffff33',3:'#33cc33',4:'#33ffff',5:'#3366ff',6:'#ff33ff',7:'#dce8f5',8:'#808080',9:'#b0b0b0'};return {layer,color:trueColor>=0?'#'+trueColor.toString(16).padStart(6,'0'):aciColors[aci]||colors[layer]||colors.General,lineweight:get(r,370,25)/100,linetype:str(r,6,'CONTINUOUS')==='DASHED'?'DASHED':'CONTINUOUS'}};
+ const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
+ for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
  const out=[],warnings={};let inEntities=false;
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
  const header=records.find(r=>r.type==='SECTION'&&str(r,2).toUpperCase()==='HEADER');const unitIndex=header?.pairs.findIndex(p=>p[0]===9&&p[1]==='$INSUNITS')??-1;const unitCode=unitIndex>=0?Number(header.pairs[unitIndex+1]?.[1]):0;const unitMap={4:'mm',5:'cm',6:'m'};if(unitCode&&!unitMap[unitCode])warn('unidades DXF no admitidas; valores sin convertir');out.drawingUnits=unitMap[unitCode]||null;
@@ -895,9 +897,29 @@ function parseDxfEntities(source){
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
   else if(type==='LWPOLYLINE'){const xs=all(r,10),ys=all(r,20),pts=xs.map((x,i)=>({x,y:ys[i]??0}));if(all(r,42).some(v=>v!==0))warn('polilíneas curvas simplificadas');if(pts.length>1)out.push({type:get(r,70,0)&1?'polygon':'poly',pts,...st})}
   else if(type==='ARC'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40),a1=get(r,50)*Math.PI/180,a2=get(r,51)*Math.PI/180,span=(a2-a1+Math.PI*2)%(Math.PI*2);if(rad>0&&span>0){const pts=[a1,a1+span/2,a1+span].map(t=>({x:a.x+rad*Math.cos(t),y:a.y+rad*Math.sin(t)}));out.push({type:'arc',pts,...st})}else warn('arcos no válidos omitidos')}
+  else if(type==='INSERT'){
+   const name=str(r,2).toUpperCase(),geometry=blockRecords.get(name),depth=Number(arguments[1]||0);
+   if(!geometry?.length||depth>=5||get(r,41,1)!==1||get(r,42,1)!==1||get(r,50)!==0||get(r,70,1)>1||get(r,71,1)>1){warn('INSERT no compatible omitido');continue}
+   const blockLines=[];for(const [key,items] of blockRecords){const base=blockBases.get(key)||{x:0,y:0};blockLines.push('0','BLOCK','2',key,'10',String(base.x),'20',String(base.y));for(const item of items)blockLines.push('0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]]));blockLines.push('0','ENDBLK')}
+   const blockSource=['0','SECTION','2','BLOCKS',...blockLines,'0','ENDSEC','0','SECTION','2','ENTITIES',...geometry.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n');
+   const pieces=parseDxfEntities(blockSource,depth+1),base=blockBases.get(name)||{x:0,y:0},dx=get(r,10)-base.x,dy=get(r,20)-base.y,groupId='dxf-insert-'+depth+'-'+out.length;
+   for(const item of pieces){if(item.a){item.a.x+=dx;item.a.y+=dy}if(item.b){item.b.x+=dx;item.b.y+=dy}if(item.pts)item.pts.forEach(point=>{point.x+=dx;point.y+=dy});out.push({...item,groupId})}
+   warn('INSERT descompuesto, sin atributos de bloque');if(pieces.importWarnings?.length)warn('INSERT con contenido simplificado u omitido');
+  }
+  else if(type==='DIMENSION'){
+   const geometry=blockRecords.get(str(r,2).toUpperCase());
+   if(!geometry?.length){warn('DIMENSION sin geometría gráfica omitida');continue}
+   const supported=geometry.filter(item=>['LINE','CIRCLE','ARC','LWPOLYLINE','ELLIPSE','TEXT','MTEXT'].includes(item.type));
+   if(!supported.length){warn('DIMENSION sin entidades compatibles omitida');continue}
+   const sourceBlock=['0','SECTION','2','ENTITIES',...supported.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n');
+   const pieces=parseDxfEntities(sourceBlock);if(!pieces.length){warn('DIMENSION sin entidades compatibles omitida');continue}const groupId='dxf-dimension-'+out.length;for(const item of pieces)out.push({...item,groupId});
+   warn('DIMENSION descompuesta, no asociativa');if(geometry.some(item=>item.type==='INSERT'))warn('símbolos de cota omitidos');
+  }
   else if(type==='HATCH'){
    const firstPath=r.pairs.findIndex(p=>p[0]===93),endPath=r.pairs.findIndex((p,i)=>i>firstPath&&p[0]===97),path=firstPath>=0?r.pairs.slice(firstPath+1,endPath<0?undefined:endPath):[];
    const xs=path.filter(p=>p[0]===10).map(p=>Number(p[1])),ys=path.filter(p=>p[0]===20).map(p=>Number(p[1]));
+   const solidPolygon=get(r,70)===1&&get(r,91)===1&&(get(r,92)&2)&&xs.length>=3&&xs.length===ys.length&&xs.every(Number.isFinite)&&ys.every(Number.isFinite)&&!path.some(pair=>pair[0]===42&&Number(pair[1])!==0);
+   if(solidPolygon&&!(get(r,93)===4&&new Set(xs).size===2&&new Set(ys).size===2)){out.push({type:'polygon',pts:xs.map((x,i)=>({x,y:ys[i]})),solidFill:true,...st});continue}
    if(get(r,70)===1&&get(r,91)===1&&(get(r,92)&2)&&get(r,93)===4&&xs.length===4&&ys.length===4&&xs.every(Number.isFinite)&&ys.every(Number.isFinite)){
     const minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys),corners=new Set(xs.map((x,i)=>`${x},${ys[i]}`));
     if(minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(`${x},${y}`)))out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},hatchPattern:'SOLID',hatchOpacity:1,...st});else warn('HATCH no rectangular omitido');
@@ -960,6 +982,7 @@ function buildDxf(){
   else if(o.type==='circle'&&a&&b)add(0,'CIRCLE',...common,100,'AcDbCircle',10,a.x,20,a.y,30,0,40,distance(a,b));
   else if(o.type==='arc'&&arcGeometry(o.pts)){const g=arcGeometry(o.pts);add(0,'ARC',...common,100,'AcDbCircle',10,g.x,20,g.y,30,0,40,g.r,100,'AcDbArc',50,g.start,51,g.end)}
   else if(o.type==='ellipse'&&a&&b&&a.x!==b.x&&a.y!==b.y){const rx=Math.abs(b.x-a.x),ry=Math.abs(b.y-a.y),horizontal=rx>=ry;add(0,'ELLIPSE',...common,100,'AcDbEllipse',10,a.x,20,a.y,30,0,11,horizontal?rx:0,21,horizontal?0:ry,31,0,40,Math.min(rx,ry)/Math.max(rx,ry),41,0,42,Math.PI*2)}
+  else if(o.type==='polygon'&&o.solidFill&&o.pts?.length>=3){add(0,'HATCH',...common,100,'AcDbHatch',10,0,20,0,30,0,210,0,220,0,230,1,2,'SOLID',70,1,71,0,91,1,92,3,72,0,73,1,93,o.pts.length);o.pts.forEach(p=>add(10,p.x,20,p.y));add(97,0,75,1,76,1,98,0)}
   else if(o.type==='hatch'&&o.hatchPattern==='SOLID'&&Number(o.hatchOpacity??.18)===1&&a&&b){const ps=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];add(0,'HATCH',...common,100,'AcDbHatch',10,0,20,0,30,0,210,0,220,0,230,1,2,'SOLID',70,1,71,0,91,1,92,3,72,0,73,1,93,4);ps.forEach(p=>add(10,p.x,20,p.y));add(97,0,75,1,76,1,98,0)}
   else if((o.type==='rect'||o.type==='hatch')&&a&&b){const ps=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}];add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,4,70,1);ps.forEach(p=>add(10,p.x,20,p.y))}
   else if(o.pts){add(0,'LWPOLYLINE',...common,100,'AcDbPolyline',90,o.pts.length,70,o.type==='polygon'?1:0);o.pts.forEach(p=>add(10,p.x,20,p.y))}

@@ -140,3 +140,11 @@ tapScope.tool='measure';tapScope.start=null;tapScope.temp=null;tapScope.updatePr
 vm.runInContext('handleTap({x:0,y:0});handleTap({x:3,y:4})',tapScope);
 assert.match(tapScope.status.textContent,/Distancia: 5\.000 m/);assert.equal(tapScope.start,null);
 console.log('Distance measurement check passed');
+
+const importFixture=['0','SECTION','2','BLOCKS','0','BLOCK','2','WALL','10','1','20','0','0','LINE','8','Muros','10','1','20','0','11','3','21','0','0','ENDBLK','0','BLOCK','2','*D1','10','0','20','0','0','LINE','10','0','20','1','11','2','21','1','0','MTEXT','10','1','20','1','40','0.2','1','2.00','0','ENDBLK','0','ENDSEC','0','SECTION','2','ENTITIES','0','INSERT','2','WALL','10','10','20','5','0','DIMENSION','2','*D1','0','HATCH','70','1','91','1','92','3','93','3','10','0','20','0','10','2','20','0','10','1','20','1','97','0','0','TEXT','10','0','20','0','40','1','50','90','1','MURO','0','ENDSEC','0','EOF'].join('\n');
+const imported=context.parseDxfEntities(importFixture);
+assert.ok(imported.some(x=>x.type==='line'&&x.a.x===10&&x.b.x===12&&x.a.y===5),'INSERT must translate block coordinates');
+assert.ok(imported.some(x=>x.groupId?.startsWith('dxf-dimension')&&x.type==='text'&&x.text==='2.00'),'DIMENSION graphics should retain label');
+assert.ok(imported.some(x=>x.type==='polygon'&&x.solidFill&&x.pts.length===3),'solid polygon hatch should be retained');
+assert.ok(imported.some(x=>x.type==='text'&&x.text==='MURO'&&x.textRotation===90),'rotated text should retain its angle');
+console.log('DXF checks passed: block translation, dimension graphics, polygon hatch and rotated text');
