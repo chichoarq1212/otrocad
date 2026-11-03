@@ -62,7 +62,7 @@ jobs:
               exit 1
             fi
           done
-          APK="https://github.com/chichoarq1212/otrocad/releases/download/android-hybrid-test-41528654796-1/OtroCAD-Android-0.5.4-test.apk"
+          APK="https://github.com/chichoarq1212/otrocad/releases/download/android-hybrid-test-41555394191-1/OtroCAD-Android-0.5.4-test.apk"
           WINDOWS_EXE="https://github.com/chichoarq1212/otrocad/releases/download/windows-experimental-41528654939-1/OtroCAD-Windows-0.5.4-experimental-Setup.exe"
 
           curl --fail --location --silent --show-error --max-time 90 "$APK" -o /tmp/otrocad-hybrid.apk
