@@ -2034,7 +2034,7 @@ function parseDxfEntities(source){
    const hatchSpacingWorld=Math.hypot(get(r,45),get(r,46))||Math.max((maxx-minx+maxy-miny)/50,.01);
    const gradient=get(r,450)===1,rgbGradient=r.pairs.filter(p=>p[0]===421).slice(0,2).map(p=>'#'+(Number(p[1])&0xffffff).toString(16).padStart(6,'0'));
    const patternLines=solid?[]:hatchPatternDefinitions(r);
-   const appearance={...st,hatchPattern:pattern,hatchOpacity:1,hatchSpacingWorld,hatchAngle:get(r,52,45),hatchPatternLines:patternLines,
+   const appearance={...st,hatchPattern:pattern,hatchOpacity:solid?1:(st.cadOpacity??1),hatchSpacingWorld,hatchAngle:get(r,52,45),hatchPatternLines:patternLines,
     hatchGradientColors:gradient&&rgbGradient.length?rgbGradient:null,hatchGradientAngle:get(r,460)*180/Math.PI,importedHatch:true};
    if(rectangular&&solid)out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},...appearance});
    else out.push({type:'polygon',pts,hatchLoops:loops,solidFill:solid,...appearance});
@@ -2088,7 +2088,7 @@ function parseDxfEntities(source){
    while(pts.length>3&&distance(pts.at(-1),pts.at(-2))<1e-9)pts.pop();
    if(pts.length>=3)out.push({type:'polygon',pts,solidFill:true,importedHatch:true,civilTin:type==='3DFACE',hatchOpacity:1,cadSourceEntity:type,...st});
    else warn(type+' no compatible omitido');
-   if(type==='3DFACE')note('3DFACE proyectada a relleno 2D');
+   if(type==='3DFACE')note('3DFACE conservada como geometría triangular 3D');
   }
   else if(type==='SPLINE'){
    const fitX=all(r,11),fitY=all(r,21),controlX=all(r,10),controlY=all(r,20),xs=fitX.length>=2?fitX:controlX,ys=fitY.length>=2?fitY:controlY,pts=xs.map((x,i)=>({x,y:ys[i]??0}));
