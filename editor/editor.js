@@ -1987,6 +1987,7 @@ function parseDxfEntities(source){
    if(columns*rows>1)note('MINSERT expandido a entidades editables');
    note('INSERT/MINSERT importado como grupo editable');
    if(linkedAttributes)activeAttributeGroup='dxf-insert-'+depth+'-'+(out.length-displayPieces.length)+'-0-0';
+   const recoveredHatches=pieces.filter(item=>item.cadHatchRecovery==='degenerate-solid').length;if(recoveredHatches)note('INSERT '+name+': '+recoveredHatches+' HATCH sólido degenerado recuperado como línea');
    if(pieces.importWarnings?.length){warn('INSERT con entidades no compatibles');diagnose('INSERT '+name,pieces.importWarningCounts);diagnose('INSERT '+name,pieces.importDiagnostics)}
   }
   else if(type==='DIMENSION'){
