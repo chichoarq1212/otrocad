@@ -395,3 +395,72 @@ assert.equal(unclosedHatch.length,1,'An open boundary cannot be treated as a val
 assert.ok(unclosedHatch.importWarnings.some(x=>x.includes('HATCH sin contorno')));
 assert.ok(Object.keys(unclosedHatch.importDiagnostics).some(x=>x.includes('referencias=1')));
 console.log('Associative HATCH checks passed: closed polylines, stitched edges and unclosed-boundary safety');
+
+
+// Preserve AutoCAD gray ACI palette and layer-inherited styling, not blue-white defaults.
+const grayLayerFixture=[
+ '0','SECTION','2','TABLES','0','TABLE','2','LAYER',
+ '0','LAYER','2','GrayFloor','62','254','6','CENTER','370','50',
+ '0','ENDTAB','0','ENDSEC',
+ '0','SECTION','2','ENTITIES',
+ '0','LINE','8','GrayFloor','10','0','20','0','11','5','21','0',
+ '0','LINE','8','GrayFloor','62','253','10','0','20','1','11','5','21','1',
+ '0','LINE','8','GrayFloor','62','251','10','0','20','2','11','5','21','2',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const grayEntities=context.parseDxfEntities(grayLayerFixture);
+assert.equal(grayEntities.length,3);
+assert.equal(grayEntities[0].color,'#cccccc','BYLAYER should inherit gray layer color ACI 254');
+assert.equal(grayEntities[0].linetype,'CENTER','BYLAYER should inherit linetype');
+assert.equal(grayEntities[0].lineweight,.5,'BYLAYER should inherit 0.50 mm lineweight');
+assert.equal(grayEntities[1].color,'#999999','ACI 253 should render actual CAD gray');
+assert.equal(grayEntities[2].color,'#656565','ACI 251 should render actual CAD dark gray');
+
+const detailedHatchFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','HATCH','8','GrayFloor','62','253','2','ANSI31','70','0','440','33554560',
+ '91','1','92','2','72','0','73','1','93','4',
+ '10','0','20','0','10','3','20','0','10','3','20','2','10','0','20','2','97','0',
+ '78','1','53','45','43','0','44','0','45','0.2','46','-0.2','79','2','49','0.5','49','-0.25',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const detailedHatch=context.parseDxfEntities(detailedHatchFixture);
+assert.equal(detailedHatch.length,1);
+assert.equal(detailedHatch[0].color,'#999999');
+assert.equal(detailedHatch[0].importedHatch,true);
+assert.equal(detailedHatch[0].hatchPatternLines.length,1,'Preserve native DXF pattern definitions');
+assert.equal(detailedHatch[0].hatchPatternLines[0].angle,45);
+assert.equal(detailedHatch[0].hatchPatternLines[0].offset.x,.2);
+assert.equal(detailedHatch[0].hatchPatternLines[0].dashes.length,2);
+assert.ok(detailedHatch[0].hatchOpacity>.49&&detailedHatch[0].hatchOpacity<.51);
+
+const gradientHatchFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','HATCH','2','SOLID','70','1','91','1','92','2','72','0','73','1','93','4',
+ '10','0','20','0','10','4','20','0','10','4','20','4','10','0','20','4','97','0',
+ '450','1','460','1.5707963267948966','421','8421504','421','16777215','470','LINEAR',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const gradientHatch=context.parseDxfEntities(gradientHatchFixture);
+assert.equal(gradientHatch.length,1);
+assert.equal(gradientHatch[0].hatchPattern,'SOLID');
+assert.equal(gradientHatch[0].hatchGradientColors[0],'#808080');
+assert.equal(gradientHatch[0].hatchGradientColors[1],'#ffffff');
+assert.ok(Math.abs(gradientHatch[0].hatchGradientAngle-90)<1e-6);
+console.log('CAD color and hatch fidelity checks passed: gray ACI, layer styles, transparency, pattern lines and gradient');
+
+
+// AutoCAD SOLID/TRACE are filled regions, and four SOLID vertices use 1-2-4-3 order.
+const solidTraceFixture=[
+ '0','SECTION','2','ENTITIES',
+ '0','SOLID','62','253','10','0','20','0','11','4','21','0','12','0','22','2','13','4','23','2',
+ '0','TRACE','10','5','20','0','11','7','21','0','12','5','22','2','13','7','23','2',
+ '0','ENDSEC','0','EOF'
+].join('\n');
+const solidTrace=context.parseDxfEntities(solidTraceFixture);
+assert.equal(solidTrace.length,2);
+assert.ok(solidTrace.every(x=>x.solidFill===true&&x.importedHatch===true),'2D SOLID and TRACE should be filled');
+assert.equal(solidTrace[0].color,'#999999');
+assert.equal(solidTrace[0].pts[2].x,4,'Third rendered SOLID corner must use DXF vertex 13');
+assert.equal(solidTrace[0].pts[3].x,0,'Fourth rendered SOLID corner must use DXF vertex 12');
+console.log('SOLID and TRACE gray fills and non-crossing vertices passed');

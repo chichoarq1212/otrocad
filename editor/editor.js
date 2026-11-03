@@ -108,8 +108,54 @@ function arcParams(points){if(!points||points.length<3)return null;const p=point
 const CAD_THEMES={white:'#ffffff',black:'#050709',dark:'#101820',graphite:'#242a30',slate:'#34424d',bluegray:'#405665'};
 let cadTheme='dark';try{cadTheme=localStorage.getItem('otrocad-canvas-theme')||'dark'}catch(e){}
 function applyCanvasTheme(name){if(!CAD_THEMES[name])return;cadTheme=name;$('#stage').style.backgroundColor=CAD_THEMES[name];try{localStorage.setItem('otrocad-canvas-theme',name)}catch(e){}render();status.textContent='Fondo: '+name.toUpperCase()}
+function cadLineDash(linetype){
+ const name=String(linetype||'CONTINUOUS').toUpperCase();
+ if(name.includes('DASHDOT')||name.includes('CENTER'))return [16,5,3,5];
+ if(name.includes('PHANTOM'))return [18,5,3,5,3,5];
+ if(name.includes('HIDDEN')||name.includes('DASH'))return [9,5];
+ if(name.includes('DOT'))return [1.5,5];
+ return [];
+}
+function cadHatchGradient(s,points){
+ const colors=s.hatchGradientColors;
+ if(!colors?.length||!points?.length)return null;
+ const xs=points.map(p=>p.x),ys=points.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+ const r=Math.max(1,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))/2);
+ const a=-Number(s.hatchGradientAngle||0)*Math.PI/180,dx=Math.cos(a)*r,dy=Math.sin(a)*r;
+ const gradient=ctx.createLinearGradient(cx-dx,cy-dy,cx+dx,cy+dy);
+ gradient.addColorStop(0,colors[0]);gradient.addColorStop(1,colors[1]||colors[0]);
+ return gradient;
+}
+function strokeCadHatchPattern(s,allPoints){
+ const defs=s.hatchPatternLines;
+ if(!defs?.length||!allPoints?.length)return false;
+ const xs=allPoints.map(p=>p.x),ys=allPoints.map(p=>p.y),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+ const radius=Math.min(40000,Math.hypot(maxX-minX,maxY-minY)+100),corners=[[minX,minY],[maxX,minY],[minX,maxY],[maxX,maxY]];
+ let rendered=0;
+ for(const def of defs.slice(0,64)){
+  const angle=Number(def.angle||0)*Math.PI/180,d={x:Math.cos(angle),y:-Math.sin(angle)},n={x:-d.y,y:d.x};
+  const base=screen(def.base||{x:0,y:0}),delta={x:Number(def.offset?.x||0)*zoom,y:-Number(def.offset?.y||0)*zoom};
+  const step=delta.x*n.x+delta.y*n.y;
+  if(!Number.isFinite(step)||Math.abs(step)<1e-7)continue;
+  const projections=corners.map(p=>p.x*n.x+p.y*n.y),baseProj=base.x*n.x+base.y*n.y;
+  const kA=(Math.min(...projections)-baseProj)/step,kB=(Math.max(...projections)-baseProj)/step;
+  const low=Math.ceil(Math.min(kA,kB)-1),high=Math.floor(Math.max(kA,kB)+1);
+  if(!Number.isFinite(low)||!Number.isFinite(high))continue;
+  const dash=(def.dashes||[]).map(v=>Math.max(.75,Math.min(2000,Math.abs(Number(v))*zoom)));
+  ctx.setLineDash(dash.length?dash:[]);
+  ctx.lineWidth=Math.max(.7,Math.min(2,Number(s.lineweight||.25)*2.4));
+  const count=Math.max(0,high-low+1),stride=Math.max(1,Math.ceil(count/Math.max(1,1200-rendered)));
+  for(let k=low;k<=high&&rendered<1200;k+=stride){
+   const p={x:base.x+k*delta.x,y:base.y+k*delta.y};
+   ctx.beginPath();ctx.moveTo(p.x-d.x*radius,p.y-d.y*radius);ctx.lineTo(p.x+d.x*radius,p.y+d.y*radius);ctx.stroke();rendered++;
+  }
+  if(rendered>=1200)break;
+ }
+ ctx.setLineDash([]);
+ return rendered>0;
+}
 function drawEntity(s,sel=false,preview=false){
- ctx.save();const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:(s.linetype==='DASHED'?[8,5]:[]));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:1;
+ ctx.save();const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
  const a=s.a&&screen(s.a),b=s.b&&screen(s.b);
  if(s.type==='point'){ctx.beginPath();ctx.moveTo(a.x-4,a.y);ctx.lineTo(a.x+4,a.y);ctx.moveTo(a.x,a.y-4);ctx.lineTo(a.x,a.y+4);ctx.stroke()}
  else if(s.type==='line'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
@@ -117,23 +163,27 @@ function drawEntity(s,sel=false,preview=false){
  else if(s.type==='arc'){const g=arcParams(s.pts);if(g){ctx.beginPath();ctx.arc(g.x,g.y,g.r,g.a1,g.a3,g.anticlockwise);ctx.stroke()}else{const ps=s.pts.map(screen);ctx.beginPath();ctx.moveTo(ps[0].x,ps[0].y);ctx.quadraticCurveTo(ps[1].x,ps[1].y,ps[2].x,ps[2].y);ctx.stroke()}}
  else if(s.type==='leader'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.font='12px system-ui';ctx.fillText(s.text||'',b.x+4,b.y-4)}
  else if(s.type==='circle'){ctx.beginPath();ctx.arc(a.x,a.y,distance(a,b),0,Math.PI*2);ctx.stroke()}
- else if(s.type==='rect'||s.type==='hatch'){const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y);ctx.strokeRect(x,y,w,h);if(s.type==='hatch'){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.lineWidth=.8;const spacing=Math.max(5,Math.min(60,Number(s.hatchSpacing||10)));const pattern=s.hatchPattern||'ANSI31';if(pattern==='SOLID'){ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??.18)));ctx.fillRect(x,y,w,h)}else{const lines=(reverse)=>{for(let k=-h-w;k<w+h*2;k+=spacing){ctx.beginPath();if(reverse){ctx.moveTo(x+k,y);ctx.lineTo(x+k-h,y+h)}else{ctx.moveTo(x+k,y);ctx.lineTo(x+k+h,y+h)}ctx.stroke()}};lines(false);if(pattern==='CROSS')lines(true);if(pattern==='GRID'){for(let k=0;k<w;k+=spacing){ctx.beginPath();ctx.moveTo(x+k,y);ctx.lineTo(x+k,y+h);ctx.stroke()}for(let k=0;k<h;k+=spacing){ctx.beginPath();ctx.moveTo(x,y+k);ctx.lineTo(x+w,y+k);ctx.stroke()}}}ctx.restore()}}
+ else if(s.type==='rect'||s.type==='hatch'){const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y);if(s.type==='rect'||!s.importedHatch||sel||preview)ctx.strokeRect(x,y,w,h);if(s.type==='hatch'){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.lineWidth=.8;const spacing=Math.max(5,Math.min(60,Number(s.hatchSpacing||10)));const pattern=s.hatchPattern||'ANSI31';if(pattern==='SOLID'){ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??.18)));ctx.fillStyle=cadHatchGradient(s,[{x,y},{x:x+w,y:y+h}])||color;ctx.fillRect(x,y,w,h)}else if(s.hatchPatternLines?.length){strokeCadHatchPattern(s,[{x,y},{x:x+w,y:y+h}])}else{const lines=(reverse)=>{for(let k=-h-w;k<w+h*2;k+=spacing){ctx.beginPath();if(reverse){ctx.moveTo(x+k,y);ctx.lineTo(x+k-h,y+h)}else{ctx.moveTo(x+k,y);ctx.lineTo(x+k+h,y+h)}ctx.stroke()}};lines(false);if(pattern==='CROSS')lines(true);if(pattern==='GRID'){for(let k=0;k<w;k+=spacing){ctx.beginPath();ctx.moveTo(x+k,y);ctx.lineTo(x+k,y+h);ctx.stroke()}for(let k=0;k<h;k+=spacing){ctx.beginPath();ctx.moveTo(x,y+k);ctx.lineTo(x+w,y+k);ctx.stroke()}}}ctx.restore()}}
  else if(s.type==='ellipse'){ctx.beginPath();ctx.ellipse(a.x,a.y,Math.abs(b.x-a.x),Math.abs(b.y-a.y),0,0,Math.PI*2);ctx.stroke()}
  else if(s.type==='polygon'){
   const loops=s.hatchLoops?.length?s.hatchLoops:[s.pts],allPoints=[];
   ctx.beginPath();
   for(const loop of loops){loop.forEach((p,i)=>{const v=screen(p);allPoints.push(v);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath()}
-  if(s.solidFill&&!preview)ctx.fill('evenodd');
-  else if(s.hatchPattern&&!preview&&allPoints.length){
-   ctx.save();ctx.clip('evenodd');ctx.globalAlpha=Math.max(.1,Math.min(1,Number(s.hatchOpacity??.65)));
-   const xs=allPoints.map(p=>p.x),ys=allPoints.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
-   const radius=Math.min(30000,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))+20);
-   const spacing=Math.max(5,Math.min(100,Math.abs(Number(s.hatchSpacingWorld)||.2)*zoom));
-   ctx.translate(cx,cy);ctx.rotate(-Number(s.hatchAngle||45)*Math.PI/180);ctx.lineWidth=.8;
-   let lines=0;for(let x=-radius;x<=radius&&lines<800;x+=spacing,lines++){ctx.beginPath();ctx.moveTo(x,-radius);ctx.lineTo(x,radius);ctx.stroke()}
+  if(s.solidFill&&!preview){
+   ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??1)));
+   ctx.fillStyle=cadHatchGradient(s,allPoints)||color;ctx.fill('evenodd');ctx.restore();
+  }else if(s.hatchPattern&&!preview&&allPoints.length){
+   ctx.save();ctx.clip('evenodd');ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??.65)));
+   if(!strokeCadHatchPattern(s,allPoints)){
+    const xs=allPoints.map(p=>p.x),ys=allPoints.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+    const radius=Math.min(30000,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))+20);
+    const spacing=Math.max(5,Math.min(100,Math.abs(Number(s.hatchSpacingWorld)||.2)*zoom));
+    ctx.translate(cx,cy);ctx.rotate(-Number(s.hatchAngle||45)*Math.PI/180);ctx.lineWidth=.8;
+    let lines=0;for(let x=-radius;x<=radius&&lines<800;x+=spacing,lines++){ctx.beginPath();ctx.moveTo(x,-radius);ctx.lineTo(x,radius);ctx.stroke()}
+   }
    ctx.restore();
   }
-  ctx.stroke();
+  if(!s.importedHatch||sel||preview)ctx.stroke();
  }
  else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
  else if(s.type==='text'){const size=s.textHeightWorld?Math.max(1,Number(s.textHeightWorld)*zoom):Number(s.textHeight||14);ctx.font=size+'px system-ui';ctx.translate(a.x,a.y);ctx.rotate(-Number(s.textRotation||0)*Math.PI/180);String(s.text||'Texto').split('\n').forEach((line,i)=>ctx.fillText(line,0,i*size*1.2))}
@@ -191,7 +241,9 @@ function updatePrompt(){promptEl.textContent=tool==='select'?'SELECCIÓN · dos 
 function render(){
  const finish=$('#finish-poly');finish.hidden=tool!=='poly'||poly.length===0;finish.disabled=poly.length<2;
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':(getComputedStyle($('#stage')).backgroundColor||'#101820');ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
- objects.forEach((s,i)=>{if(!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
+ // Imported CAD hatches are background fills; keep dimensions, walls and labels visible on top.
+ objects.forEach((s,i)=>{if(s.importedHatch&&!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
+ objects.forEach((s,i)=>{if(!s.importedHatch&&!hiddenLayers.has(s.layer))drawEntity(s,i===selected||selectedSet.has(i))});
  drawSelectionGrips();if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
  if(!printing&&temp)drawEntity(temp,false,true);
@@ -889,18 +941,19 @@ async function getDwgRuntime(){
  }
  return dwgRuntimePromise;
 }
-const importReportButton=$('#importReport'),copyImportReportButton=$('#copyImportReport');let lastImportReport=[];
+const importReportButton=$('#importReport'),copyImportReportButton=$('#copyImportReport'),convertedDxfButton=$('#convertedDxf');let lastImportReport=[],lastConvertedDxf=null,lastConvertedName='dibujo';
+if(convertedDxfButton)convertedDxfButton.onclick=()=>{if(lastConvertedDxf)download(lastConvertedName.replace(/\.[^.]+$/,'')+'-convertido.dxf',lastConvertedDxf,'application/dxf')};
 importReportButton.onclick=()=>alert(lastImportReport.length?lastImportReport.join('\n'):'No hay advertencias en el último dibujo importado.');
 copyImportReportButton.onclick=async()=>{
  const report=lastImportReport.join('\n');if(!report)return;
  try{await navigator.clipboard.writeText(report);status.textContent='Diagnóstico CAD copiado. Puedes pegarlo en el chat.'}
  catch(error){console.warn('No se pudo copiar el diagnóstico:',error);alert(report)}
 };
-$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;lastImportReport=[
+$('#file').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const ext=f.name.split('.').pop().toLowerCase();let arr,importedDxf=null;if(ext==='json'){const v=JSON.parse(await f.text());arr=Array.isArray(v)?v:v.shapes;if(!Array.isArray(arr))throw Error('El JSON no contiene entidades válidas')}else if(ext==='dxf'){arr=parseDxfEntities(await f.text())}else if(ext==='dwg'){status.textContent='Convirtiendo DWG en el dispositivo…';const engine=await getDwgRuntime();const input=new Uint8Array(await f.arrayBuffer());if(input.length<6||new TextDecoder().decode(input.subarray(0,4))!=='AC10')throw Error('El archivo no tiene una cabecera DWG válida.');let dxfBytes,recovered=false;try{dxfBytes=engine.dwg_to_dxf(input)}catch(strictError){console.warn('Lectura DWG estricta falló:',strictError);if(typeof engine.dwg_to_dxf_failsafe!=='function')throw Error('El lector DWG no pudo abrir este archivo. Actualiza OtroCAD e inténtalo nuevamente. Detalle: '+(strictError.message||strictError));if(!confirm('La lectura completa del DWG falló. ¿Intentar recuperar las entidades compatibles?\n\nPuede perder bloques, cotas u otros elementos. El archivo DWG original no se modificará.'))return;dxfBytes=engine.dwg_to_dxf_failsafe(input);recovered=true}const dxf=new TextDecoder('utf-8').decode(dxfBytes);importedDxf=dxf;arr=parseDxfEntities(dxf);if(recovered){arr.recoveredDwg=true;arr.importWarnings=arr.importWarnings||[];arr.importWarnings.unshift('DWG recuperado parcialmente tras un error de lectura. Comprueba el plano antes de guardar.')}}else throw Error('Formato no compatible. Usa JSON, DXF o DWG.');if(!arr.length)throw Error('No se encontraron entidades compatibles.');if(arr.importWarnings?.length&&!confirm('El archivo contiene elementos que pueden perderse o simplificarse:\n'+arr.importWarnings.join('\n')+'\n\n¿Abrir de todos modos? Conserva el archivo original.'))return;if(!checkpoint()&&objects.length)throw Error('No se reemplazó el dibujo porque no se pudo conservar la copia anterior.');objects=arr;lastConvertedDxf=importedDxf;lastConvertedName=f.name;if(convertedDxfButton)convertedDxfButton.hidden=!importedDxf;lastImportReport=[
  'OtroCAD · Informe de importación', 'Archivo: '+f.name, 'Entidades editables: '+arr.length,
  'Pérdidas o incompatibilidades:',...(arr.importWarnings?.length?arr.importWarnings:['Ninguna detectada']),
  'Ajustes visuales:',...(arr.importNotes?.length?arr.importNotes:['Ninguno']),
- 'Causas dentro de bloques y cotas:',
+ 'Causas dentro de bloques, cotas y sombreados (sin coordenadas):',
  ...((Object.entries(arr.importDiagnostics||{}).sort((a,b)=>b[1]-a[1]).map(([name,count])=>count+' '+name))||[])
 ];importReportButton.hidden=false;copyImportReportButton.hidden=false;if(arr.drawingUnits)units=arr.drawingUnits;clearSelection();save();render();status.textContent=f.name+' · '+arr.length+' entidades cargadas'+(arr.recoveredDwg?' · RECUPERACIÓN PARCIAL':'')+(arr.importNotes?.length?' · '+arr.importNotes.length+' avisos de compatibilidad':'');status.title=[...(arr.importWarnings||[]),...(arr.importNotes||[])].join('\n')}catch(err){console.error(err);alert('No se pudo abrir el archivo: '+(err.message||err))}finally{e.target.value=''}};
 function parseDxfEntities(source){
@@ -912,7 +965,37 @@ function parseDxfEntities(source){
  const get=(r,c,d=0)=>{const p=r.pairs.find(x=>x[0]===c);if(!p)return d;const n=Number(p[1]);return Number.isFinite(n)?n:d};
  const all=(r,c)=>r.pairs.filter(x=>x[0]===c).map(x=>Number(x[1]));
  const str=(r,c,d='')=>r.pairs.find(x=>x[0]===c)?.[1]??d;
- const style=r=>{const layer=str(r,8,'General'),aci=get(r,62,7),trueColor=get(r,420,-1),aciColors={1:'#ff3333',2:'#ffff33',3:'#33cc33',4:'#33ffff',5:'#3366ff',6:'#ff33ff',7:'#dce8f5',8:'#808080',9:'#b0b0b0'};return {layer,color:trueColor>=0?'#'+trueColor.toString(16).padStart(6,'0'):aciColors[aci]||colors[layer]||colors.General,lineweight:get(r,370,25)/100,linetype:str(r,6,'CONTINUOUS')==='DASHED'?'DASHED':'CONTINUOUS'}};
+ const dxfOpacity=raw=>raw>=0&&(raw>>>24)===2?(raw&255)/255:1;
+ // AutoCAD's ACI palette: 10–249 are 24 hues × 10 brightness/saturation steps;
+ // 250–255 are true grayscale. 7 adapts to light/dark drawing backgrounds.
+ const aciColor=index=>{
+  if(index===7)return '#dce8f5';
+  const basic={1:'#ff0000',2:'#ffff00',3:'#00ff00',4:'#00ffff',5:'#0000ff',6:'#ff00ff',8:'#808080',9:'#c0c0c0',250:'#000000',251:'#656565',252:'#666666',253:'#999999',254:'#cccccc',255:'#ffffff'};
+  if(basic[index])return basic[index];
+  if(index<10||index>249)return null;
+  const group=Math.floor((index-10)/10),shade=(index-10)%10,v=[255,255,165,165,127,127,76,76,38,38][shade],sat=shade%2?.5:1;
+  const h=group*15/60,c=v*sat,x=c*(1-Math.abs(h%2-1)),m=v-c;
+  const rgb=h<1?[c,x,0]:h<2?[x,c,0]:h<3?[0,c,x]:h<4?[0,x,c]:h<5?[x,0,c]:[c,0,x];
+  return '#'+rgb.map(v=>Math.floor(v+m+1e-8).toString(16).padStart(2,'0')).join('');
+ };
+ const layerStyles=new Map();let inTables=false,inLayerTable=false;
+ for(const record of records){
+  if(record.type==='SECTION'){inTables=str(record,2).toUpperCase()==='TABLES';inLayerTable=false;continue}
+  if(record.type==='ENDSEC'){inTables=false;inLayerTable=false;continue}
+  if(!inTables)continue;
+  if(record.type==='TABLE'){inLayerTable=str(record,2).toUpperCase()==='LAYER';continue}
+  if(record.type==='ENDTAB'){inLayerTable=false;continue}
+  if(inLayerTable&&record.type==='LAYER'){
+   const aci=Math.abs(get(record,62,7)),rgb=get(record,420,-1),name=str(record,2,'0');
+   layerStyles.set(name,{color:rgb>=0?'#'+(rgb&0xffffff).toString(16).padStart(6,'0'):aciColor(aci),linetype:str(record,6,'CONTINUOUS'),lineweight:get(record,370,25),opacity:dxfOpacity(get(record,440,-1))});
+  }
+ }
+ const style=r=>{
+  const layer=str(r,8,'0'),ly=layerStyles.get(layer)||{},aci=get(r,62,256),trueColor=get(r,420,-1),lineweight=get(r,370,-1),linetype=str(r,6,'BYLAYER');
+  const byBlock=aci===0;
+  const color=trueColor>=0?'#'+(trueColor&0xffffff).toString(16).padStart(6,'0'):(aci>=1&&aci<=255?aciColor(aci):ly.color)||colors[layer]||colors.General;
+  return {layer,color,cadByBlock:byBlock,cadOpacity:r.pairs.some(p=>p[0]===440)?dxfOpacity(get(r,440,-1)):(ly.opacity??1),lineweight:(lineweight>=0?lineweight:(ly.lineweight>=0?ly.lineweight:25))/100,linetype:linetype==='BYLAYER'?(ly.linetype||'CONTINUOUS'):linetype};
+ };
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
  const out=[],warnings={},notes={},diagnostics={};let inEntities=false,activeAttributeGroup=null;
@@ -958,6 +1041,21 @@ function parseDxfEntities(source){
   return Array.from({length:steps+1},(_,i)=>{const t=a1+direction*sweep*i/steps;return{x:cx+radius*Math.cos(t),y:cy+radius*Math.sin(t)}});
  };
 
+ const hatchPatternDefinitions=r=>{
+  const p=r.pairs,idx=p.findIndex(pair=>pair[0]===78);
+  if(idx<0)return [];
+  const count=Math.min(64,Math.max(0,Number(p[idx][1])||0)),defs=[];let i=idx+1;
+  for(let k=0;k<count&&i<p.length;k++){
+   while(i<p.length&&p[i][0]!==53&&p[i][0]!==98&&p[i][0]!==450)i++;
+   if(p[i]?.[0]!==53)break;
+   const part=[];part.push(p[i++]);
+   while(i<p.length&&![53,98,450].includes(p[i][0]))part.push(p[i++]);
+   const val=(code,def=0)=>{const pair=part.find(v=>v[0]===code);return pair&&Number.isFinite(Number(pair[1]))?Number(pair[1]):def};
+   const dashes=part.filter(v=>v[0]===49).slice(0,32).map(v=>Number(v[1])).filter(Number.isFinite);
+   defs.push({angle:val(53),base:{x:val(43),y:val(44)},offset:{x:val(45),y:val(46)},dashes});
+  }
+  return defs;
+ };
  const hatchBoundaries=r=>{
   const pairs=r.pairs,loops=[];let i=pairs.findIndex(p=>p[0]===91);if(i<0)return loops;
   const total=Math.min(512,+pairs[i++][1]||0);
@@ -1095,7 +1193,7 @@ function parseDxfEntities(source){
  };
  const transformBlockItem=(sourceItem,transformPoint,scaleX,scaleY,rotation,groupId,insertStyle)=>{
   const item={...sourceItem,groupId},nonUniform=Math.abs(Math.abs(scaleX)-Math.abs(scaleY))>1e-9,rotated=Math.abs(rotation)>1e-9;
-  if(sourceItem.layer==='0'&&insertStyle){item.layer=insertStyle.layer;item.color=insertStyle.color}
+  if(insertStyle&&(sourceItem.layer==='0'||sourceItem.cadByBlock)){if(sourceItem.layer==='0')item.layer=insertStyle.layer;if(sourceItem.layer==='0'||sourceItem.cadByBlock)item.color=insertStyle.color;item.cadByBlock=false}
   let points=null;
   if(sourceItem.type==='circle'&&nonUniform&&sourceItem.a&&sourceItem.b){
    const center=sourceItem.a,r=distance(center,sourceItem.b);points=Array.from({length:49},(_,i)=>{const t=i/48*Math.PI*2;return transformPoint({x:center.x+r*Math.cos(t),y:center.y+r*Math.sin(t)})});
@@ -1203,17 +1301,20 @@ function parseDxfEntities(source){
    if(!pts?.length){
     warn('HATCH sin contorno compatible omitido');
     const paths=get(r,91,-1),vertices=r.pairs.filter(p=>p[0]===10).length;
-    diagnose('HATCH',{['rutas='+paths+', vértices='+vertices+', referencias='+association.refs.length+', entidades asociadas='+(Object.keys(association.types).join('/')||'ninguna')]:1});
+    diagnose('HATCH capa='+st.layer+' handle='+str(r,5,'?')+' patrón='+pattern,{['rutas='+paths+', vértices='+vertices+', referencias='+association.refs.length+', entidades asociadas='+(Object.keys(association.types).join('/')||'ninguna')+', códigos='+[...new Set(r.pairs.map(p=>p[0]))].join('/')]:1});
     continue;
    }
    const minx=Math.min(...pts.map(p=>p.x)),maxx=Math.max(...pts.map(p=>p.x)),miny=Math.min(...pts.map(p=>p.y)),maxy=Math.max(...pts.map(p=>p.y));
    const corners=new Set(pts.map(p=>p.x+','+p.y));
    const rectangular=loops.length===1&&pts.length===4&&minx<maxx&&miny<maxy&&[[minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy]].every(([x,y])=>corners.has(x+','+y));
    const hatchSpacingWorld=Math.hypot(get(r,45),get(r,46))||Math.max((maxx-minx+maxy-miny)/50,.01);
-   const appearance={hatchPattern:pattern,hatchOpacity:solid?1:.65,hatchSpacingWorld,hatchAngle:get(r,52,45),...st};
+   const gradient=get(r,450)===1,rgbGradient=r.pairs.filter(p=>p[0]===421).slice(0,2).map(p=>'#'+(Number(p[1])&0xffffff).toString(16).padStart(6,'0'));
+   const patternLines=solid?[]:hatchPatternDefinitions(r);
+   const appearance={...st,hatchPattern:pattern,hatchOpacity:st.cadOpacity??1,hatchSpacingWorld,hatchAngle:get(r,52,45),hatchPatternLines:patternLines,
+    hatchGradientColors:gradient&&rgbGradient.length?rgbGradient:null,hatchGradientAngle:get(r,460)*180/Math.PI,importedHatch:true};
    if(rectangular&&solid)out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},...appearance});
    else out.push({type:'polygon',pts,hatchLoops:loops,solidFill:solid,...appearance});
-   if(!solid)note('HATCH con trama visual aproximada');
+   if(!solid&&!patternLines.length)note('HATCH con trama visual aproximada');
   }
   else if(type==='ELLIPSE'){
    const a={x:get(r,10),y:get(r,20)},vx=get(r,11),vy=get(r,21),ratio=get(r,40),begin=get(r,41),end=get(r,42,Math.PI*2),length=Math.hypot(vx,vy);
@@ -1235,9 +1336,14 @@ function parseDxfEntities(source){
    out.push(item);
   }
   else if(type==='SOLID'||type==='TRACE'||type==='3DFACE'){
-   const pts=[10,11,12,13].filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10)}));
-   while(pts.length>3&&distance(pts[pts.length-1],pts[pts.length-2])<1e-9)pts.pop();
-   if(pts.length>=3)out.push({type:'polygon',pts,...st});else warn(type+' no compatible omitido');
+   // AutoCAD SOLID/TRACE vertex order is 1-2-4-3 (not 1-2-3-4).
+   // The previous outline-only import lost the opaque gray areas of many floor plans.
+   const order=type==='3DFACE'?[10,11,12,13]:[10,11,13,12];
+   const pts=order.filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10)}));
+   while(pts.length>3&&distance(pts.at(-1),pts.at(-2))<1e-9)pts.pop();
+   if(pts.length>=3)out.push({type:'polygon',pts,solidFill:true,importedHatch:true,...st});
+   else warn(type+' no compatible omitido');
+   if(type==='3DFACE')note('3DFACE proyectada a relleno 2D');
   }
   else if(type==='SPLINE'){
    const fitX=all(r,11),fitY=all(r,21),controlX=all(r,10),controlY=all(r,20),xs=fitX.length>=2?fitX:controlX,ys=fitY.length>=2?fitY:controlY,pts=xs.map((x,i)=>({x,y:ys[i]??0}));
