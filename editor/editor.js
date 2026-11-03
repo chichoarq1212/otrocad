@@ -901,8 +901,9 @@ function parseDxfEntities(source){
  const style=r=>{const layer=str(r,8,'General'),aci=get(r,62,7),trueColor=get(r,420,-1),aciColors={1:'#ff3333',2:'#ffff33',3:'#33cc33',4:'#33ffff',5:'#3366ff',6:'#ff33ff',7:'#dce8f5',8:'#808080',9:'#b0b0b0'};return {layer,color:trueColor>=0?'#'+trueColor.toString(16).padStart(6,'0'):aciColors[aci]||colors[layer]||colors.General,lineweight:get(r,370,25)/100,linetype:str(r,6,'CONTINUOUS')==='DASHED'?'DASHED':'CONTINUOUS'}};
  const blockRecords=new Map(),blockBases=new Map();let inBlocks=false,activeBlock=null;
  for(const record of records){if(record.type==='SECTION'){inBlocks=str(record,2).toUpperCase()==='BLOCKS';continue}if(record.type==='ENDSEC'){inBlocks=false;activeBlock=null;continue}if(!inBlocks)continue;if(record.type==='BLOCK'){activeBlock=str(record,2).toUpperCase();blockRecords.set(activeBlock,[]);blockBases.set(activeBlock,{x:get(record,10),y:get(record,20)});continue}if(record.type==='ENDBLK'){activeBlock=null;continue}if(activeBlock)blockRecords.get(activeBlock).push(record)}
- const out=[],warnings={};let inEntities=false;
+ const out=[],warnings={},notes={};let inEntities=false,activeAttributeGroup=null;
  const warn=type=>warnings[type]=(warnings[type]||0)+1;
+ const note=type=>notes[type]=(notes[type]||0)+1;
  const buildPolylinePoints=(vertices,closed)=>{
   const points=[];if(!vertices.length)return points;
   points.push({x:vertices[0].x,y:vertices[0].y});
@@ -1039,12 +1040,16 @@ function parseDxfEntities(source){
   }
   return item;
  };
+ const blockLines=[];for(const [key,items] of blockRecords){const base=blockBases.get(key)||{x:0,y:0};blockLines.push('0','BLOCK','2',key,'10',String(base.x),'20',String(base.y));for(const item of items)blockLines.push('0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]]));blockLines.push('0','ENDBLK')}
+ const blockSection=['0','SECTION','2','BLOCKS',...blockLines,'0','ENDSEC'];
+ const parseBlockItems=(items,depth=0)=>parseDxfEntities([...blockSection,'0','SECTION','2','ENTITIES',...items.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n'),depth+1);
  const header=records.find(r=>r.type==='SECTION'&&str(r,2).toUpperCase()==='HEADER');const unitIndex=header?.pairs.findIndex(p=>p[0]===9&&p[1]==='$INSUNITS')??-1;const unitCode=unitIndex>=0?Number(header.pairs[unitIndex+1]?.[1]):0;const unitMap={4:'mm',5:'cm',6:'m'};if(unitCode&&!unitMap[unitCode])warn('unidades DXF no admitidas; valores sin convertir');out.drawingUnits=unitMap[unitCode]||null;
  for(const r of records){
   if(r.type==='SECTION'){inEntities=str(r,2).toUpperCase()==='ENTITIES';continue}
   if(r.type==='ENDSEC'){inEntities=false;continue}
   if(!inEntities)continue;
   const st=style(r),type=r.type;
+  if(type==='SEQEND'&&activeAttributeGroup){activeAttributeGroup=null;continue}
   if(type==='LINE')out.push({type:'line',a:{x:get(r,10),y:get(r,20)},b:{x:get(r,11),y:get(r,21)},...st});
   else if(type==='CIRCLE'){const a={x:get(r,10),y:get(r,20)},rad=get(r,40);out.push({type:'circle',a,b:{x:a.x+rad,y:a.y},...st})}
   else if(type==='LWPOLYLINE'){const vertices=lightPolylineVertices(r),closed=Boolean(get(r,70,0)&1),pts=buildPolylinePoints(vertices,closed);if(vertices.some(v=>Math.abs(v.bulge)>1e-9))warn('polilíneas curvas aproximadas');if(pts.length>1)out.push({type:closed?'polygon':'poly',pts,...st})}
@@ -1062,26 +1067,26 @@ function parseDxfEntities(source){
    const scaleX=get(r,41,1),scaleY=get(r,42,1),rotation=get(r,50)*Math.PI/180;
    const columns=Math.max(1,Math.round(get(r,70,1))),rows=Math.max(1,Math.round(get(r,71,1)));
    if(!geometry?.length||depth>=5||!Number.isFinite(scaleX)||!Number.isFinite(scaleY)||Math.abs(scaleX)<1e-9||Math.abs(scaleY)<1e-9||columns*rows>256){warn('INSERT no compatible omitido');continue}
-   const blockLines=[];for(const [key,items] of blockRecords){const base=blockBases.get(key)||{x:0,y:0};blockLines.push('0','BLOCK','2',key,'10',String(base.x),'20',String(base.y));for(const item of items)blockLines.push('0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]]));blockLines.push('0','ENDBLK')}
-   const blockSource=['0','SECTION','2','BLOCKS',...blockLines,'0','ENDSEC','0','SECTION','2','ENTITIES',...geometry.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n');
-   const pieces=parseDxfEntities(blockSource,depth+1),base=blockBases.get(name)||{x:0,y:0},origin={x:get(r,10),y:get(r,20)},cos=Math.cos(rotation),sin=Math.sin(rotation);
+   const pieces=parseBlockItems(geometry,depth),base=blockBases.get(name)||{x:0,y:0},origin={x:get(r,10),y:get(r,20)},cos=Math.cos(rotation),sin=Math.sin(rotation);
    for(let row=0;row<rows;row++)for(let column=0;column<columns;column++){
     const transformPoint=p=>{const x=(p.x-base.x+column*get(r,44))*scaleX,y=(p.y-base.y+row*get(r,45))*scaleY;return{x:origin.x+x*cos-y*sin,y:origin.y+x*sin+y*cos}};
     const groupId='dxf-insert-'+depth+'-'+out.length+'-'+row+'-'+column;
     for(const piece of pieces)out.push(transformBlockItem(piece,transformPoint,scaleX,scaleY,rotation,groupId));
    }
-   if(columns*rows>1)warn('MINSERT expandido a entidades editables');
-   warn('INSERT/MINSERT descompuesto, sin atributos de bloque');
-   if(pieces.importWarnings?.length)warn('INSERT con contenido simplificado u omitido');
+   if(columns*rows>1)note('MINSERT expandido a entidades editables');
+   note('INSERT/MINSERT importado como grupo editable');
+   if(get(r,66)===1)activeAttributeGroup='dxf-insert-'+depth+'-'+(out.length-pieces.length)+'-0-0';
+   if(pieces.importWarnings?.length)warn('INSERT con entidades no compatibles');
   }
   else if(type==='DIMENSION'){
    const geometry=blockRecords.get(str(r,2).toUpperCase());
    if(!geometry?.length){warn('DIMENSION sin geometría gráfica omitida');continue}
-   const supported=geometry.filter(item=>['LINE','CIRCLE','ARC','LWPOLYLINE','ELLIPSE','TEXT','MTEXT'].includes(item.type));
-   if(!supported.length){warn('DIMENSION sin entidades compatibles omitida');continue}
-   const sourceBlock=['0','SECTION','2','ENTITIES',...supported.flatMap(item=>['0',item.type,...item.pairs.flatMap(pair=>[String(pair[0]),pair[1]])]),'0','ENDSEC','0','EOF'].join('\n');
-   const pieces=parseDxfEntities(sourceBlock);if(!pieces.length){warn('DIMENSION sin entidades compatibles omitida');continue}const groupId='dxf-dimension-'+out.length;for(const item of pieces)out.push({...item,groupId});
-   warn('DIMENSION descompuesta, no asociativa');if(geometry.some(item=>item.type==='INSERT'))warn('símbolos de cota omitidos');
+   const pieces=parseBlockItems(geometry,Number(arguments[1]||0));
+   if(!pieces.length){warn('DIMENSION sin entidades compatibles omitida');continue}
+   const groupId='dxf-dimension-'+out.length;
+   for(const item of pieces)out.push({...item,groupId});
+   note('DIMENSION dibujada como geometría no asociativa');
+   if(pieces.importWarnings?.length)warn('DIMENSION con elementos gráficos no compatibles');
   }
   else if(type==='HATCH'){
    const loops=hatchBoundaries(r),solid=get(r,70)===1,pattern=solid?'SOLID':str(r,2,'ANSI31'),pts=loops[0];
@@ -1093,7 +1098,7 @@ function parseDxfEntities(source){
    const appearance={hatchPattern:pattern,hatchOpacity:solid?1:.65,hatchSpacingWorld,hatchAngle:get(r,52,45),...st};
    if(rectangular&&solid)out.push({type:'hatch',a:{x:minx,y:miny},b:{x:maxx,y:maxy},...appearance});
    else out.push({type:'polygon',pts,hatchLoops:loops,solidFill:solid,...appearance});
-   if(!solid)warn('HATCH con trama visual aproximada');
+   if(!solid)note('HATCH con trama visual aproximada');
   }
   else if(type==='ELLIPSE'){
    const a={x:get(r,10),y:get(r,20)},vx=get(r,11),vy=get(r,21),ratio=get(r,40),begin=get(r,41),end=get(r,42,Math.PI*2),length=Math.hypot(vx,vy);
@@ -1102,12 +1107,17 @@ function parseDxfEntities(source){
    else if(length>0&&ratio>0&&end>begin){const pts=Array.from({length:65},(_,i)=>{const t=begin+(end-begin)*i/64;return{x:a.x+vx*Math.cos(t)-vy*ratio*Math.sin(t),y:a.y+vy*Math.cos(t)+vx*ratio*Math.sin(t)}});out.push({type:'poly',pts,...st});warn('elipses rotadas o parciales simplificadas')}
    else warn('elipses no válidas omitidas');
   }
-  else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'){
+  else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'||type==='ATTDEF'){
+   if(type==='ATTDEF'&&!(get(r,70)&2))continue; // non-constant attributes are represented by their INSERT's ATTRIB entities
    const raw=type==='MTEXT'?r.pairs.filter(p=>p[0]===3||p[0]===1).map(p=>p[1]).join(''):str(r,1,'');
-   if(type==='MTEXT'&&/[{}]|\\\\[A-Za-z]/.test(raw.replace(/\\\\P/g,'')))warn('formato de texto múltiple simplificado');
-   const value=raw.replace(/\\\\P/g,'\\n').replace(/\\\\~/g,' '),vx=get(r,11,1),vy=get(r,21,0);
+   const value=type==='MTEXT'?cleanMText(raw):raw;
+   if(type==='MTEXT'&&/\\(?:[AaCcFfHhQqTtWw]|p|S)/.test(raw))note('MTEXT con formato visual aproximado');
+   const vx=get(r,11,1),vy=get(r,21,0);
    const rotation=r.pairs.some(p=>p[0]===50)?get(r,50):(type==='MTEXT'?Math.atan2(vy,vx)*180/Math.PI:0);
-   out.push({type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:get(r,40,0.4),...st})
+   const item={type:'text',a:{x:get(r,10),y:get(r,20)},text:value,textRotation:rotation,textHeightWorld:get(r,40,0.4),...st};
+   if(type==='MTEXT'){item.mtextRaw=raw;item.mtextPlain=value}
+   if(type==='ATTRIB'&&activeAttributeGroup)item.groupId=activeAttributeGroup;
+   out.push(item);
   }
   else if(type==='SOLID'||type==='TRACE'||type==='3DFACE'){
    const pts=[10,11,12,13].filter(code=>r.pairs.some(pair=>pair[0]===code)).map(code=>({x:get(r,code),y:get(r,code+10)}));
@@ -1122,10 +1132,12 @@ function parseDxfEntities(source){
    const xs=all(r,10),ys=all(r,20),pts=xs.map((x,i)=>({x,y:ys[i]??0}));
    if(pts.length>=2)out.push({type:'poly',pts,...st});else warn('LEADER sin vértices omitida');
   }
+  else if(type==='VIEWPORT'){(out.layoutViewports??=[]).push({x:get(r,10),y:get(r,20),width:get(r,40),height:get(r,41),id:get(r,69)});note('VIEWPORT de presentación no editable')}
   else if(type==='VERTEX'||type==='SEQEND'){}
   else warn(type+' omitido');
  }
  out.importWarnings=Object.entries(warnings).map(([name,count])=>count+' '+name);
+ out.importNotes=Object.entries(notes).map(([name,count])=>count+' '+name);
  return out;
 }
 async function download(name,content,type){const blob=content instanceof Blob?content:new Blob([content],{type:type||'application/octet-stream'});if(window.OtroCadAndroid&&typeof window.OtroCadAndroid.saveFile==='function'){try{const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));window.OtroCadAndroid.saveFile(name,type||'application/octet-stream',btoa(binary));return}catch(err){console.error(err)}}const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1200)}
