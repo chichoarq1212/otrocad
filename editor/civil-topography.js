@@ -113,7 +113,7 @@ function showImportDialog(source=''){
  d.showModal();if(area.value)parse();
 }
 const group=document.createElement('div');group.className='toolgroup';group.dataset.panel='civil';group.hidden=true;
-const head=document.createElement('span');head.className='group-title';head.textContent='COORDENADAS UTM';group.append(head);
+const head=document.createElement('span');head.className='group-title';head.textContent='COORD. UTM';group.append(head);
 function addTool(text,handler){
  const button=document.createElement('button');button.type='button';button.className='civil-tool';
  const mark=document.createElement('span');mark.className='ico';
