@@ -104,7 +104,7 @@ assert.equal(vm.runInContext('offsetAwaitingDistance',context),true);
 assert.doesNotMatch(cad,/function showOffsetInput|offsetInline/,'OFFSET must never mount the old floating window');
 
 assert.match(cad,/Space must remain a valid separator in commands/,'command input spaces must not trigger Enter');
-assert.match(cad,/shortcut=\{s:'#save',o:'#open',n:'#newDrawing',p:'#pdf'\}/,'Ctrl+S must open the unified DWG/DXF save workflow');
+assert.match(cad,/shortcut=\{s:e\.shiftKey\?'#saveAs':'#save',o:'#open',n:'#newDrawing',p:'#pdf'\}/,'Ctrl+S must open the unified DWG/DXF save workflow');
 assert.match(cad,/k==='1'/,'Ctrl+1 properties shortcut missing');
 assert.match(cad,/k==='e'&&e\.shiftKey/,'Ctrl+Shift+E DXF export missing');
 assert.match(cad,/if\(e\.key==='F12'\)/,'F12 keyboard event handler missing');

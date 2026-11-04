@@ -1841,7 +1841,7 @@ document.addEventListener('keydown',e=>{
  if(document.querySelector('dialog[open]'))return;
  if((e.ctrlKey||e.metaKey)&&!e.altKey){
   const k=e.key.toLowerCase();
-  const shortcut={s:'#save',o:'#open',n:'#newDrawing',p:'#pdf'}[k];
+  const shortcut={s:e.shiftKey?'#saveAs':'#save',o:'#open',n:'#newDrawing',p:'#pdf'}[k];
   if(shortcut){e.preventDefault();$(shortcut).click();return}
   if(k==='1'){e.preventDefault();$('#propertiesBtn').click();return}
   if(k==='e'&&e.shiftKey){e.preventDefault();$('#saveAsDxf').click();return}

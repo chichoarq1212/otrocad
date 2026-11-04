@@ -35,7 +35,7 @@ assert.match(editor,/cadRecoveryWrite\('autosave-latest'/);
 assert.match(editor,/cadRecoveryWrite\('autosave-previous'/);
 assert.match(editor,/window\.addEventListener\('visibilitychange'/);
 assert.match(editor,/setInterval\(\(\)=>\{if\(cadAutosaveDirty\)/);
-assert.match(editor,/shortcut=\{s:'#save'/,'Ctrl+S should use unified save');
+assert.match(editor,/s:e\.shiftKey\?'#saveAs':'#save'/,'Ctrl+S and Ctrl+Shift+S should use unified saving');
 assert.match(html,/id="saveAs"/);
 assert.match(html,/id="saveLocal"/);
 assert.match(html,/id="recoverProgress"/);
