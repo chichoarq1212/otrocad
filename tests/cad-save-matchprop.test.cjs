@@ -1,0 +1,53 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const editor=fs.readFileSync('editor/editor.js','utf8');
+const html=fs.readFileSync('editor/index.html','utf8');
+const saveUI=fs.readFileSync('editor/cad-file-ui.js','utf8');
+const css=fs.readFileSync('editor/cad-file-ui.css','utf8');
+const sw=fs.readFileSync('sw.js','utf8');
+const pack=fs.readFileSync('scripts/build-pages.cjs','utf8');
+const android=fs.readFileSync('scripts/verify-android-offline.cjs','utf8');
+const keys=['MA','MATCHPROP','IGUALAR'];
+for(const alias of keys){
+ assert.match(editor,new RegExp(alias+":'matchprop'"),'Missing keyboard alias '+alias);
+}
+assert.match(editor,/function matchPropertiesAt\(q\)/);
+assert.match(editor,/matchState\.source=clone\(item\)/,'Source property snapshot required');
+assert.match(editor,/matchStyleKeys=\[/);
+assert.match(editor,/matchTypeKeys=/);
+assert.match(editor,/if\(item\.type===source\.type\)/,'Type-specific property transfer must be guarded');
+assert.match(editor,/if\(lockedLayers\.has\(item\.layer\)\)/);
+assert.match(editor,/checkpoint\(\);[\s\S]*?item\[key\]=value/,'Properties must be undoable');
+assert.match(editor,/if\(tool==='matchprop'\)\{matchPropertiesAt\(world\(p\)\);return\}/);
+assert.ok(html.includes('data-tool="matchprop"'));
+assert.match(editor,/function safeDrawingFilename\(name,format\)/);
+assert.match(editor,/async function saveDrawingAs\(format=/);
+assert.match(editor,/async function drawingContent\(format\)/);
+assert.match(editor,/getDwgRuntime\(\)/);
+assert.match(editor,/engine\.dxf_to_dwg/);
+assert.match(editor,/engine\.dwg_to_dxf/);
+assert.match(editor,/check\.length!==expected\.length/,'DWG round-trip validation required');
+assert.match(editor,/showSaveFilePicker/);
+assert.match(editor,/OtroCadAndroid/);
+assert.match(editor,/window\.OtroCadFileCore=\{/);
+assert.match(editor,/cadRecoveryWrite\('autosave-latest'/);
+assert.match(editor,/cadRecoveryWrite\('autosave-previous'/);
+assert.match(editor,/window\.addEventListener\('visibilitychange'/);
+assert.match(editor,/setInterval\(\(\)=>\{if\(cadAutosaveDirty\)/);
+assert.match(editor,/shortcut=\{s:'#save'/,'Ctrl+S should use unified save');
+assert.match(html,/id="saveAs"/);
+assert.match(html,/id="saveLocal"/);
+assert.match(html,/id="recoverProgress"/);
+assert.match(saveUI,/core\.saveAs\(type\.value,name\.value\)/);
+assert.match(saveUI,/core\.restoreProgress\(slot\)/);
+assert.match(saveUI,/keydown/);
+assert.match(saveUI,/Ctrl\+S|event\.shiftKey/);
+assert.match(css,/orientation:landscape/);
+for(const item of ['cad-file-ui.js','cad-file-ui.css']){
+ assert.ok(html.includes(item));
+ assert.ok(sw.includes('./editor/'+item));
+ assert.ok(pack.includes("'editor/"+item+"'"));
+ assert.ok(android.includes("'"+item+"'"));
+}
+console.log('CAD saving and MA checks passed: alias, keyboard, visual button, DWG validation, Save As and incremental IndexedDB recovery.');
