@@ -1,0 +1,61 @@
+/* Shared CAD ribbon sizing: compact commands, complete labels, room for the model. */
+body{display:flex;flex-direction:column}
+header{height:36px!important;min-height:36px!important;flex:0 0 36px;padding:3px 8px!important;gap:7px}
+#brand{font-size:17px!important;margin-right:6px}
+#brand .brandmark{width:25px!important;height:25px!important}
+#filebar button{min-height:26px!important;padding:4px 8px!important;font-size:11px!important}
+#ribbon{height:98px!important;min-height:0;flex:0 0 auto}
+#tabs{height:26px!important;min-height:26px!important;flex:0 0 26px;align-items:center!important;padding:1px 6px;gap:2px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+#tabs button{min-height:23px!important;height:23px;padding:3px 9px!important;font-size:10px!important;flex:0 0 auto}
+#groups{height:72px!important;min-height:72px!important;flex:0 0 72px;gap:7px;padding:2px 6px!important;overflow-x:auto!important;overflow-y:hidden;scroll-snap-type:none!important;scrollbar-width:thin;align-items:stretch}
+#groups::-webkit-scrollbar{height:6px}
+#groups::-webkit-scrollbar-thumb{background:#a9bbd4;border-radius:4px}
+#groups>.toolgroup:not([hidden]){display:grid!important;grid-auto-flow:column;grid-template-rows:repeat(2,24px);grid-auto-columns:max-content;align-content:start;align-items:center;gap:2px 4px;position:relative;width:max-content;min-width:max-content;padding:0 7px 12px 0}
+#groups .toolgroup>.group-title{position:absolute;left:0;right:7px;bottom:0;height:10px;padding:0;text-align:center;font-size:8px;line-height:10px;letter-spacing:.5px}
+#groups .toolgroup button{min-width:0!important;min-height:24px!important;height:24px!important;max-height:none!important;flex-direction:row!important;justify-content:flex-start!important;align-items:center!important;gap:4px!important;padding:1px 5px!important;border-radius:4px!important;box-shadow:none!important;font-size:10.5px!important;font-weight:550;line-height:18px!important;white-space:nowrap!important;transform:none!important}
+#groups .toolgroup button .ico{width:20px!important;height:20px!important;min-width:20px;flex:0 0 20px;border-radius:4px!important;font-size:17px!important;box-shadow:none!important}
+#groups .toolgroup button .ico svg{width:17px!important;height:17px!important;filter:none!important}
+#groups .civil-tool .civil-label{max-width:none;font-size:10.5px!important;line-height:18px!important;white-space:nowrap!important}
+#groups .toolgroup select,#groups .toolgroup input{height:23px!important;padding:2px 5px!important;font-size:11px}
+#groups .cad-option{gap:1px;font-size:8px;line-height:10px;flex-direction:row;align-items:center}
+#multiSelectToggle .multi-label{max-width:none;white-space:nowrap;line-height:18px;font-size:10px}
+#multiSelectToggle .multi-dot{width:6px;height:6px}
+#multiSelectToggle .multi-state{font-size:8px;padding:1px 3px}
+#workspace{flex:1 1 auto;height:auto!important;min-height:0!important}
+#stage{min-height:0!important}
+#commandbar{height:28px!important;flex:0 0 28px;padding:2px 7px!important}
+#cmd{height:23px!important;padding:3px 7px;font-size:12px!important}
+#cmdRun{height:23px;min-height:23px!important;padding:2px 9px}
+#statusbar{height:24px!important;flex:0 0 24px;padding:1px 7px!important}
+#statusbar button{min-height:20px!important;height:20px;padding:2px 6px!important;font-size:10px!important}
+#layoutBar{min-height:30px;padding:2px 6px}
+#layoutBar button{min-height:24px;height:24px;padding:2px 8px;font-size:10px}
+@media(max-width:760px){
+ header{height:44px!important;min-height:44px!important;flex-basis:44px}
+ #filebar button{min-height:32px!important;font-size:11px!important}
+ #ribbon{height:118px!important}
+ #tabs{height:36px!important;min-height:36px!important;flex-basis:36px}
+ #tabs button{height:32px;min-height:32px!important;padding:5px 10px!important;font-size:11px!important}
+ #groups{height:82px!important;min-height:82px!important;flex-basis:82px;scrollbar-width:none}
+ #groups>.toolgroup:not([hidden]){grid-template-rows:repeat(2,32px)}
+ #groups .toolgroup button{height:32px!important;min-height:32px!important;padding:4px 6px!important;font-size:11px!important}
+ #groups .civil-tool .civil-label{font-size:11px!important}
+ #commandbar{height:40px!important;flex-basis:40px}
+ #cmd{height:32px!important;font-size:14px!important}
+ #cmdRun{height:32px;min-height:32px!important}
+ #statusbar{height:34px!important;flex-basis:34px}
+ #statusbar button{height:30px;min-height:30px!important;font-size:11px!important}
+}
+@media (orientation:landscape) and (max-height:500px) and (max-width:950px) and (pointer:coarse){
+ header{height:40px!important;min-height:40px!important;flex-basis:40px}
+ #ribbon{height:110px!important}
+ #tabs{height:34px!important;min-height:34px!important;flex-basis:34px}
+ #groups{height:76px!important;min-height:76px!important;flex-basis:76px;scrollbar-width:none}
+ #groups::-webkit-scrollbar{display:none}
+ #groups>.toolgroup:not([hidden]){grid-template-rows:repeat(2,29px)}
+ #groups .toolgroup button{height:29px!important;min-height:29px!important}
+ body.cad-ribbon-collapsed #ribbon{display:none!important}
+ body.cad-mobile-bottom-open #commandbar{height:40px!important}
+ body.cad-mobile-bottom-open #statusbar{height:36px!important}
+}
+@media print{body{display:block}#workspace{height:auto!important;flex:none}.jaimito-root{display:none!important}}
