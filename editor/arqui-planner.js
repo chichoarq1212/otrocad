@@ -96,16 +96,16 @@
   const lotW=spec.lotWidth,lotD=spec.lotDepth;
   const buildDepth=lotD-spec.frontSetback-spec.backSetback;
   if(buildDepth<11.6)throw Error('El terreno no deja fondo edificable suficiente. Reduce el programa o revisa los retiros propuestos.');
-  const garageWidth=3,garageGap=.15;
+  const garageWidth=spec.garageSpaces===2?2.8:3.0,garageGap=.1;
   let houseWidth=lotW-2*spec.sideSetback,sideGarage=false;
-  if(spec.garage&&lotW-2*spec.sideSetback-garageWidth-garageGap>=7.85){
+  if(spec.garage&&lotW-2*spec.sideSetback-garageWidth-garageGap>=7.05){
    sideGarage=true;houseWidth-=garageWidth+garageGap;
   }else if(spec.garage){
    warnings.push('No cabe una plaza lateral estándar con este esquema: garaje pendiente de rediseñar; no se dibuja un espacio demasiado pequeño.');
   }
   const corridor=1.2,rightWidth=clamp(houseWidth*.365,2.9,3.5),
    leftWidth=houseWidth-corridor-rightWidth;
-  if(rightWidth<2.9-1e-7||leftWidth<3.7)
+  if(rightWidth<2.9-1e-7||leftWidth<3.0-1e-7)
    throw Error('El ancho edificable no permite una franja habitable y circulación de 1,20 m. Se requiere una solución arquitectónica diferente.');
   const floors=[],originX=spec.sideSetback,originY=spec.frontSetback;
   for(let floor=0;floor<spec.floors;floor++){
@@ -126,13 +126,13 @@
       {name:'BODEGA / SERVICIO',min:2.0,weight:.7}
      ];
     }else{
-     right=[...Array.from({length:spec.bedrooms},(_,i)=>({name:'DORMITORIO '+(i+1),min:3.0,weight:1.1,kind:'bedroom'})),
+     right=[...Array.from({length:spec.bedrooms},(_,i)=>({name:i===0&&spec.mainSuite?'DORMITORIO PRINCIPAL':'DORMITORIO '+(i+1),min:3.25,weight:1.1,kind:'bedroom'})),
       {name:'BAÑO',min:2.3,weight:.7,kind:'bath'}];
     }
    }else{
     const nRight=Math.max(1,spec.bedrooms-1);
     right=[
-      ...Array.from({length:nRight},(_,i)=>({name:'DORMITORIO '+(i+2),min:3,weight:1.1,kind:'bedroom'})),
+      ...Array.from({length:nRight},(_,i)=>({name:'DORMITORIO '+(i+2),min:3.25,weight:1.1,kind:'bedroom'})),
       {name:'BAÑO COMPLETO',min:2.3,weight:.75,kind:'bath'}
     ];
     left=[
@@ -152,9 +152,13 @@
     hallStart:leftWidth,hallWidth:corridor,rooms,leftParts,rightParts});
   }
   if(spec.garageSpaces===2&&spec.garage){
-   warnings.push('Se solicitaron dos estacionamientos: este esquema solo reserva una plaza lateral. La segunda plaza queda PENDIENTE; no se dibujará un segundo vehículo invadiendo áreas habitables.');
+   if(sideGarage&&buildDepth>=11.1)
+    warnings.push('Dos autos resueltos solo en TÁNDEM sobre una franja lateral; uno debe salir para retirar el otro. Verificar radios de giro y viabilidad municipal.');
+   else warnings.push('Se solicitaron DOS estacionamientos, pero no caben en el terreno con estos retiros y programa. No se dibuja una segunda plaza inexistente.');
   }
   if(sideGarage)warnings.push('Estacionamiento lateral conceptual: comprobar maniobra de acceso, estructura, servidumbres y medidas locales.');
+  if(spec.kitchenIsland&&leftWidth<3.7)warnings.push('Cocina con isla solicitada: el ancho de '+leftWidth.toFixed(2)+' m no permite una isla con circulaciones suficientes en este esquema. Se propone cocina lineal, pendiente de rediseño.');
+
   warnings.push('Retiros configurables, no equivalen a normativa municipal; verificar implantación, iluminación, ventilación, accesibilidad, estructura e instalaciones.');
   warnings.push('Esquema de anteproyecto con accesos y zonificación; la distribución, el mobiliario y las escaleras requieren comprobación profesional para obra.');
   const audit=[];
@@ -169,7 +173,7 @@
    }
   }
   return {spec,floors,warnings,audit,garage:sideGarage?
-   {x:originX+houseWidth+garageGap,y:originY,width:garageWidth,depth:5.3}:null,
+   {x:originX+houseWidth+garageGap,y:originY,width:garageWidth,depth:spec.garageSpaces===2&&buildDepth>=11.1?10.7:5.3,spaces:spec.garageSpaces===2&&buildDepth>=11.1?2:1}:null,
    references:{Plazola:'sin biblioteca autorizada vinculada',Neufert:'sin biblioteca autorizada vinculada'},
    provenance:'Geometría esquemática basada en reglas generales explícitas; NO se han consultado libros de Plazola ni Neufert.'};
  }
