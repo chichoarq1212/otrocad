@@ -192,7 +192,16 @@ window.OtroCadMep={
  commitRoute(points){try{const items=route(points,{...pendingRoute,units:api.getUnits()});if(!layerFor(pendingRoute.system))return false;pendingRoute=null;api.addObjects(items,'Red MEP creada · capas y geometría editables');return true}catch(error){api.setStatus(error.message);return false}},
  placeAt(point){if(!pendingSymbol||api.getActiveTool()!=='mep-symbol')return false;try{const value=currentSymbol();if(!layerFor(value.system))return true;const items=symbol(value.kind,point,value);api.addObjects(items,symbolNames[value.kind]+' colocado · clic para repetir · Esc: terminar')}catch(error){api.setStatus(error.message)}return true},
  getPreview(){try{if(pendingSymbol&&api.getActiveTool()==='mep-symbol'){const value=currentSymbol();return symbol(value.kind,api.getDraftPoint(),{...value,groupId:'mep-preview'})}if(pendingRoute){const path=api.getDraftPath();if(path.length>=2)return route(path,{...pendingRoute,groupId:'mep-preview',units:api.getUnits()})}}catch(_){}return []},
- beginRoute,showQuantities
+ beginRoute,showQuantities,
+ beginSymbol:(kind,system)=>beginSymbol(kind,system,systems[system]?.family==='hvac'),
+ chooseSystem:(system)=>{
+  if(!systems[system])throw Error('Sistema MEP no disponible.');
+  const air=systems[system].family==='hvac';
+  const tab=tabs.querySelector('[data-tab="'+(air?'hvac':'mep')+'"]');
+  activate(tab);$(air?'hvacSystem':'mepSystem').value=system;beginRoute(air);
+ },
+ getSystemInfo:()=>Object.entries(systems).map(([id,value])=>({id,...value})),
+ getQuantities:()=>quantities(api.getObjects(),api.getUnits())
 };
 Object.assign(window.OtroCadCivilCommands,{MEP:()=>activate(tabs.querySelector('[data-tab="mep"]')),HVAC:()=>activate(tabs.querySelector('[data-tab="hvac"]')),MEPROUTE:()=>beginRoute(false),DUCT:()=>beginRoute(true),MEPQTY:showQuantities});
 })();
