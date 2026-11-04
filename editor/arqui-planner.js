@@ -22,7 +22,7 @@
   s=s.replace(/\b(un|una|uno|dos|tres|cuatro|cinco|seis|ocho|nueve|diez|doce|quince|veinte|treinta|cuarenta|cincuenta)\b/g,w=>words[w]);
   const spec={lotWidth:12,lotDepth:20,floors:1,bedrooms:3,garage:true,
    frontSetback:3,backSetback:2,sideSetback:.45,kitchenExtra:0,...base};
-  const m=s.match(/(?:terreno|lote|solar|predio)?\s*(?:de\s*)?(\d{1,3}(?:[.,]\d+)?)\s*(?:m(?:etros?)?)?\s*(?:[x×]|por)\s*(\d{1,3}(?:[.,]\d+)?)/);
+  const m=s.match(/(?:terreno|lote|solar|predio)\s*(?:(?:es|de|mide)\s*)?(\d{1,3}(?:[.,]\d+)?)\s*(?:m(?:etros?)?)?\s*(?:[x×]|por)\s*(\d{1,3}(?:[.,]\d+)?)/)||s.match(/(?:^|\s)(?:de\s*)?(\d{1,3}(?:[.,]\d+)?)\s*(?:m(?:etros?)?)?\s*(?:[x×]|por)\s*(\d{1,3}(?:[.,]\d+)?)/);
   if(m){spec.lotWidth=Number(m[1].replace(',','.'));spec.lotDepth=Number(m[2].replace(',','.'))}
   const detailed=s.match(/(?:terreno|lote|solar).{0,16}?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?\s*(?:de\s*)?(?:frente|ancho).{0,12}?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?\s*(?:de\s*)?(?:fondo|largo)/);
   if(detailed){spec.lotWidth=Number(detailed[1].replace(',','.'));spec.lotDepth=Number(detailed[2].replace(',','.'))}
@@ -92,7 +92,7 @@
  function validateSpec(s){
   return{
    lotWidth:number(s.lotWidth,12,8,60,'Ancho del terreno'),
-   lotDepth:number(s.lotDepth,20,12,80,'Fondo del terreno'),
+   lotDepth:number(s.lotDepth,20,5,80,'Fondo del terreno'),
    floors:integer(s.floors,1,1,2,'Número de plantas'),
    bedrooms:integer(s.bedrooms,3,1,4,'Dormitorios'),
    garage:Boolean(s.garage),
@@ -138,7 +138,7 @@
   const spec=validateSpec(input),warnings=[];
   const lotW=spec.lotWidth,lotD=spec.lotDepth;
   const buildDepth=lotD-spec.frontSetback-spec.backSetback;
-  if(buildDepth<11.6)throw Error('El terreno no deja fondo edificable suficiente. Reduce el programa o revisa los retiros propuestos.');
+  if(buildDepth<11.6)throw Error('Para este esquema, el terreno de '+lotW+' x '+lotD+' m deja '+round(buildDepth)+' m de fondo después de los retiros; se requieren al menos 11.6 m. Revisa los retiros o el programa: este motor no puede resolver todavía esta configuración.');
   const garageWidth=spec.garageSpaces===2?2.8:3.0,garageGap=.1;
   let houseWidth=lotW-2*spec.sideSetback,sideGarage=false;
   if(spec.garage&&lotW-2*spec.sideSetback-garageWidth-garageGap>=7.05){

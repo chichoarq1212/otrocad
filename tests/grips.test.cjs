@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const source = fs.readFileSync('editor/editor.js', 'utf8');
-const descriptorsStart = source.indexOf('function gripDescriptors(s){');
+const descriptorsStart = source.indexOf('function dimensionGeometry(s){');
 const descriptorsEnd = source.indexOf('function drawSelectionGrips()', descriptorsStart);
 const applyStart = source.indexOf('function applyGrip(s,key,q){');
 const applyEnd = source.indexOf('function cancelGripDrag()', applyStart);
@@ -43,10 +43,21 @@ test('line endpoints', () => {
 test('dimension and leader endpoints', () => {
   for (const type of ['dim', 'leader']) {
     const e = { type, a: { x: 0, y: 0 }, b: { x: 4, y: 3 } };
-    assert.equal(gripDescriptors(e).length, 2);
+    assert.equal(gripDescriptors(e).length, type === 'dim' ? 3 : 2);
     applyGrip(e, 'b', { x: 8, y: 6 });
     assert.deepEqual(e.b, { x: 8, y: 6 });
   }
+});
+
+test('dimension offset moves only the dimension line for horizontal and angled walls', () => {
+  const e = {type:'dimaligned', a:{x:0,y:0}, b:{x:4,y:0}};
+  applyGrip(e,'dimOffset',{x:8,y:2});
+  assert.equal(e.dimOffset,2);
+  assert.deepEqual(e.a,{x:0,y:0});assert.deepEqual(e.b,{x:4,y:0});
+  assert.deepEqual(gripDescriptors(e).find(g=>g.key==='dimOffset').p,{x:2,y:2});
+  const angled={type:'dim',a:{x:0,y:0},b:{x:3,y:4}};
+  applyGrip(angled,'dimOffset',{x:-1.6,y:1.2});
+  assert.ok(Math.abs(angled.dimOffset-2)<1e-9);
 });
 
 test('polyline and polygon vertices', () => {

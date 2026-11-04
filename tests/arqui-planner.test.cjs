@@ -98,3 +98,10 @@ for(const name of ['arqui-planner.js','arqui-references.js','arqui-assistant.js'
 assert.ok(html.includes('arqui-assistant.css'));
 assert.ok(sw.includes('./editor/assets/el-arqui.webp'));
 console.log('Arqui IA checks passed: original transparent avatar, room criteria, real doors/windows/dimensions, 2 floors, opt-in references and CAD approval.');
+
+{
+ const input = p.parsePrompt('Quiero una vivienda pequeña de 12x8 con 3 cuartos y el terreno 15x10');
+ assert.equal(input.lotWidth, 15);
+ assert.equal(input.lotDepth, 10);
+ assert.throws(() => p.design(input), /terreno de 15 x 10 m/);
+}

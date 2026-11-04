@@ -413,9 +413,9 @@ function drawEntity(s,sel=false,preview=false){
    }
    ctx.restore();
   }
-  if(!s.importedHatch||sel||preview||s.civilTin||s.civilSlope)ctx.stroke();
+  if(!s.importedHatch||sel||preview||s.civilTin||s.civilSlope){ctx.beginPath();for(const loop of loops){loop.forEach((point,i)=>{const v=screen(point);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath()}ctx.stroke()}
  }
- else if(s.type==='dim'||s.type==='dimaligned'){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.beginPath();ctx.moveTo(a.x-4,a.y-4);ctx.lineTo(a.x+4,a.y+4);ctx.moveTo(b.x-4,b.y-4);ctx.lineTo(b.x+4,b.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(distance(s.a,s.b).toFixed(2)+' '+units,(mid.x+7),(mid.y-8))}
+ else if(s.type==='dim'||s.type==='dimaligned'){const g=dimensionGeometry(s);if(g){const da=screen(g.a),db=screen(g.b),mid=screen(g.mid);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(da.x,da.y);ctx.moveTo(b.x,b.y);ctx.lineTo(db.x,db.y);ctx.moveTo(da.x,da.y);ctx.lineTo(db.x,db.y);ctx.stroke();ctx.beginPath();ctx.moveTo(da.x-4,da.y-4);ctx.lineTo(da.x+4,da.y+4);ctx.moveTo(db.x-4,db.y-4);ctx.lineTo(db.x+4,db.y+4);ctx.stroke();ctx.font='12px system-ui';ctx.fillStyle=resolveCadColor(s,canvasIsLight());ctx.fillText(g.length.toFixed(2)+' '+units,mid.x+7,mid.y-8)}}
  else if(s.type==='text'){
   const size=Math.max(.5,s.textHeightWorld?Number(s.textHeightWorld)*drawZoom:Number(s.textHeight||14));
   const fontFile=String(s.textFontFile||'txt.shx'),fontFamily=s.textFontFamily||cadFontFamilyFromFile(fontFile);
@@ -1127,7 +1127,8 @@ function matchPropertiesAt(q){
  save();render();matchState.applied++;
  status.textContent='MA · '+matchState.applied+' objeto(s) igualados · selecciona otro destino · Esc para terminar';
 }
-function setTool(t,options={}){if(t!=='matchprop'){matchState.source=null;matchState.sourceIndex=-1}if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;resetRectangleDimensions();resetLineCoordinates();window.OtroCadMep?.onToolChanged(t);offsetAwaitingDistance=t==='offset'&&!options.offsetDistanceProvided;if(t==='offset'){clearSelection();offsetDistancePreset=!!options.offsetDistanceProvided;if(offsetAwaitingDistance)$('#dynLen').value=String(offsetDistance)}selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render();if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});$('#dynLen').select();status.textContent='OFFSET: escribe distancia y pulsa Enter'}}
+let trimState={phase:'quick',boundaries:new Set()};
+function setTool(t,options={}){if(t==='trim')trimState={phase:'quick',boundaries:new Set()};updateTrimPanel(t);if(t!=='matchprop'){matchState.source=null;matchState.sourceIndex=-1}if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;resetRectangleDimensions();resetLineCoordinates();window.OtroCadMep?.onToolChanged(t);offsetAwaitingDistance=t==='offset'&&!options.offsetDistanceProvided;if(t==='offset'){clearSelection();offsetDistancePreset=!!options.offsetDistanceProvided;if(offsetAwaitingDistance)$('#dynLen').value=String(offsetDistance)}selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render();if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});$('#dynLen').select();status.textContent='OFFSET: escribe distancia y pulsa Enter'}}
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(!isVisibleModelEntity(s)||lockedLayers.has(s.layer))continue;let d=1e9;
@@ -1136,6 +1137,7 @@ function selectAt(q){
   else if(s.type==='ellipse'){const rx=Math.abs(s.b.x-s.a.x),ry=Math.abs(s.b.y-s.a.y);if(rx&&ry){const normalized=Math.hypot((q.x-s.a.x)/rx,(q.y-s.a.y)/ry);d=Math.abs(normalized-1)*Math.min(rx,ry)}}
   else if(s.type==='arc'&&s.pts?.length>=3){const g=arcParams(s.pts);if(g){const p=screen(q),theta=Math.atan2(p.y-g.y,p.x-g.x),span=v=>(v+2*Math.PI)%(2*Math.PI),onArc=g.anticlockwise?span(g.a1-theta)<=span(g.a1-g.a3):span(theta-g.a1)<=span(g.a3-g.a1);d=onArc?Math.abs(Math.hypot(p.x-g.x,p.y-g.y)-g.r)/zoom:Math.min(distance(q,s.pts[0]),distance(q,s.pts[2]))}else for(let j=0;j<s.pts.length-1;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[j+1]))}
   else if(s.type==='circle')d=Math.abs(distance(q,s.a)-distance(s.a,s.b));
+  else if(s.type==='dim'||s.type==='dimaligned'){const g=dimensionGeometry(s);if(g)d=Math.min(pointLineDistance(q,g.a,g.b),pointLineDistance(q,s.a,g.a),pointLineDistance(q,s.b,g.b))}
   else if(s.type==='text'){const bounds=cadTextBoundsWorld(s);if(bounds.length===4){if(pointInPolygon(q,bounds))d=0;else for(let j=0;j<4;j++)d=Math.min(d,pointLineDistance(q,bounds[j],bounds[(j+1)%4]))}}
   else if(s.a&&s.b)d=pointLineDistance(q,s.a,s.b);else if(s.a)d=distance(q,s.a);
   if(d<best){best=d;found=i}
@@ -1143,9 +1145,17 @@ function selectAt(q){
  return found
 }
 function pointLineDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
+function dimensionGeometry(s){
+ if(!s.a||!s.b)return null;
+ const dx=s.b.x-s.a.x,dy=s.b.y-s.a.y,length=Math.hypot(dx,dy);if(length<1e-12)return null;
+ const nx=-dy/length,ny=dx/length,offset=Number(s.dimOffset)||0;
+ const a={x:s.a.x+nx*offset,y:s.a.y+ny*offset},b={x:s.b.x+nx*offset,y:s.b.y+ny*offset};
+ return {a,b,mid:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},nx,ny,length};
+}
 function gripDescriptors(s){
  const out=[],add=(key,p)=>{if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))out.push({key,p})};
- if(s.type==='line'||s.type==='dim'||s.type==='dimaligned'||s.type==='leader'){add('a',s.a);add('b',s.b)}
+ if(s.type==='dim'||s.type==='dimaligned'){add('a',s.a);add('b',s.b);const g=dimensionGeometry(s);if(g)add('dimOffset',g.mid)}
+ else if(s.type==='line'||s.type==='leader'){add('a',s.a);add('b',s.b)}
  else if(s.type==='rect'||s.type==='hatch'){
   if(s.a&&s.b){add('rect0',{x:s.a.x,y:s.a.y});add('rect1',{x:s.b.x,y:s.a.y});add('rect2',{x:s.b.x,y:s.b.y});add('rect3',{x:s.a.x,y:s.b.y})}
  }else if(s.type==='circle'&&s.a&&s.b){
@@ -1180,6 +1190,7 @@ function findGripAt(p,isTouch=false){
 }
 function applyGrip(s,key,q){
  const p={x:q.x,y:q.y};
+ if(key==='dimOffset'){const g=dimensionGeometry(s);if(g)s.dimOffset=(p.x-s.a.x)*g.nx+(p.y-s.a.y)*g.ny;return}
  if(key==='a'){if(s.a)s.a=p;else if(s.pts?.length)s.pts[0]=p;return}
  if(key==='b'){if(s.b)s.b=p;else if(s.pts?.length>1)s.pts[1]=p;return}
  if(key==='radius'){if(s.b)s.b=p;return}
@@ -1455,7 +1466,7 @@ function handleTap(p){
   save();applySelection([modifyTarget,hit,objects.length-1]);modifyTarget=-1;moveBase=null;render();status.textContent='CHAFLÁN aplicado';return;
  }
  if(tool==='trim'||tool==='extend'){
-  const pick=world(p),idx=selectAt(pick);if(idx<0){status.textContent='Toca el tramo que deseas modificar';return}
+  const pick=world(p),idx=selectAt(pick);if(tool==='trim'&&trimState.phase==='boundaries'){if(idx<0){status.textContent='Selecciona un borde de corte';return}const edge=objects[idx];if(!entitySegments(edge).length){status.textContent='Este objeto no puede usarse como borde';return}trimState.boundaries.has(edge)?trimState.boundaries.delete(edge):trimState.boundaries.add(edge);applySelection(objects.map((o,i)=>trimState.boundaries.has(o)?i:-1).filter(i=>i>=0));updateTrimPanel('trim');render();return}if(idx<0){status.textContent='Toca el tramo que deseas modificar';return}
   const mode=tool==='trim'&&p.shiftForTrim?'extend':tool;
   if(mode==='trim')quickTrim(idx,pick);else trimOrExtend(idx,pick,'extend');return;
  }
@@ -1502,7 +1513,8 @@ function transformEntityGeometry(s,transform,axisAligned){
 function translate(s,dx,dy){if(s.a){s.a.x+=dx;s.a.y+=dy}if(s.textAlignmentPoint){s.textAlignmentPoint.x+=dx;s.textAlignmentPoint.y+=dy}if(s.b){s.b.x+=dx;s.b.y+=dy}if(s.pts)s.pts.forEach(p=>{p.x+=dx;p.y+=dy});if(s.hatchLoops)s.hatchLoops.forEach(loop=>loop.forEach(p=>{p.x+=dx;p.y+=dy}))}
 function entitySegments(s){
  const pts=[];
- if(s.type==='line'||s.type==='dim'||s.type==='dimaligned'||s.type==='leader'){if(s.a&&s.b)pts.push([s.a,s.b]);return pts}
+ if(s.type==='dim'||s.type==='dimaligned'){const g=dimensionGeometry(s);return g?[[s.a,g.a],[s.b,g.b],[g.a,g.b]]:[]}
+ if(s.type==='line'||s.type==='leader'){if(s.a&&s.b)pts.push([s.a,s.b]);return pts}
  if(s.type==='rect'||s.type==='hatch'){const a=s.a,b=s.b;return [[a,{x:b.x,y:a.y}],[{x:b.x,y:a.y},b],[b,{x:a.x,y:b.y}],[{x:a.x,y:b.y},a]]}
  if(s.type==='circle'){const r=distance(s.a,s.b);let prev=null;for(let i=0;i<=72;i++){const t=i*Math.PI*2/72,p={x:s.a.x+r*Math.cos(t),y:s.a.y+r*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
  if(s.type==='ellipse'){let prev=null;for(let i=0;i<=64;i++){const t=i*Math.PI*2/64,p={x:s.a.x+(s.b.x-s.a.x)*Math.cos(t),y:s.a.y+(s.b.y-s.a.y)*Math.sin(t)};if(prev)pts.push([prev,p]);prev=p}return pts}
@@ -1594,7 +1606,7 @@ function quickTrim(index,pick){
  const shape=objects[index];if(!shape||shape.type!=='line'){status.textContent='RECORTAR rápido admite líneas; otras entidades aún no son compatibles';return}
  const a=shape.a,b=shape.b,dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18){status.textContent='Línea sin longitud';return}
  const t=Math.max(0,Math.min(1,((pick.x-a.x)*dx+(pick.y-a.y)*dy)/den)),cuts=[0,1];
- objects.forEach((other,i)=>{if(i===index||hiddenLayers.has(other.layer))return;for(const [c,d] of entitySegments(other)){const h=lineIntersection(a,b,c,d,true);if(h&&h.t>1e-8&&h.t<1-1e-8)cuts.push(h.t)}});
+ objects.forEach((other,i)=>{if(i===index||!isVisibleModelEntity(other)||(trimState.phase==='cut'&&!trimState.boundaries.has(other)))return;for(const [c,d] of entitySegments(other)){const h=lineIntersection(a,b,c,d,true);if(h&&h.t>1e-8&&h.t<1-1e-8)cuts.push(h.t)}});
  cuts.sort((x,y)=>x-y);const bounds=cuts.filter((x,i)=>i===0||Math.abs(x-cuts[i-1])>1e-8);if(bounds.length<3){status.textContent='No hay un borde de corte que cruce esta línea';return}
  if(bounds.some(x=>Math.abs(x-t)<1e-7)){status.textContent='Toca un tramo, no exactamente la intersección';return}
  let n=0;while(n<bounds.length-2&&t>bounds[n+1])n++;const lo=bounds[n],hi=bounds[n+1],point=v=>({x:a.x+dx*v,y:a.y+dy*v}),pieces=[];
@@ -1640,6 +1652,23 @@ contextMenuEl.hidden=true;
 contextMenuEl.setAttribute('role','menu');
 document.body.append(contextMenuEl);
 try{lastCommand=localStorage.getItem('otrocad-last-command')||''}catch(e){}
+function updateTrimPanel(activeTool){
+ const panel=document.getElementById('trimOptions');if(!panel)return;
+ panel.hidden=activeTool!=='trim';if(panel.hidden)return;
+ const detail=panel.querySelector('.trim-detail');if(detail)detail.textContent=trimState.phase==='boundaries'?'Selecciona bordes ('+trimState.boundaries.size+') y pulsa Listo':trimState.phase==='cut'?'Toca el tramo · bordes seleccionados: '+trimState.boundaries.size:'Toca el tramo · todos los bordes visibles';
+}
+function finishTrimBoundaries(){
+ if(trimState.boundaries.size){trimState.phase='cut';status.textContent='TRIM: toca el tramo que deseas quitar'}
+ else{trimState.phase='quick';status.textContent='TRIM rápido: todos los bordes visibles'}
+ clearSelection();updateTrimPanel('trim');render();
+}
+const trimPanel=document.getElementById('trimOptions');
+if(trimPanel){
+ trimPanel.querySelector('[data-trim="quick"]').onclick=()=>{trimState={phase:'quick',boundaries:new Set()};clearSelection();updateTrimPanel('trim');render();status.textContent='TRIM rápido: toca el tramo'};
+ trimPanel.querySelector('[data-trim="edges"]').onclick=()=>{trimState={phase:'boundaries',boundaries:new Set()};clearSelection();updateTrimPanel('trim');render();status.textContent='TRIM: selecciona bordes y pulsa Listo o Enter'};
+ trimPanel.querySelector('[data-trim="done"]').onclick=finishTrimBoundaries;
+ trimPanel.querySelector('[data-trim="exit"]').onclick=()=>setTool('select');
+}
 function updateCursorCommand(){
  const value=$('#cmd').value.trim();
  if(tool==='offset'&&offsetAwaitingDistance){cursorCommandEl.hidden=true;return}
@@ -1667,6 +1696,7 @@ function cancelCurrentAction(){
 }
 function performEnterAction(){
  if(tool==='offset'&&offsetAwaitingDistance){acceptOffsetDistance($('#dynLen').value);return}
+ if(tool==='trim'&&trimState.phase==='boundaries'&&!$('#cmd').value.trim()){finishTrimBoundaries();return}
  if(tool==='rect'&&start&&dynamicInputOn){const point=pointFromInputs();if(point)commitEntity(point);else status.textContent='Rectángulo: indica ancho y alto válidos';return}
  if(selectionClickAnchor){selectionClickAnchor=null;selectionStart=null;selectionBox=null;render();status.textContent='Ventana de selección terminada';return}
  const raw=$('#cmd').value.trim();
@@ -2622,7 +2652,7 @@ function parseDxfEntities(source){
 }
 async function download(name,content,type){const blob=content instanceof Blob?content:new Blob([content],{type:type||'application/octet-stream'});if(window.OtroCadAndroid&&typeof window.OtroCadAndroid.saveFile==='function'){try{const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));window.OtroCadAndroid.saveFile(name,type||'application/octet-stream',btoa(binary));return}catch(err){console.error(err)}}const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1200)}
 $('#project').onclick=()=>download('otrocad.json',JSON.stringify({version:3,shapes:objects,layouts,viewports:layoutViewportRecords,geolocation:typeof window==='undefined'?null:window.OtroCadGeolocation?.getState()||null},null,2),'application/json');
-$('#export').onclick=()=>{let s='<svg xmlns="http://www.w3.org/2000/svg"><g fill="none">';const attrs=o=>' stroke="'+(o.color||colors[o.layer]||colors.General)+'" stroke-width="'+(o.lineweight||.25)+'"'+(o.linetype==='DASHED'?' stroke-dasharray="6 4"':'');objects.forEach(o=>{const a=o.a,b=o.b,at=attrs(o);if(o.type==='line'||o.type==='dim')s+='<line'+at+' x1="'+a.x+'" y1="'+(-a.y)+'" x2="'+b.x+'" y2="'+(-b.y)+'"/>';else if(o.type==='point')s+='<circle'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" r="0.05"/>';else if(o.type==='circle')s+='<circle'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" r="'+distance(a,b)+'"/>';else if(o.type==='rect'||o.type==='hatch')s+='<rect'+at+' x="'+Math.min(a.x,b.x)+'" y="'+(-Math.max(a.y,b.y))+'" width="'+Math.abs(b.x-a.x)+'" height="'+Math.abs(b.y-a.y)+'"/>';else if(o.type==='ellipse')s+='<ellipse'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" rx="'+Math.abs(b.x-a.x)+'" ry="'+Math.abs(b.y-a.y)+'"/>';else if(o.pts)s+='<polyline'+at+' points="'+o.pts.map(p=>p.x+','+(-p.y)).join(' ')+'"/>';else if(o.type==='text')s+='<text'+at+' x="'+a.x+'" y="'+(-a.y)+'">'+String(o.text||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</text>'});download('otrocad.svg',s+'</g></svg>','image/svg+xml')};
+$('#export').onclick=()=>{let s='<svg xmlns="http://www.w3.org/2000/svg"><g fill="none">';const attrs=o=>' stroke="'+(o.color||colors[o.layer]||colors.General)+'" stroke-width="'+(o.lineweight||.25)+'"'+(o.linetype==='DASHED'?' stroke-dasharray="6 4"':'');objects.forEach(o=>{const a=o.a,b=o.b,at=attrs(o);if(o.type==='dim'||o.type==='dimaligned'){const g=dimensionGeometry(o);if(g){for(const [u,v] of [[a,g.a],[b,g.b],[g.a,g.b]])s+='<line'+at+' x1="'+u.x+'" y1="'+(-u.y)+'" x2="'+v.x+'" y2="'+(-v.y)+'"/>';s+='<text'+at+' x="'+g.mid.x+'" y="'+(-g.mid.y)+'">'+g.length.toFixed(2)+' '+units+'</text>'}}else if(o.type==='line')s+='<line'+at+' x1="'+a.x+'" y1="'+(-a.y)+'" x2="'+b.x+'" y2="'+(-b.y)+'"/>';else if(o.type==='point')s+='<circle'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" r="0.05"/>';else if(o.type==='circle')s+='<circle'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" r="'+distance(a,b)+'"/>';else if(o.type==='rect'||o.type==='hatch')s+='<rect'+at+' x="'+Math.min(a.x,b.x)+'" y="'+(-Math.max(a.y,b.y))+'" width="'+Math.abs(b.x-a.x)+'" height="'+Math.abs(b.y-a.y)+'"/>';else if(o.type==='ellipse')s+='<ellipse'+at+' cx="'+a.x+'" cy="'+(-a.y)+'" rx="'+Math.abs(b.x-a.x)+'" ry="'+Math.abs(b.y-a.y)+'"/>';else if(o.pts)s+='<polyline'+at+' points="'+o.pts.map(p=>p.x+','+(-p.y)).join(' ')+'"/>';else if(o.type==='text')s+='<text'+at+' x="'+a.x+'" y="'+(-a.y)+'">'+String(o.text||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</text>'});download('otrocad.svg',s+'</g></svg>','image/svg+xml')};
 function buildDxf(){
  const arcGeometry=points=>{
   if(!points||points.length!==3)return null;
@@ -2665,7 +2695,8 @@ function buildDxf(){
     if(Boolean(source.isMText)||valueText.includes('\n')||Number(source.mtextWidthWorld)>0)add(0,'MTEXT',...common,100,'AcDbMText',10,p.x,20,p.y,30,0,40,height,41,Number(source.mtextWidthWorld||0),44,Number(source.mtextLineSpacingFactor||1),71,Number(source.mtextAttachment||1),50,rotation,7,styleName,1,valueText.replace(/\n/g,'\\P'));
     else{add(0,'TEXT',...common,100,'AcDbText',10,p.x,20,p.y,30,0,40,height,41,widthFactor,50,rotation,51,oblique,7,styleName,71,Number(source.textGenerationFlags||0),72,Number(source.textHorizontalAlignment||0),73,Number(source.textVerticalAlignment||0),1,valueText);if(source.textAlignmentPoint)add(11,source.textAlignmentPoint.x,21,source.textAlignmentPoint.y,31,0)}
    };
-  if(['line','dim','dimaligned','leader'].includes(o.type)&&a&&b){line(a,b);if(o.type==='dim'||o.type==='dimaligned')textEntity({x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance(a,b).toFixed(2)+' '+units,12/zoom);if(o.type==='leader'&&o.text)textEntity(b,o.text,12/zoom)}
+  if(['dim','dimaligned'].includes(o.type)&&a&&b){const g=dimensionGeometry(o);if(g){line(a,g.a);line(b,g.b);line(g.a,g.b);textEntity(g.mid,g.length.toFixed(2)+' '+units,12/zoom)}}
+  else if(['line','leader'].includes(o.type)&&a&&b){line(a,b);if(o.type==='leader'&&o.text)textEntity(b,o.text,12/zoom)}
   else if(o.type==='point'&&a)add(0,'POINT',...common,100,'AcDbPoint',10,a.x,20,a.y,30,Number(o.z)||0);
   else if(o.type==='text'&&a){if(o.mtextRaw&&o.text===o.mtextPlain)add(0,'MTEXT',...common,100,'AcDbMText',10,a.x,20,a.y,30,0,40,o.textHeightWorld||.4,41,Number(o.mtextWidthWorld||0),44,Number(o.mtextLineSpacingFactor||1),71,Number(o.mtextAttachment||1),50,o.textRotation||0,7,dxfTextStyleName(o),1,o.mtextRaw);else textEntity(a,o.text,o.textHeightWorld||Number(o.textHeight||14)/zoom,o.textRotation||0,o)}
   else if(o.type==='circle'&&a&&b)add(0,'CIRCLE',...common,100,'AcDbCircle',10,a.x,20,a.y,30,0,40,distance(a,b));
