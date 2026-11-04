@@ -77,6 +77,12 @@ jobs:
           node tests/arqui-planner.test.cjs
           node --check tests/arqui-assistant.test.cjs
           node tests/arqui-assistant.test.cjs
+          node --check editor/arqui-professional.js
+          node --check editor/cad-file-ui.js
+          node --check tests/arqui-professional.test.cjs
+          node --check tests/cad-save-matchprop.test.cjs
+          node tests/arqui-professional.test.cjs
+          node tests/cad-save-matchprop.test.cjs
           node --check tests/arqui-worker.test.cjs
           node tests/arqui-worker.test.cjs
           node --check tests/kelvin-portrait.test.cjs
