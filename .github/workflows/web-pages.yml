@@ -59,6 +59,12 @@ jobs:
           node --check editor/civil3d.js
           node --check editor/mep.js
           node tests/mep.test.cjs
+          node --check editor/civil-points.js
+          node --check editor/civil-topography.js
+          node --check editor/civil-road.js
+          node --check editor/kelvin-assistant.js
+          node --check tests/civil-topography-road.test.cjs
+          node tests/civil-topography-road.test.cjs
           node --check editor/geolocation.js
           node tests/geolocation.test.cjs
           node --check editor/jaimito-assistant.js
