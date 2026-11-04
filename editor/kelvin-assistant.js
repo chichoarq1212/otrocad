@@ -1,4 +1,4 @@
-/* OtroCAD · Ing. Keeeeeeelvin · Asistente MEP / HVAC */
+/* OtroCAD · Ing. Keeelvin · Asistente MEP / HVAC */
 (()=>{
 'use strict';
 if(window.OtroCadKelvin||!window.OtroCadMep)return;
@@ -34,20 +34,11 @@ const help=[
 const root=document.createElement('div');root.id='kelvinAssistant';root.className='jaimito-root kelvin-root';
 root.hidden=true;
 root.innerHTML=[
- '<button id="kelvinMascot" class="jaimito-mascot kelvin-mascot" type="button" aria-label="Abrir asistente Ing. Keeeeeeelvin" aria-controls="kelvinPanel" aria-expanded="false">',
- '<span class="kelvin-illustration" aria-hidden="true"><svg viewBox="0 0 100 120" width="90" height="104" fill="none" xmlns="http://www.w3.org/2000/svg">',
- '<path d="M22 36V23C22 7 37 4 50 4s28 3 28 19v13" fill="#F9FDFF" stroke="#8EA4C7" stroke-width="3"/>',
- '<path d="M17 36Q50 20 83 36Q83 45 50 43Q17 45 17 36Z" fill="#E5F0FE" stroke="#8EA4C7" stroke-width="3"/>',
- '<ellipse cx="50" cy="55" rx="24" ry="25" fill="#E9AB7E" stroke="#BD7A54" stroke-width="2"/>',
- '<path d="M37 53h5m16 0h5" stroke="#243852" stroke-linecap="round" stroke-width="3"/>',
- '<path d="M44 66q7 6 14 0" stroke="#9B513F" stroke-linecap="round" stroke-width="3"/>',
- '<path d="M15 118v-13q0-24 35-24t35 24v13" fill="#185BE8" stroke="#0E3D95" stroke-width="3"/>',
- '<path d="M38 82l12 18 12-18" fill="#FFCF23"/>',
- '<path d="M9 99l21-6 4 12-22 5Z" fill="#F7FBFF" stroke="#82A8D6" stroke-width="2"/>',
- '<path d="M15 100l8 8M22 97l8 9" stroke="#185BE8" stroke-width="2"/></svg></span>',
- '<span class="jaimito-mascot-tag">Ing. Keeeeeeelvin <b>IA</b></span></button>',
+ '<button id="kelvinMascot" class="jaimito-mascot kelvin-mascot" type="button" aria-label="Abrir asistente Ing. Keeelvin" aria-controls="kelvinPanel" aria-expanded="false">',
+ '<img class="kelvin-portrait" src="assets/ing-kelvin.webp" alt="Ing. Keeelvin, casco blanco, chaleco amarillo y planos MEP" draggable="false">',
+ '<span class="jaimito-mascot-tag">Ing. Keeelvin <b>IA</b></span></button>',
  '<section id="kelvinPanel" class="jaimito-chat" hidden aria-label="Asistente MEP HVAC">',
- '<div class="jaimito-head"><div><strong>🛠 Ing. Keeeeeeelvin IA</strong><small id="kelvinMode">Guía MEP local</small></div>',
+ '<div class="jaimito-head"><div><strong>🛠 Ing. Keeelvin IA</strong><small id="kelvinMode">Guía MEP local</small></div>',
  '<button id="kelvinMinimize" type="button" aria-label="Minimizar">−</button>',
  '<button id="kelvinClose" type="button" aria-label="Cerrar">×</button></div>',
  '<div id="kelvinMessages" class="jaimito-messages" role="log" aria-live="polite"></div>',
@@ -65,19 +56,19 @@ function close(){opened=false;panel.hidden=true;mascot.setAttribute('aria-expand
 function sync(){root.hidden=!isActive();trigger.hidden=!isActive();if(!isActive())close()}
 function add(role,content){
  const box=document.createElement('div');box.className='jaimito-message '+role;
- const head=document.createElement('strong');head.textContent=role==='user'?'Tú':'Ing. Keeeeeeelvin';
+ const head=document.createElement('strong');head.textContent=role==='user'?'Tú':'Ing. Keeelvin';
  const body=document.createElement('p');body.textContent=String(content);
  box.append(head,body);messages.append(box);messages.scrollTop=messages.scrollHeight;
 }
 function open(){
  if(!isActive())return;
  opened=true;panel.hidden=false;mascot.setAttribute('aria-expanded','true');
- if(!messages.children.length)add('bot','¡Hola! Soy el Ing. Keeeeeeelvin. Te apoyo en MEP, HVAC, agua potable, sanitaria, desagües, difusores y cuantificaciones. ¿Qué trazamos?');
+ if(!messages.children.length)add('bot','¡Hola! Soy el Ing. Keeelvin. Te apoyo en MEP, HVAC, agua potable, sanitaria, desagües, difusores y cuantificaciones. ¿Qué trazamos?');
 }
 mascot.onclick=()=>opened?close():open();
 $('kelvinMinimize').onclick=close;$('kelvinClose').onclick=close;
 const trigger=document.createElement('button');trigger.type='button';trigger.id='kelvinRibbon';
-trigger.textContent='🛠 Keeeeeeelvin IA';trigger.title='Asistente virtual MEP';trigger.hidden=true;
+trigger.textContent='🛠 Keeelvin IA';trigger.title='Asistente virtual MEP';trigger.hidden=true;
 trigger.onclick=()=>{open();$('kelvinQuestion').focus({preventScroll:true})};tabs.append(trigger);
 function run(kind){
  try{
@@ -108,7 +99,7 @@ const url=endpoint(),browserAI=typeof window.LanguageModel?.create==='function';
 $('kelvinMode').textContent=url?'IA remota configurable':browserAI?'IA local experimental':'Guía técnica local · sin IA generativa';
 async function generate(question){
  const context={units:api.getUnits(),quantities:mep.getQuantities?.().slice(0,30)||[]};
- const instructions='Eres Ing. Keeeeeeelvin, asistente MEP/HVAC de OtroCAD. Responde en español conciso. No inventes cálculos de caudales, carga térmica, pérdidas, normativa ni instalaciones que no existen. El software es un editor CAD experimental con sistemas y símbolos MEP editables.';
+ const instructions='Eres Ing. Keeelvin, asistente MEP/HVAC de OtroCAD. Responde en español conciso. No inventes cálculos de caudales, carga térmica, pérdidas, normativa ni instalaciones que no existen. El software es un editor CAD experimental con sistemas y símbolos MEP editables.';
  if(url){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
   try{
