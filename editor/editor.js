@@ -583,15 +583,17 @@ function modelPaperViewportEstimate(vp,layout){
   estimateSource:ratio?(explicit?'escala elegida por usuario':annotated.source):'encuadre de geometría del Modelo',
   centerEstimated:!hasCenter,heightEstimated:true,originalViewHeight:vp.viewHeight};
 }
+function cadStandardSheetArea(layout){
+ const pw=Math.max(30,Number(layout.paperWidth)||420),ph=Math.max(30,Number(layout.paperHeight)||297);
+ const margin=Math.max(0,Number(layout.margin)||0);
+ const band=layout.sheetTemplate?Math.max(28,Math.min(38,ph*.12)):0;
+ const width=Math.max(5,pw-2*margin),height=Math.max(5,ph-2*margin-band);
+ return {center:{x:pw/2,y:margin+band+height/2},width,height};
+}
 function manualCadPaperView(layout){
  const c=layout.manualView;
  if(!c||!Number.isFinite(Number(c.viewHeight))||Number(c.viewHeight)<=0||!Number.isFinite(Number(c.center?.x))||!Number.isFinite(Number(c.center?.y)))return null;
- const area=layout.sheetTemplate
-  ?{center:{x:Number(layout.paperWidth)/2,y:Math.max(0,Number(layout.margin)||0)+Math.max(28,Math.min(38,Number(layout.paperHeight)*.12))/2+
-       Math.max(5,Number(layout.paperHeight)-2*Math.max(0,Number(layout.margin)||0)-Math.max(28,Math.min(38,Number(layout.paperHeight)*.12)))/2},
-    width:Math.max(5,Number(layout.paperWidth)-2*Math.max(0,Number(layout.margin)||0)),
-    height:Math.max(5,Number(layout.paperHeight)-2*Math.max(0,Number(layout.margin)||0)-Math.max(28,Math.min(38,Number(layout.paperHeight)*.12)))}
-  :cadPaperMissingViewportArea(layout);
+ const area=layout.sheetTemplate?cadStandardSheetArea(layout):cadPaperMissingViewportArea(layout);
  return {...area,layout:layout.name,id:2,status:1,viewCenter:{x:Number(c.center.x),y:Number(c.center.y)},viewHeight:Number(c.viewHeight),
   generated:true,manual:true,paperRegionEstimated:true,estimated:false};
 }
@@ -633,12 +635,10 @@ function effectivePaperViewports(layout){
   const provisional=modelPaperViewportEstimate(implied,layout);
   return provisional?[{...provisional,generated:true,estimated:true,paperRegionEstimated:true,viewportMissing:true}]:[];
  }
- const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin);
- const titleband=layout.sheetTemplate?Math.max(28,Math.min(38,Number(layout.paperHeight)*.12)):0;
- const height=Math.max(5,layout.paperHeight-2*margin-titleband);
+ const {center,width,height}=cadStandardSheetArea(layout);
  const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);
  const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
- return[{layout:layout.name,center:{x:layout.paperWidth/2,y:margin+titleband+height/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
+ return[{layout:layout.name,center,width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
 }
 function describePaperLayoutState(layout,viewports){
  const paperCount=objects.filter(x=>x.cadLayout===layout.name).length;
