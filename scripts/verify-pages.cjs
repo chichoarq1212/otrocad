@@ -22,13 +22,13 @@ if(manifest.display!=='standalone')throw Error('PWA must be standalone');
 console.log('Local links, pages, assets, and PWA manifest verified');
 
 // Ensure the only advertised Android download is the current, direct .apk asset.
-const apk='https://github.com/chichoarq1212/otrocad/releases/download/android-0.5.7-test/OtroCAD-Android-0.5.7-alpha.apk';
+const apk='https://github.com/chichoarq1212/otrocad/releases/download/android-0.5.8-test/OtroCAD-Android-0.5.8-alpha.apk';
 for(const page of ['index.html','descargas/index.html']){
  const html=fs.readFileSync(path.join(root,page),'utf8');
- if(!html.includes('href="'+apk+'"'))throw Error('Direct APK 0.5.7 link missing in '+page);
- if(/android-hybrid-test-|OtroCAD-Android-0\.(?:5\.4|5\.6)-test\.apk/.test(html))throw Error('Outdated Android APK still advertised in '+page);
+ if(!html.includes('href="'+apk+'"'))throw Error('Direct APK 0.5.8 link missing in '+page);
+ if(/android-hybrid-test-|OtroCAD-Android-0\.(?:5\.4|5\.6|5\.7)-test\.apk/.test(html))throw Error('Outdated Android APK still advertised in '+page);
 }
-console.log('Direct current APK 0.5.7 links verified in home and downloads');
+console.log('Direct current APK 0.5.8 links verified in home and downloads');
 
 // Safari iOS needs real PNG Apple touch icon, standalone manifest and touch-friendly CAD editing.
 const icon=fs.readFileSync(path.join(root,'apple-touch-icon.png'));
