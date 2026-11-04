@@ -427,7 +427,7 @@ function activeAnchor(){return tool==='poly'&&poly.length?poly[poly.length-1]:st
 let offsetAwaitingDistance=false;
 let lineCoordinateMode='absolute',lineCoordinates={x:null,y:null};
 function civilUtmInputActive(){
- return ['line','poly'].includes(tool)&&!!document.querySelector('[data-tab="civil"].active')&&!!window.OtroCadCivilTopo;
+ return ['line','poly'].includes(tool)&&!!document.querySelector?.('[data-tab="civil"].active')&&!!window.OtroCadCivilTopo;
 }
 function usesLineCoordinates(){return ['line','poly'].includes(tool)&&(civilUtmInputActive()||lineCoordinateMode!=='polar')}
 function resetLineCoordinates(){lineCoordinates={x:null,y:null}}
