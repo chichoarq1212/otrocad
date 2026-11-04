@@ -586,7 +586,12 @@ function modelPaperViewportEstimate(vp,layout){
 function manualCadPaperView(layout){
  const c=layout.manualView;
  if(!c||!Number.isFinite(Number(c.viewHeight))||Number(c.viewHeight)<=0||!Number.isFinite(Number(c.center?.x))||!Number.isFinite(Number(c.center?.y)))return null;
- const area=cadPaperMissingViewportArea(layout);
+ const area=layout.sheetTemplate
+  ?{center:{x:Number(layout.paperWidth)/2,y:Math.max(0,Number(layout.margin)||0)+Math.max(28,Math.min(38,Number(layout.paperHeight)*.12))/2+
+       Math.max(5,Number(layout.paperHeight)-2*Math.max(0,Number(layout.margin)||0)-Math.max(28,Math.min(38,Number(layout.paperHeight)*.12)))/2},
+    width:Math.max(5,Number(layout.paperWidth)-2*Math.max(0,Number(layout.margin)||0)),
+    height:Math.max(5,Number(layout.paperHeight)-2*Math.max(0,Number(layout.margin)||0)-Math.max(28,Math.min(38,Number(layout.paperHeight)*.12)))}
+  :cadPaperMissingViewportArea(layout);
  return {...area,layout:layout.name,id:2,status:1,viewCenter:{x:Number(c.center.x),y:Number(c.center.y)},viewHeight:Number(c.viewHeight),
   generated:true,manual:true,paperRegionEstimated:true,estimated:false};
 }
