@@ -120,14 +120,16 @@
    people*peopleW*peopleHours/1000+defrostKWh;
   const baseKWhDay=transKWh+infilKWh+internalKWh+productKWh;
   const designKWhDay=baseKWhDay*(1+marginPct/100);
-  const capacityKW=designKWhDay/operationHours;
+  const averageKW=designKWhDay/operationHours;
+  const pullDownKW=(productKWh/processHours+(baseKWhDay-productKWh)/operationHours)*(1+marginPct/100);
+  const capacityKW=Math.max(averageKW,pullDownKW);
   const nominalPanelLambda=finite(raw.lambda??.023,'Conductividad aislante',.015,.08);
   const rFilms=.16;
   const panelThicknessM=Math.max(0,nominalPanelLambda*(1/uWall-rFilms));
   return{mode:'cold',inputs:{...raw,length,width,height},geometry:{wallArea,roofArea,floorArea,volume},
    transmissionW:transW,air,productKJkg,
    breakdownKWh:{transmission:transKWh,infiltration:infilKWh,product:productKWh,internal:internalKWh},
-   baseKWhDay,designKWhDay,capacityKW,capacityBTUh:capacityKW*3412.141633,
+   baseKWhDay,designKWhDay,capacityKW,averageKW,pullDownKW,capacityBTUh:capacityKW*3412.141633,
    panelThicknessMm:panelThicknessM*1000,
    warnings:['La carga diaria es orientativa y NO dimensiona por sí sola compresor, evaporador o válvula.',
     'Verificar infiltración por aperturas de puertas, cargas del producto, congelación, formación de escarcha, ventiladores y ciclos de desescarche.',
