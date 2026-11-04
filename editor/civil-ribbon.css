@@ -1,0 +1,86 @@
+/* Civil 3D ribbon only: clean grouping, readable titles and horizontal overflow.
+   Keeps the normal CAD/MEP ribbon and mobile landscape height unchanged. */
+body.cad-civil-active #groups{
+  gap:9px!important;
+  align-items:stretch!important;
+  overflow-x:auto!important;overflow-y:hidden!important;
+  overscroll-behavior-x:contain;
+  scrollbar-width:thin;
+  scroll-padding-inline:12px;
+}
+body.cad-civil-active #groups>.toolgroup[data-panel="civil"]:not([hidden]){
+  flex:0 0 auto!important;
+  display:grid!important;
+  grid-auto-flow:column!important;
+  grid-template-rows:repeat(2,23px)!important;
+  grid-auto-columns:max-content!important;
+  align-content:start!important;
+  align-items:center!important;
+  gap:3px 5px!important;
+  position:relative!important;
+  width:max-content!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:68px!important;
+  box-sizing:border-box!important;
+  padding:2px 10px 18px 3px!important;
+  margin:0!important;
+  border-right:1px solid #d3e0f4!important;
+}
+body.cad-civil-active #groups>.toolgroup[data-panel="civil"]:not([hidden])>.group-title{
+  box-sizing:border-box!important;display:block!important;
+  position:absolute!important;left:0!important;right:10px!important;bottom:0!important;
+  max-width:calc(100% - 10px)!important;min-width:0!important;
+  height:16px!important;line-height:16px!important;
+  overflow:hidden!important;text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font:700 9px/16px system-ui,-apple-system,"Segoe UI",sans-serif!important;
+  letter-spacing:.25px!important;text-align:center!important;
+  color:#3d5f91!important;background:#eef4ff!important;
+  border-top:1px solid #dce7f6!important;border-radius:2px 2px 0 0!important;
+  pointer-events:none!important;
+  padding:0 5px!important;
+}
+body.cad-civil-active #groups .toolgroup[data-panel="civil"] button.civil-tool{
+  min-width:85px!important;max-width:132px!important;
+  width:max-content!important;height:23px!important;min-height:23px!important;
+  padding:1px 6px!important;margin:0!important;
+  display:flex!important;flex-direction:row!important;
+  align-items:center!important;justify-content:flex-start!important;gap:5px!important;
+  box-sizing:border-box!important;overflow:hidden!important;
+  border-radius:5px!important;
+  font-size:10px!important;
+}
+body.cad-civil-active #groups .toolgroup[data-panel="civil"] button.civil-tool .ico{
+  flex:0 0 19px!important;width:19px!important;min-width:19px!important;
+  height:19px!important;
+}
+body.cad-civil-active #groups .toolgroup[data-panel="civil"] button.civil-tool .civil-label{
+  min-width:0!important;max-width:102px!important;overflow:hidden!important;
+  text-overflow:ellipsis!important;white-space:nowrap!important;
+  font:600 10px/18px system-ui,-apple-system,"Segoe UI",sans-serif!important;
+}
+body.cad-civil-active #groups>.toolgroup[data-panel="civil"] [hidden]{display:none!important}
+body.cad-civil-active #groups::-webkit-scrollbar{height:5px}
+body.cad-civil-active #groups::-webkit-scrollbar-thumb{border-radius:4px;background:#a9bdd7}
+@media(max-width:760px){
+ body.cad-civil-active #groups>.toolgroup[data-panel="civil"]:not([hidden]){
+  height:76px!important;grid-template-rows:repeat(2,27px)!important;
+  padding-top:2px!important;padding-bottom:17px!important;gap:2px 4px!important;
+ }
+ body.cad-civil-active #groups .toolgroup[data-panel="civil"] button.civil-tool{
+  height:27px!important;min-height:27px!important;max-width:120px!important;
+ }
+ body.cad-civil-active #groups .toolgroup[data-panel="civil"] button.civil-tool .civil-label{
+  max-width:94px!important;font-size:10px!important;
+ }
+}
+@media(max-width:950px) and (orientation:landscape) and (max-height:500px) and (pointer:coarse){
+ body.cad-civil-active #groups>.toolgroup[data-panel="civil"]:not([hidden]){
+  height:71px!important;grid-template-rows:repeat(2,24px)!important;
+  padding-top:1px!important;padding-bottom:17px!important;
+ }
+ body.cad-civil-active #groups .toolgroup[data-panel="civil"] button.civil-tool{
+  height:24px!important;min-height:24px!important;
+ }
+}
