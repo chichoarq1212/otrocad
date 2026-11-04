@@ -347,8 +347,8 @@ function cadTextBoundsWorld(s){
 
 function drawEntity(s,sel=false,preview=false){
  ctx.save();const drawZoom=layoutRenderTransform?.scale||zoom;let color=resolveCadColor(s,canvasIsLight());
- if(activePaperPlotStyle==='monochrome')color='#111111';
- else if(activePaperPlotStyle==='grayscale'){
+ if(typeof activePaperPlotStyle!=='undefined'&&activePaperPlotStyle==='monochrome')color='#111111';
+ else if(typeof activePaperPlotStyle!=='undefined'&&activePaperPlotStyle==='grayscale'){
   const match=color.match(/^#([0-9a-f]{6})$/i);
   if(match){const n=parseInt(match[1],16),gray=Math.round(.2126*((n>>16)&255)+.7152*((n>>8)&255)+.0722*(n&255));
    color='#'+[gray,gray,gray].map(v=>Math.min(215,Math.max(40,v)).toString(16).padStart(2,'0')).join('');}
