@@ -72,6 +72,7 @@ jobs:
           node --check editor/kelvin-assistant.js
           node --check editor/arqui-planner.js
           node --check editor/arqui-house-layout.js
+          node --check editor/arqui-user-ai.js
           node --check editor/arqui-references.js
           node --check editor/arqui-assistant.js
           node --check tests/arqui-planner.test.cjs
