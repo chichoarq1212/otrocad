@@ -57,6 +57,9 @@ jobs:
         run: |
           node --check editor/editor.js
           node --check editor/civil3d.js
+          node --check editor/jaimito-assistant.js
+          node --check tests/jaimito-assistant.test.cjs
+          node tests/jaimito-assistant.test.cjs
           node --check editor/demo/vivienda.js
           node --check sw.js
           node --check tests/civil3d.test.cjs
