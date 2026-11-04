@@ -417,13 +417,36 @@ function drawGrid(w,h){
  const o=screen({x:0,y:0});ctx.strokeStyle=canvasIsLight()?'#9aa9b8':'#46637b';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(o.x,0);ctx.lineTo(o.x,h);ctx.moveTo(0,o.y);ctx.lineTo(w,o.y);ctx.stroke();
 }
 function activeAnchor(){return tool==='poly'&&poly.length?poly[poly.length-1]:start}
+// Dynamic input: dimensional feedback follows the actual snapped point without
+// intercepting mouse/touch events. The editable input panel remains available.
+let dynamicInputOn=true;
+try{dynamicInputOn=localStorage.getItem('otrocad-dynmode')!=='off'}catch(e){}
+const cursorMeasureEl=document.createElement('div');
+cursorMeasureEl.id='cadCursorMeasure';
+cursorMeasureEl.className='cad-cursor-measure';
+cursorMeasureEl.hidden=true;
+cursorMeasureEl.setAttribute('aria-hidden','true');
+stage.append(cursorMeasureEl);
+function toggleDynamicInput(){
+ dynamicInputOn=!dynamicInputOn;
+ try{localStorage.setItem('otrocad-dynmode',dynamicInputOn?'on':'off')}catch(e){}
+ updateDynamic();
+ status.textContent='Entrada dinámica F12: '+(dynamicInputOn?'ACTIVADA':'DESACTIVADA');
+}
 function updateDynamic(){
- const anchor=activeAnchor();if(!anchor||!temp){$('#dynamic').style.display='none';return}
+ const anchor=activeAnchor();if(!dynamicInputOn||!anchor||!temp){$('#dynamic').style.display='none';cursorMeasureEl.hidden=true;return}
  $('#dynamic').style.display='flex';
  $('#dynamic label').textContent='LONGITUD ('+units+')';
  const len=distance(anchor,temp.b),ang=normalize(angle(anchor,temp.b));
  if(document.activeElement!==$('#dynLen'))$('#dynLen').value=len.toFixed(3);
  if(document.activeElement!==$('#dynAngle'))$('#dynAngle').value=ang.toFixed(1);
+ cursorMeasureEl.textContent=(tool==='circle'?'R ':'↔ ')+len.toFixed(3)+' '+units+(tool==='circle'?'':'  ·  '+ang.toFixed(1)+'°');
+ cursorMeasureEl.hidden=false;
+ const p=screen(temp.b),sw=Math.max(0,stage.clientWidth),sh=Math.max(0,stage.clientHeight);
+ const bw=cursorMeasureEl.offsetWidth||148,bh=cursorMeasureEl.offsetHeight||26;
+ const x=Math.min(Math.max(8,p.x+18),Math.max(8,sw-bw-8));
+ const y=p.y+bh+22>sh?Math.max(8,p.y-bh-18):Math.max(8,p.y+18);
+ cursorMeasureEl.style.left=x+'px';cursorMeasureEl.style.top=y+'px';
 }
 function showDraftSettings(){
  const dlg=document.createElement('dialog');
@@ -714,8 +737,8 @@ function render(){
  if(!printing&&tool==='poly'&&poly.length)drawEntity({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)},false);
  if(!printing&&start&&crossOn){const p=screen(start);ctx.strokeStyle=resolveCadColor({layer:'General',color:'#dce8f5'},canvasIsLight());ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(p.x-8,p.y);ctx.lineTo(p.x+8,p.y);ctx.moveTo(p.x,p.y-8);ctx.lineTo(p.x,p.y+8);ctx.stroke()}
  if(!printing&&crossOn){const p=cursor;ctx.strokeStyle='#5cb7e8aa';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(p.x,0);ctx.lineTo(p.x,h);ctx.moveTo(0,p.y);ctx.lineTo(w,p.y);ctx.stroke()}
- const anchor=activeAnchor();if(!printing&&temp&&anchor){const b=screen(temp.b);ctx.fillStyle='#62b8e8';ctx.beginPath();ctx.arc(b.x,b.y,3,0,Math.PI*2);ctx.fill();ctx.font='12px system-ui';ctx.fillText(distance(anchor,temp.b).toFixed(2)+' '+units+' < '+normalize(angle(anchor,temp.b)).toFixed(1)+'°',b.x+12,b.y-12)}
- if(printing)$('#dynamic').style.display='none';else updateDynamic();
+ const anchor=activeAnchor();if(!printing&&temp&&anchor){const b=screen(temp.b);ctx.fillStyle='#62b8e8';ctx.beginPath();ctx.arc(b.x,b.y,3,0,Math.PI*2);ctx.fill();/* Dimensions are positioned near the snapped cursor by updateDynamic. */}
+ if(printing){$('#dynamic').style.display='none';cursorMeasureEl.hidden=true}else updateDynamic();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
 function setTool(t){if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;$('#offsetInline')?.remove();if(t==='offset')clearSelection();selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render()}
@@ -1284,6 +1307,28 @@ function submitCommand(){
  if(raw){$('#cmd').value='';updateCursorCommand();runCommand(raw);return}
  performEnterAction();
 }
+function showCadKeyboardHelp(){
+ let dlg=document.getElementById('cadKeyboardHelp');
+ if(!dlg){
+  dlg=document.createElement('dialog');
+  dlg.id='cadKeyboardHelp';dlg.className='cad-utility-dialog cad-shortcut-help';
+  dlg.innerHTML='<h3>⌨ OtroCAD · Atajos de teclado</h3>'+
+   '<p>Escribe el comando con el lienzo activo y pulsa Enter o Espacio. '+
+   'En el campo CMD, usa espacios para separar parámetros.</p>'+
+   '<div class="cad-help-grid">'+
+   '<div><b>Dibujo</b><span>L, PL, C, A, REC, H, T</span></div>'+
+   '<div><b>Modificar</b><span>M, CO / CP, O, TR, EX, RO, MI, SC, F, CHA, X, E</span></div>'+
+   '<div><b>Vista y precisión</b><span>Z E, PAN, DS / HP, F3, F7, F8, F9, F10, F12</span></div>'+
+   '<div><b>Archivo</b><span>Ctrl+S DWG · Ctrl+O abrir · Ctrl+N nuevo · Ctrl+P imprimir · Ctrl+Shift+E DXF</span></div>'+
+   '<div><b>Edición</b><span>Ctrl+Z deshacer · Ctrl+Y rehacer · Ctrl+1 propiedades · Esc cancelar</span></div>'+
+   '<div><b>Entrada numérica</b><span>L, primer punto, mover cursor, 5 ↵ · @3,4 ↵ · @5&lt;30 ↵</span></div>'+
+   '<div><b>Civil 3D</b><span>C3DTIN, C3DCONTOURS, C3DPROFILE, C3DSECTION, C3DVOLUME, C3DEXPORTTIN</span></div>'+
+   '</div><button type="button" class="cad-shortcut-close">Cerrar</button>';
+  document.body.append(dlg);
+  dlg.querySelector('.cad-shortcut-close').onclick=()=>dlg.close();
+ }
+ dlg.showModal();
+}
 function repeatLastCommand(){
  if(!lastCommand){status.textContent='Todavía no hay un comando anterior';return}
  $('#cmd').value='';updateCursorCommand();runCommand(lastCommand);
@@ -1315,7 +1360,8 @@ $('#cmd').addEventListener('input',updateCursorCommand);
 applyCanvasTheme(cadTheme);
 $('#canvasTheme').addEventListener('change',e=>applyCanvasTheme(e.target.value));$('#canvasTheme').value=cadTheme;
 $('#cmd').addEventListener('keydown',e=>{
- if(e.key==='Enter'||e.key===' '&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();e.stopImmediatePropagation();submitCommand();$('#cmd').blur()}
+ // Space must remain a valid separator in commands such as OFFSET 2.5 and ZOOM E.
+ if(e.key==='Enter'){e.preventDefault();e.stopImmediatePropagation();submitCommand();$('#cmd').blur()}
  else if(e.key==='Escape'){e.preventDefault();cancelCurrentAction();$('#cmd').blur();stage.focus({preventScroll:true})}
 });
 $('#cmdRun').addEventListener('click',()=>{submitCommand();$('#cmd').blur()});
@@ -1406,12 +1452,19 @@ $('#multiSelectToggle').onclick=()=>{multiSelectOn=!multiSelectOn;$('#multiSelec
 document.addEventListener('keydown',e=>{
  if(!contextMenuEl.hidden&&e.key==='Escape'){e.preventDefault();hideCadContextMenu();return}
  const active=document.activeElement;
+ if(document.querySelector('dialog[open]'))return;
+ if((e.ctrlKey||e.metaKey)&&!e.altKey){
+  const k=e.key.toLowerCase();
+  const shortcut={s:'#saveAsDwg',o:'#open',n:'#newDrawing',p:'#pdf'}[k];
+  if(shortcut){e.preventDefault();$(shortcut).click();return}
+  if(k==='1'){e.preventDefault();$('#propertiesBtn').click();return}
+  if(k==='e'&&e.shiftKey){e.preventDefault();$('#saveAsDxf').click();return}
+ }
  if(['INPUT','TEXTAREA','SELECT'].includes(active?.tagName)){
   if(e.key==='Enter'&&active.id==='dynLen'){e.preventDefault();$('#dynAngle').focus()}
   else if(e.key==='Enter'&&active.id==='dynAngle'){e.preventDefault();const q=pointFromInputs();if(q){if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)}}
   return;
  }
- if(document.querySelector('dialog[open]'))return;
  if(e.key==='Escape'){e.preventDefault();cancelCurrentAction();return}
  if(e.key==='Backspace'&&$('#cmd').value){e.preventDefault();$('#cmd').value=$('#cmd').value.slice(0,-1);updateCursorCommand();return}
  if(e.key==='Delete'||e.key==='Backspace'){if(selectedItems().length){e.preventDefault();deleteSelection();showProperties();return}}
@@ -1421,6 +1474,8 @@ document.addEventListener('keydown',e=>{
  if(e.key==='F10'){e.preventDefault();toggle('polarToggle');return}
  if(e.key==='F3'){e.preventDefault();toggle('osnapToggle');return}
  if(e.key==='F2'){e.preventDefault();editSelectedText();return}
+ if(e.key==='F12'){e.preventDefault();toggleDynamicInput();return}
+ if(e.key==='F1'){e.preventDefault();showCadKeyboardHelp();return}
  if(e.key==='Enter'){e.preventDefault();performEnterAction();return}
  if(e.key===' '&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();performEnterAction();return}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$(e.shiftKey?'#redo':'#undo').click();return}
@@ -1440,6 +1495,23 @@ function parseCoordinate(raw,base){
 function runCommand(raw){
  const textValue=raw.trim(),upper=textValue.toUpperCase(),parts=upper.split(/\s+/),c=parts[0];if(!c)return;
  if(!/^[+-]?(?:\d|[.,])/.test(textValue)&&!textValue.startsWith('@')&&!['DS','HP','DSETTINGS','DRAFTINGSETTINGS','SETTINGS','F3','F7','F8','F9','F10','GRID','ORTHO','SNAP','OSNAP','POLAR'].includes(c)){lastCommand=textValue;try{localStorage.setItem('otrocad-last-command',lastCommand)}catch(e){}}
+ if(c==='F12'||c==='DYNMODE'||c==='DYN'){toggleDynamicInput();return}
+ if(c==='F1'||c==='HELP'||c==='ATAJOS'){showCadKeyboardHelp();return}
+ if(window.OtroCadCivilCommands&&typeof window.OtroCadCivilCommands[c]==='function'){
+  try{window.OtroCadCivilCommands[c]()}catch(error){console.error(error);status.textContent=error.message||String(error);alert(status.textContent)}
+  return;
+ }
+ // In line/polyline mode a distance alone follows the current pointer angle.
+ // This matches the common CAD sequence L ↵ first point ↵ 5 ↵.
+ if(/^[+]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(textValue)&&temp&&activeAnchor()&&['line','poly','measure'].includes(tool)){
+  const len=Number(textValue.replace(',','.'));
+  if(!(len>0)){status.textContent='La distancia debe ser mayor que cero';return}
+  const a=activeAnchor(),heading=angle(a,temp.b)*Math.PI/180;
+  const point=round({x:a.x+len*Math.cos(heading),y:a.y+len*Math.sin(heading)});
+  if(tool==='poly'){poly.push(point);temp=null;render();status.textContent='Vértice por distancia · Enter para terminar';return}
+  if(tool==='measure'){handleTap(screen(point));return}
+  commitEntity(point);status.textContent='Línea de '+len+' '+units+' creada con ángulo del cursor';return;
+ }
  if(c==='O'||c==='OFFSET'){const d=Number(parts[1]);if(parts[1]&&Number.isFinite(d)&&d>0){offsetDistance=d;offsetDistancePreset=true}setTool('offset');return}
  const coordinateBase=tool==='arc'&&arcPoints.length?arcPoints[arcPoints.length-1]:(activeAnchor()||{x:0,y:0});
  const coordinate=parseCoordinate(textValue,coordinateBase);
@@ -1465,7 +1537,7 @@ function runCommand(raw){
  if(['ED','TEXTEDIT','DDEDIT','EDITTEXT','STYLE','TEXTSTYLE'].includes(c)){editSelectedText();return}
  if(c==='SELECTTEXT'||c==='QSELECTTEXT'){const ids=objects.map((o,i)=>o.type==='text'&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer)?i:-1).filter(i=>i>=0);applySelection(ids);showProperties();status.textContent=ids.length+' textos seleccionados · ejecuta ED para cambiar formato en conjunto';return}
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
- if(c==='Z'||c==='ZOOM'){zoom=Math.min(500,zoom*1.25);render();return}
+ if(c==='Z'||c==='ZOOM'){if(['E','EXTENTS','ALL','A'].includes(parts[1])){$('#fit').click();return}zoom=Math.min(500,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
  if(c==='ARRAY'||c==='ARRAYRECT'){showArrayDialog();return}
  if(c==='AREA'){selectedArea();return}
@@ -1477,7 +1549,7 @@ function runCommand(raw){
  if(c==='F'||c==='FILLET'){setTool('fillet');return}
  if(c==='DLI'||c==='DIMLINEAR'){setTool('dim');return}
  if(c==='DAL'||c==='DIMALIGNED'){setTool('dimaligned');return}
- const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',T:'text',TEXT:'text',MTEXT:'text',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
+ const aliases={DI:'measure',DIST:'measure',DISTANCE:'measure',CP:'copy',X:'explode',CH:'chamfer',BH:'hatch',BHATCH:'hatch',T:'text',TEXT:'text',MTEXT:'text',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EXT:'extend',EXTEND:'extend',EX:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
