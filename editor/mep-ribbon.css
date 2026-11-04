@@ -1,0 +1,95 @@
+/* MEP/HVAC ribbon: no clipped or superimposed groups and captions.
+   Scoped to MEP and AIRE ACOND. only, preserves CAD/Civil keyboard and touch. */
+body.cad-mep-active #groups{
+ gap:9px!important;align-items:stretch!important;
+ overflow-x:auto!important;overflow-y:hidden!important;
+ overscroll-behavior-x:contain;scrollbar-width:thin;
+}
+body.cad-mep-active #groups>.toolgroup[data-panel="mep"]:not([hidden]),
+body.cad-mep-active #groups>.toolgroup[data-panel="hvac"]:not([hidden]){
+ flex:0 0 auto!important;display:grid!important;grid-auto-flow:column!important;
+ grid-template-rows:repeat(2,23px)!important;grid-auto-columns:max-content!important;
+ gap:3px 6px!important;align-content:start!important;align-items:center!important;
+ position:relative!important;box-sizing:border-box!important;
+ width:max-content!important;min-width:0!important;max-width:none!important;
+ height:68px!important;margin:0!important;
+ padding:2px 11px 18px 3px!important;border-right:1px solid #d3e0f4!important;
+}
+body.cad-mep-active #groups>.toolgroup[data-panel="mep"]:not([hidden])>.group-title,
+body.cad-mep-active #groups>.toolgroup[data-panel="hvac"]:not([hidden])>.group-title{
+ box-sizing:border-box!important;display:block!important;position:absolute!important;
+ left:0!important;right:11px!important;bottom:0!important;
+ height:16px!important;padding:0 5px!important;
+ color:#3d5f91!important;background:#eef4ff!important;
+ border-top:1px solid #dce7f6!important;
+ border-radius:2px 2px 0 0!important;
+ font:700 9px/16px system-ui,-apple-system,"Segoe UI",sans-serif!important;
+ white-space:nowrap!important;text-overflow:ellipsis!important;overflow:hidden!important;
+ letter-spacing:.25px!important;text-align:center!important;pointer-events:none!important;
+}
+body.cad-mep-active #groups .toolgroup[data-panel="mep"] button.mep-tool,
+body.cad-mep-active #groups .toolgroup[data-panel="hvac"] button.mep-tool{
+ box-sizing:border-box!important;display:flex!important;flex-direction:row!important;
+ align-items:center!important;justify-content:flex-start!important;
+ height:23px!important;min-height:23px!important;max-height:23px!important;
+ min-width:89px!important;max-width:156px!important;width:max-content!important;
+ margin:0!important;padding:1px 6px!important;gap:5px!important;
+ border-radius:5px!important;white-space:nowrap!important;overflow:hidden!important;
+ line-height:19px!important;
+}
+body.cad-mep-active #groups .toolgroup[data-panel="mep"] button .ico,
+body.cad-mep-active #groups .toolgroup[data-panel="hvac"] button .ico{
+ flex:0 0 19px!important;min-width:19px!important;width:19px!important;
+ height:19px!important;
+}
+body.cad-mep-active #groups .toolgroup[data-panel="mep"] .civil-label,
+body.cad-mep-active #groups .toolgroup[data-panel="hvac"] .civil-label{
+ min-width:0!important;max-width:120px!important;overflow:hidden!important;
+ text-overflow:ellipsis!important;white-space:nowrap!important;
+ font:600 10px/18px system-ui,-apple-system,"Segoe UI",sans-serif!important;
+}
+body.cad-mep-active #groups .mep-field{
+ min-width:125px!important;max-width:205px!important;
+ display:flex!important;flex-direction:row!important;align-items:center!important;
+ gap:5px!important;margin:0!important;padding:0 5px!important;
+ white-space:nowrap!important;overflow:hidden!important;
+ font:650 10px/18px system-ui,-apple-system,"Segoe UI",sans-serif!important;
+}
+body.cad-mep-active #groups .mep-field input,
+body.cad-mep-active #groups .mep-field select{
+ flex:1 1 80px!important;min-width:54px!important;max-width:115px!important;
+ width:90px!important;height:23px!important;min-height:23px!important;
+ box-sizing:border-box!important;margin-left:auto!important;
+ font:11px system-ui,-apple-system,"Segoe UI",sans-serif!important;
+}
+body.cad-mep-active #groups .mep-field select{max-width:135px!important}
+body.cad-mep-active #groups .mep-field input.mep-tag{max-width:90px!important}
+body.cad-mep-active #groups .toolgroup[data-panel="mep"] [hidden],
+body.cad-mep-active #groups .toolgroup[data-panel="hvac"] [hidden]{display:none!important}
+body.cad-mep-active #groups::-webkit-scrollbar{height:5px}
+body.cad-mep-active #groups::-webkit-scrollbar-thumb{background:#a9bbd4;border-radius:4px}
+@media(max-width:760px){
+ body.cad-mep-active #groups>.toolgroup[data-panel="mep"]:not([hidden]),
+ body.cad-mep-active #groups>.toolgroup[data-panel="hvac"]:not([hidden]){
+  height:76px!important;grid-template-rows:repeat(2,27px)!important;
+  padding-bottom:17px!important;gap:2px 4px!important;
+ }
+ body.cad-mep-active #groups .toolgroup[data-panel="mep"] button.mep-tool,
+ body.cad-mep-active #groups .toolgroup[data-panel="hvac"] button.mep-tool{
+  min-height:27px!important;height:27px!important;max-height:27px!important;
+  max-width:138px!important;
+ }
+ body.cad-mep-active #groups .mep-field{max-width:188px!important}
+ body.cad-mep-active #groups .mep-field input,
+ body.cad-mep-active #groups .mep-field select{height:27px!important;min-height:27px!important}
+}
+@media(max-width:950px) and (orientation:landscape) and (max-height:500px) and (pointer:coarse){
+ body.cad-mep-active #groups>.toolgroup[data-panel="mep"]:not([hidden]),
+ body.cad-mep-active #groups>.toolgroup[data-panel="hvac"]:not([hidden]){
+  height:71px!important;grid-template-rows:repeat(2,24px)!important;padding-bottom:17px!important;
+ }
+ body.cad-mep-active #groups .toolgroup[data-panel="mep"] button.mep-tool,
+ body.cad-mep-active #groups .toolgroup[data-panel="hvac"] button.mep-tool{
+  height:24px!important;min-height:24px!important;max-height:24px!important;
+ }
+}
