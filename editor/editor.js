@@ -426,14 +426,23 @@ function drawGrid(w,h){
 function activeAnchor(){return tool==='poly'&&poly.length?poly[poly.length-1]:start}
 let offsetAwaitingDistance=false;
 let lineCoordinateMode='absolute',lineCoordinates={x:null,y:null};
-function usesLineCoordinates(){return ['line','poly'].includes(tool)&&lineCoordinateMode!=='polar'}
+function civilUtmInputActive(){
+ return ['line','poly'].includes(tool)&&!!document.querySelector('[data-tab="civil"].active')&&!!window.OtroCadCivilTopo;
+}
+function usesLineCoordinates(){return ['line','poly'].includes(tool)&&(civilUtmInputActive()||lineCoordinateMode!=='polar')}
 function resetLineCoordinates(){lineCoordinates={x:null,y:null}}
 function coordinatePoint(x,y){
  if(!Number.isFinite(x)||!Number.isFinite(y))return null;
+ if(civilUtmInputActive())return window.OtroCadCivilTopo.toModel(x,y);
  const base=lineCoordinateMode==='relative'?(activeAnchor()||{x:0,y:0}):{x:0,y:0};
  return {x:base.x+x,y:base.y+y};
 }
 function coordinateCorner(reference){
+ if(civilUtmInputActive()){
+  const xy=window.OtroCadCivilTopo.fromModel(reference);
+  const east=lineCoordinates.x??xy.east,north=lineCoordinates.y??xy.north;
+  return window.OtroCadCivilTopo.toModel(east,north);
+ }
  const base=lineCoordinateMode==='relative'?(activeAnchor()||{x:0,y:0}):{x:0,y:0};
  const point={...reference};for(const axis of ['x','y'])if(lineCoordinates[axis]!==null&&Number.isFinite(lineCoordinates[axis]))point[axis]=base[axis]+lineCoordinates[axis];
  return point;
@@ -443,7 +452,7 @@ function acceptDynamicPoint(point){
  if(!usesLineCoordinates()){commitEntity(point);return true}
  const layer=$('#layer').value;if(lockedLayers.has(layer)){status.textContent='La capa actual está bloqueada';return false}
  if(tool==='poly'){poly.push({...point});temp=null;resetLineCoordinates();render();updatePrompt();status.textContent='Vértice por coordenadas · Enter para terminar';return true}
- if(!start){start={...point};temp={type:'line',a:{...point},b:{...point},...currentStyle(layer)};resetLineCoordinates();render();updatePrompt();status.textContent='Primer punto fijado por X/Y · indica el extremo';return true}
+ if(!start){start={...point};temp={type:'line',a:{...point},b:{...point},...currentStyle(layer)};resetLineCoordinates();render();updatePrompt();status.textContent=(civilUtmInputActive()?'Primer punto UTM E/N':'Primer punto X/Y')+' fijado · indica el extremo';return true}
  commitEntity(point);return true;
 }
 let rectangleDimensions={width:null,height:null},rectangleDirections={x:1,y:1};
@@ -486,7 +495,7 @@ function updateDynamic(){
  const panel=$('#dynamic'),rect=tool==='rect',offsetEntry=tool==='offset'&&offsetAwaitingDistance,cartesian=usesLineCoordinates()&&dynamicInputOn;
  panel.classList.toggle('cad-rect-input',rect);panel.classList.toggle('cad-offset-input',offsetEntry);
  panel.classList.toggle('cad-coordinate-input',cartesian);
- $('#dynCoordMode').hidden=!['line','poly'].includes(tool);
+ $('#dynCoordMode').hidden=!['line','poly'].includes(tool)||civilUtmInputActive();
  $('#dynCoordMode').value=lineCoordinateMode;
  $('#dynAngle').hidden=offsetEntry;$('#dynAngleLabel').hidden=offsetEntry;$('#acceptPoint').hidden=offsetEntry;
  $('#dynHint').hidden=!rect&&!offsetEntry&&!cartesian;
@@ -503,13 +512,16 @@ function updateDynamic(){
  }
  if(cartesian&&!$('#cmd').value.trim()){
   panel.style.display='flex';cursorMeasureEl.hidden=true;
-  const point=temp?.b||snapPoint(world(cursor)),base=lineCoordinateMode==='relative'?(anchor||{x:0,y:0}):{x:0,y:0};
-  $('#dynamic label').textContent=(lineCoordinateMode==='relative'?'ΔX':'X')+' ('+units+')';
-  $('#dynAngleLabel').textContent=(lineCoordinateMode==='relative'?'ΔY':'Y')+' ('+units+')';
-  $('#dynLen').setAttribute('aria-label','Coordenada X');$('#dynAngle').setAttribute('aria-label','Coordenada Y');
-  if(document.activeElement!==$('#dynLen')&&lineCoordinates.x===null)$('#dynLen').value=(point.x-base.x).toFixed(3);
-  if(document.activeElement!==$('#dynAngle')&&lineCoordinates.y===null)$('#dynAngle').value=(point.y-base.y).toFixed(3);
-  $('#dynHint').textContent=(anchor?'Extremo':'Primer punto')+' · Tab / ;: X ↔ Y · Enter: fijar'+(anchor?' · L '+distance(anchor,point).toFixed(3)+' '+units:'');
+  const point=temp?.b||snapPoint(world(cursor)),civil=civilUtmInputActive(),
+   base=lineCoordinateMode==='relative'&&!civil?(anchor||{x:0,y:0}):{x:0,y:0};
+  const topo=civil?window.OtroCadCivilTopo.fromModel(point):null;
+  $('#dynamic label').textContent=civil?'E (UTM m)':(lineCoordinateMode==='relative'?'ΔX':'X')+' ('+units+')';
+  $('#dynAngleLabel').textContent=civil?'N (UTM m)':(lineCoordinateMode==='relative'?'ΔY':'Y')+' ('+units+')';
+  $('#dynLen').setAttribute('aria-label',civil?'Este UTM metros':'Coordenada X');
+  $('#dynAngle').setAttribute('aria-label',civil?'Norte UTM metros':'Coordenada Y');
+  if(document.activeElement!==$('#dynLen')&&lineCoordinates.x===null)$('#dynLen').value=(civil?topo.east:point.x-base.x).toFixed(3);
+  if(document.activeElement!==$('#dynAngle')&&lineCoordinates.y===null)$('#dynAngle').value=(civil?topo.north:point.y-base.y).toFixed(3);
+  $('#dynHint').textContent=(civil?'Civil UTM · E / N en metros':anchor?'Extremo':'Primer punto')+' · Tab / ;: cambiar campo · Enter: fijar'+(anchor?' · L '+distance(anchor,point).toFixed(3)+' '+units:'');
   positionCursorInput(panel,cursor);return;
  }
  if(dynamicInputOn&&['line','poly'].includes(tool)&&lineCoordinateMode==='polar'&&!anchor&&!$('#cmd').value.trim()){panel.style.display='flex';positionCursorInput(panel,cursor);$('#dynamic label').textContent='LONGITUD ('+units+')';$('#dynAngleLabel').textContent='ÁNGULO';$('#dynLen').value='';$('#dynAngle').value='';cursorMeasureEl.hidden=true;return}
@@ -571,7 +583,7 @@ function handleCursorDimensionKey(event,active){
   if(coordinates&&!input&&lineCoordinates.x===null&&lineCoordinates.y===null)return false;
   event.preventDefault();
   if(offset)acceptOffsetDistance($('#dynLen').value);
-  else{const point=pointFromInputs();if(point){acceptDynamicPoint(point);stage.focus({preventScroll:true})}else status.textContent=coordinates?'Ingresa X e Y válidos':'Rectángulo: ancho y alto deben ser distintos de cero'}
+  else{const point=pointFromInputs();if(point){acceptDynamicPoint(point);stage.focus({preventScroll:true})}else status.textContent=coordinates?(civilUtmInputActive()?'Ingresa Este y Norte UTM válidos':'Ingresa X e Y válidos'):'Rectángulo: ancho y alto deben ser distintos de cero'}
   return true;
  }
  if(event.key==='Tab'||((rect||coordinates)&&[';',','].includes(event.key))){
