@@ -153,6 +153,15 @@
   function text(x,y,value,height=.2,layer='AI-ARQ-TEXTOS',color=colors.labels){
    push('text',layer,color,{a:p(x,y),text:String(value).slice(0,75),textHeightWorld:height*factor});
   }
+  function wallWithOpeningsH(x1,x2,y,openings=[]){
+   const ranges=openings.map(([cx,w])=>[cx-w/2,cx+w/2]).sort((a,b)=>a[0]-b[0]);
+   let start=x1;
+   for(const [a,b] of ranges){
+    if(a>start+1e-5)line(start,y,a,y);
+    start=Math.max(start,b);
+   }
+   if(start<x2-1e-5)line(start,y,x2,y);
+  }
   function withOpeningH(x1,x2,y,c,w,layer='AI-ARQ-MUROS'){
    if(c-w/2<=x1||c+w/2>=x2){line(x1,y,x2,y,layer);return}
    line(x1,y,c-w/2,y,layer);line(c+w/2,y,x2,y,layer);
@@ -193,25 +202,32 @@
    const X=f.x,Y=f.y,W=f.width,D=f.depth,L=f.hallStart,C=f.hallWidth,R=L+C;
    const hallDoor=L+C/2;
    // Continuous outer contour with real gaps for the main entrance and windows.
-   withOpeningH(X,X+W,Y,X+hallDoor,1.0);
+   const frontLeft=X+L/2,frontRight=X+R+(W-R)/2;
+   wallWithOpeningsH(X,X+W,Y,[[X+hallDoor,1.0],[frontLeft,1.35],[frontRight,1.05]]);
    door(X+hallDoor,Y,1.0,true,1);
-   windowH(X+L/2,Y,1.35);
-   if(f.level===1&&plan.garage){windowH(X+W-.75,Y,.9)}
-   else windowH(X+R+(W-R)/2,Y,1.05);
-   line(X,Y,X,Y+D);line(X+W,Y,X+W,Y+D);line(X,Y+D,X+W,Y+D);
+   windowH(frontLeft,Y,1.35);
+   windowH(frontRight,Y,1.05);
+   // Exterior side walls are interrupted at each real window opening.
+   const rearWindow=X+L/2;
+   wallWithOpeningsH(X,X+W,Y+D,[[rearWindow,1.3]]);
+   windowH(rearWindow,Y+D,1.3);
    const left=f.rooms.filter(r=>r.side==='left'),right=f.rooms.filter(r=>r.side==='right');
    // The corridor is accessible from every zone through a real 0.90m door gap.
    for(const z of left){
     const yy=Y+z.y+z.depth/2,w=z.name.includes('SALA')?1.25:.9;
     withOpeningV(X+L,Y+z.y,Y+z.y+z.depth,yy,w);
     door(X+L,yy,w,false,-1);
-    windowV(X,Y+z.y+z.depth*.5,Math.min(1.3,z.depth*.45));
+    const ww=Math.min(1.3,z.depth*.45);
+    withOpeningV(X,Y+z.y,Y+z.y+z.depth,yy,ww);
+    windowV(X,yy,ww);
    }
    for(const z of right){
     const yy=Y+z.y+z.depth/2,w=z.kind==='stairs'?1.1:z.kind==='bath'?.8:.9;
     withOpeningV(X+R,Y+z.y,Y+z.y+z.depth,yy,w);
     door(X+R,yy,w,false,1);
-    windowV(X+W,Y+z.y+z.depth*.5,Math.min(1.15,z.depth*.46));
+    const ww=Math.min(1.15,z.depth*.46);
+    withOpeningV(X+W,Y+z.y,Y+z.y+z.depth,yy,ww);
+    windowV(X+W,yy,ww);
    }
    for(const zones of [left,right]){
     const start=zones[0]?.side==='left'?X:X+R;
