@@ -1,8 +1,8 @@
 {
   "name": "otrocad-desktop",
-  "version": "0.5.4",
+  "version": "0.5.6",
   "private": true,
-  "description": "OtroCAD para Windows sin conexión, versión experimental",
+  "description": "OtroCAD para Windows sin conexión, versión alfa experimental",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
@@ -20,18 +20,24 @@
     },
     "files": [
       "main.cjs",
+      "build/otrocad.ico",
       "dist/**/*"
     ],
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "build/otrocad.ico"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "OtroCAD-Windows-0.5.4-experimental-Setup.${ext}"
+      "artifactName": "OtroCAD-Windows-0.5.6-experimental-Setup.${ext}",
+      "installerIcon": "build/otrocad.ico",
+      "uninstallerIcon": "build/otrocad.ico",
+      "installerHeaderIcon": "build/otrocad.ico",
+      "shortcutName": "OtroCAD"
     }
   }
 }
