@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
 const root=path.join(process.cwd(),'dist');
-const required=['index.html','editor/index.html','editor/editor.js','editor/civil3d.js','descargas/index.html','tutorial/index.html','herramientas/index.html','ios/index.html','sw.js','manifest.webmanifest','icon.svg','apple-touch-icon.png','icon-192.png','icon-512.png','editor-preview.svg'];
+const required=['index.html','editor/index.html','editor/editor.js','editor/civil3d.js','editor/jaimito-assistant.js','editor/jaimito-assistant.css','editor/compact-chrome.css','editor/assets/ing-jaimito-hd.webp','descargas/index.html','tutorial/index.html','herramientas/index.html','ios/index.html','sw.js','manifest.webmanifest','icon.svg','apple-touch-icon.png','icon-192.png','icon-512.png','editor-preview.svg'];
 for(const file of required){if(!fs.existsSync(path.join(root,file)))throw Error('Missing '+file);}
 const pages=['index.html','descargas/index.html','tutorial/index.html','herramientas/index.html','ios/index.html','editor/index.html'];
 for(const page of pages){

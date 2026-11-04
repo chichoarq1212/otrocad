@@ -42,7 +42,7 @@ root.innerHTML=[
 ].join('');
 document.body.append(root);
 const avatar=$('jaimitoAvatar'),avatarButton=$('jaimitoAvatarButton'),panel=$('jaimitoPanel'),messages=$('jaimitoMessages');
-avatar.src=window.OtroCadJaimitoAvatar||'assets/ing-jaimito.webp';
+avatar.src=window.OtroCadJaimitoAvatar||'assets/ing-jaimito-hd.webp';
 avatar.addEventListener('error',()=>{if(!avatar.dataset.fallback){avatar.dataset.fallback='1';avatar.src='../icon-192.png'}});
 let opened=false,hiddenByUser=false,busy=false;
 try{hiddenByUser=!!JSON.parse(localStorage.getItem(key)||'{}').hidden}catch(_){}
@@ -52,9 +52,22 @@ const civilActive=()=>{
  return !!civil&&civil.classList.contains('active')&&civil.getAttribute('aria-selected')==='true';
 };
 function hidePanel(){opened=false;panel.hidden=true;avatarButton.setAttribute('aria-expanded','false')}
+function positionAssistant(){
+ // Anchor above the actual CAD controls, including the expanded phone command bar.
+ const area=stage.getBoundingClientRect?.();
+ if(!area||!window.innerHeight)return;
+ let edge=area.bottom;
+ for(const id of ['layoutBar','commandbar','statusbar']){
+  const rect=$(id)?.getBoundingClientRect?.();
+  if(rect?.height&&rect.top>=area.top)edge=Math.min(edge,rect.top);
+ }
+ root.style.setProperty('--jaimito-bottom',Math.max(8,window.innerHeight-edge+8)+'px');
+ root.style.setProperty('--jaimito-room',Math.max(150,edge-area.top-16)+'px');
+}
 function sync(){
  const active=civilActive();root.hidden=!active||hiddenByUser;
  ribbon.hidden=!active;
+ positionAssistant();
  if(!active)hidePanel();
 }
 function message(role,value){
@@ -165,6 +178,13 @@ tabs.addEventListener('click',()=>queueMicrotask(sync));
 const observer=new MutationObserver(sync);
 observer.observe(tabs,{subtree:true,attributes:true,attributeFilter:['class','aria-selected']});
 window.addEventListener('pageshow',sync);
+window.addEventListener('resize',positionAssistant);
+if(typeof ResizeObserver==='function'){
+ const sizeObserver=new ResizeObserver(positionAssistant);
+ sizeObserver.observe(stage);
+ if($('layoutBar'))sizeObserver.observe($('layoutBar'));
+}
+new MutationObserver(positionAssistant).observe(document.body,{attributes:true,attributeFilter:['class']});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&opened&&document.activeElement?.id!=='jaimitoQuestion')hidePanel()});
 window.OtroCadJaimito={open:openPanel,close:hidePanel,ask,runTool:execute,sync,hide:()=>{hiddenByUser=true;persist();sync()}};
 sync();

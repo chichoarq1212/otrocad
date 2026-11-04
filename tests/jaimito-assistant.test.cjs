@@ -7,15 +7,17 @@ const html=fs.readFileSync('editor/index.html','utf8');
 const css=fs.readFileSync('editor/jaimito-assistant.css','utf8');
 const src=fs.readFileSync('editor/jaimito-assistant.js','utf8');
 const sw=fs.readFileSync('sw.js','utf8');
-const asset='editor/assets/ing-jaimito.webp';
+const asset='editor/assets/ing-jaimito-hd.webp';
 const bytes=fs.readFileSync(asset);
 assert.equal(bytes.toString('ascii',0,4),'RIFF','Mascot must have a valid RIFF header');
 assert.equal(bytes.toString('ascii',8,12),'WEBP','Mascot must be a WEBP image');
 assert.equal(bytes.toString('ascii',12,16),'VP8X','Mascot must support alpha');
 assert.ok(bytes[20]&0x10,'Ing Jaimito mascot must keep background transparency');
+assert.ok(1+bytes.readUIntLE(24,3)>=384,'Mascot must remain sharp on high-DPI displays');
+assert.ok(1+bytes.readUIntLE(27,3)>=768,'Do not replace the HD mascot with a small thumbnail');
 for(const filename of ['jaimito-assistant.js','jaimito-assistant.css'])assert.match(html,new RegExp(filename.replace('.','\\.')));
 assert.match(html,/src="civil3d\.js"><\/script><script src="jaimito-assistant\.js"/,'Assistant must load after Civil 3D commands');
-for(const part of ['jaimito-assistant.js','jaimito-assistant.css','assets/ing-jaimito.webp']){
+for(const part of ['jaimito-assistant.js','jaimito-assistant.css','assets/ing-jaimito-hd.webp']){
  assert.ok(sw.includes(part),'Offline worker must include '+part);
 }
 assert.match(css,/pointer-events:none/,'Assistant container must not interfere with CAD drawing');
@@ -66,7 +68,7 @@ vm.createContext(context);
 vm.runInContext(src,context);
 assert.ok(nodes.jaimitoAssistant,'Assistant must mount in editor');
 assert.equal(nodes.jaimitoAssistant.hidden,true,'Mascot must be hidden outside Civil');
-assert.equal(nodes.jaimitoAvatar.src,'assets/ing-jaimito.webp','Use provided transparent avatar');
+assert.equal(nodes.jaimitoAvatar.src,'assets/ing-jaimito-hd.webp','Use the high-resolution transparent avatar');
 tab.classList.add('active');tab.setAttribute('aria-selected','true');
 window.OtroCadJaimito.sync();
 assert.equal(nodes.jaimitoAssistant.hidden,false,'Show mascot only on Civil tab');
@@ -84,4 +86,16 @@ assert.equal(nodes.jaimitoAssistant.hidden,false,'Minimize retains floating char
 tab.classList.remove('active');tab.setAttribute('aria-selected','false');
 window.OtroCadJaimito.sync();
 assert.equal(nodes.jaimitoAssistant.hidden,true,'Leaving Civil must hide mascot');
+// Keep the sharper, larger mascot clear of both ordinary and expanded phone controls.
+const root=nodes.jaimitoAssistant;
+root.style.setProperty=(name,value)=>{root.style[name]=value};
+window.innerHeight=900;
+stage.getBoundingClientRect=()=>({top:150,bottom:842,height:692});
+node('layoutBar').getBoundingClientRect=()=>({top:804,height:38});
+node('commandbar').getBoundingClientRect=()=>({top:842,height:31});
+window.OtroCadJaimito.sync();
+assert.equal(root.style['--jaimito-bottom'],'104px','Mascot must sit above layout buttons');
+nodes.commandbar.getBoundingClientRect=()=>({top:728,height:40});
+window.OtroCadJaimito.sync();
+assert.equal(root.style['--jaimito-bottom'],'180px','Expanded phone commands must remain unobstructed');
 console.log('Ing. Jaimito checks passed: transparent avatar, only Civil, conversation, Civil commands, mobile CSS and offline assets.');
