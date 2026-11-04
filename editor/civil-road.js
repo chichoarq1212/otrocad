@@ -121,6 +121,7 @@ const actions=[
  ['Señal vertical','sign','Símbolo de señal junto al eje']
 ];
 const open=(kind)=>{
+ if(!document.querySelector('[data-tab="civil"].active'))throw Error('Abre CIVIL 3D para la señalización vial.');
  const selected=api.getSelectedObjects();
  const source=selected.find(x=>(x.type==='line'&&x.a&&x.b)||(x.type==='poly'&&x.pts?.length>=2));
  if(!source)throw Error('Selecciona antes una línea o polilínea que represente el eje vial.');
