@@ -266,7 +266,7 @@ function generate(plan,options={}){
    const outerWindows=[],hallDoors=[];
    for(const z of zones){
     const y=Y+z.y+z.depth/2;
-    const opening=z.kind==='stairs'?1.0:z.kind==='bath'?.8:/SALA/.test(z.name)?1.12:.88;
+    const opening=s.accessible?1.04:(z.kind==='stairs'?1.0:z.kind==='bath'?.8:/SALA/.test(z.name)?1.12:.88);
     const windowWidth=Math.min(side==='left'?1.18:1.0,z.depth*.40);
     hallDoors.push({center:y,width:opening});
     if(z.depth>1.8)outerWindows.push({center:y,width:windowWidth});
@@ -289,11 +289,11 @@ function generate(plan,options={}){
     const midX=X+r.x+r.width/2,midY=Y+r.y+r.depth/2;
     const label=r.name;
     text(midX-Math.min(1.04,r.width*.30),midY-.30,label,.18,'AI-ARQ-TEXTOS',art.text,'room-label');
-    text(midX-.42,midY-.06,compact(r.area)+' m²',.155,'AI-ARQ-TEXTOS',art.dim,'room-area');
-    livingArea+=r.area;
+    text(midX-.42,midY-.06,compact(r.netArea??r.area)+' m² útiles',.155,'AI-ARQ-TEXTOS',art.dim,'room-area');
+    livingArea+=r.netArea??r.area;
     furniture(r,X,Y);
    }else{
-    text(X+r.x+.06,Y+.65,'PASILLO '+compact(r.width)+' m',.12,'AI-ARQ-TEXTOS',art.dim,'circulation');
+    text(X+r.x+.06,Y+.65,'PASO LIBRE '+compact(r.clearWidth??r.width)+' m',.12,'AI-ARQ-TEXTOS',art.dim,'circulation');
    }
   }
   dimensionChains(f);
@@ -318,6 +318,8 @@ function generate(plan,options={}){
   }
  }
  if(s.style!=='esquematico')northAndTitle();
+ // Persist the validated program with the actual CAD transaction for reopening/editing.
+ for(const marker of out.filter((e,i)=>i===0||e.aiElement==='floor-title')){marker.aiDesignSpec={...s};marker.aiDesignOrigin={...origin};marker.aiDesignUnits=options.units||'m';marker.aiDesignVersion=2;}
  if(out.length>3300)throw Error('El anteproyecto excede el límite gráfico: reduce la complejidad.');
  return out;
 }

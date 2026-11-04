@@ -17,15 +17,20 @@
  };
  const normal=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  function parsePrompt(text,base={}){
-  const s=normal(text);
+  let s=normal(text);
+  const words={un:1,una:1,uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,ocho:8,nueve:9,diez:10,doce:12,quince:15,veinte:20,treinta:30,cuarenta:40,cincuenta:50};
+  s=s.replace(/\b(un|una|uno|dos|tres|cuatro|cinco|seis|ocho|nueve|diez|doce|quince|veinte|treinta|cuarenta|cincuenta)\b/g,w=>words[w]);
   const spec={lotWidth:12,lotDepth:20,floors:1,bedrooms:3,garage:true,
    frontSetback:3,backSetback:2,sideSetback:.45,kitchenExtra:0,...base};
-  const m=s.match(/(?:terreno|lote|solar|predio)?\s*(?:de\s*)?(\d{1,3}(?:[.,]\d+)?)\s*(?:m(?:etros?)?)?\s*[x×]\s*(\d{1,3}(?:[.,]\d+)?)/);
+  const m=s.match(/(?:terreno|lote|solar|predio)?\s*(?:de\s*)?(\d{1,3}(?:[.,]\d+)?)\s*(?:m(?:etros?)?)?\s*(?:[x×]|por)\s*(\d{1,3}(?:[.,]\d+)?)/);
   if(m){spec.lotWidth=Number(m[1].replace(',','.'));spec.lotDepth=Number(m[2].replace(',','.'))}
+  const detailed=s.match(/(?:terreno|lote|solar).{0,16}?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?\s*(?:de\s*)?(?:frente|ancho).{0,12}?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?\s*(?:de\s*)?(?:fondo|largo)/);
+  if(detailed){spec.lotWidth=Number(detailed[1].replace(',','.'));spec.lotDepth=Number(detailed[2].replace(',','.'))}
+  const baths=s.match(/(\d+)\s*banos?\b/);if(baths)spec.bathrooms=Number(baths[1]);
   const beds=s.match(/(\d+|un|uno|dos|tres|cuatro)\s*(?:habitacion|dormitorio|cuarto|recamara)/);
-  if(beds){const map={un:1,uno:1,dos:2,tres:3,cuatro:4};spec.bedrooms=map[beds[1]]||Number(beds[1])}
-  if(/\b(?:dos|2)\s*(?:planta|piso|nivel)/.test(s))spec.floors=2;
-  else if(/\b(?:una?|1)\s*(?:planta|piso|nivel)/.test(s))spec.floors=1;
+  if(beds&&!/(?:agrega|anade|suma|quita|elimina)\s+(?:otro\s+)?\d*\s*(?:dormitorio|habitacion|cuarto)/.test(s)){const map={un:1,uno:1,dos:2,tres:3,cuatro:4};spec.bedrooms=map[beds[1]]||Number(beds[1])}
+  if(/\b2\s*(?:planta|piso|nivel)/.test(s))spec.floors=2;
+  else if(/\b1\s*(?:planta|piso|nivel)/.test(s))spec.floors=1;
   if(/sin\s*(?:garaje|garage|estacionamiento|parqueadero)/.test(s))spec.garage=false;
   else if(/\b(?:garaje|garage|estacionamiento|parqueadero)\b/.test(s))spec.garage=true;
   const pickRetiro=(words)=>{const q=s.match(new RegExp('(?:retiro|retiros|separacion)\\s*(?:de\\s*)?(?:'+words+')\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:m|metros)?'));return q?Number(q[1].replace(',','.')):null};
@@ -37,10 +42,12 @@
   const wallExt=s.match(/(?:muros?|pared(?:es)?)\s*(?:exteriores?|perimetrales?)\s*(?:de|:)?\s*(\d+(?:[.,]\d+)?)\s*(cm|centimetros|m|metros)?/);
   const wallInt=s.match(/(?:muros?|pared(?:es)?)\s*(?:interiores?|internas?)\s*(?:de|:)?\s*(\d+(?:[.,]\d+)?)\s*(cm|centimetros|m|metros)?/);
   const thickness=m=>Number(m[1].replace(',','.'))*(m[2]?.startsWith('c')?.01:(!m[2]&&Number(m[1])>1?.01:1));
+  const allWalls=s.match(/(?:muros?|pared(?:es)?)\s*(?:de|:)\s*(\d+(?:[.,]\d+)?)\s*(cm|centimetros|m|metros)?/);
+  if(allWalls){spec.wallOuter=thickness(allWalls);spec.wallInner=thickness(allWalls)}
   if(wallExt)spec.wallOuter=thickness(wallExt);
   if(wallInt)spec.wallInner=thickness(wallInt);
   if(/(?:garage|garaje|estacionamiento|parqueadero).{0,24}?(?:dos|2)\s*(?:autos|vehiculos|carros|puestos|plazas)/.test(s)||/(?:dos|2)\s*(?:autos|vehiculos|puestos|plazas)\s*(?:de\s*)?(?:garaje|estacionamiento)/.test(s))spec.garageSpaces=2;
-  else if(/(?:garage|garaje|estacionamiento).{0,18}?(?:un|uno|1)\s*(?:auto|carro|vehiculo|puesto)/.test(s))spec.garageSpaces=1;
+  else if(/(?:garage|garaje|estacionamiento).{0,18}?(?:1)\s*(?:auto|carro|vehiculo|puesto)/.test(s))spec.garageSpaces=1;
   if(/sin\s*mobiliario/.test(s))spec.furniture=false;else if(/mobiliario|amobla|amuebl|equipamiento/.test(s))spec.furniture=true;
   if(/sin\s*(?:hatch|hachurado|tramado)/.test(s))spec.wallHatch=false;else if(/hatch|hachur|trama.*muro/.test(s))spec.wallHatch=true;
   if(/sin\s*cotas|no\s*acotes/.test(s))spec.dimensions=false;else if(/acotad|cotas|acotar/.test(s))spec.dimensions=true;
@@ -52,24 +59,52 @@
   if(/(?:walking\s*closet|walk\s*in|vestidor)/.test(s))spec.walkInCloset=true;
   if(/ban[o]?\s*social|medio\s*ban[o]?/.test(s))spec.socialBath=true;
   if(/lavanderia|cuarto\s*de\s*lavado/.test(s))spec.laundry=true;
-  if(/agrand(?:a|ar)\s*(?:la\s*)?cocina/.test(s)){
-   const change=s.match(/cocina.{0,28}?(\d+(?:[.,]\d+)?)\s*(cm|centimetros|m|metros)/);
-   spec.kitchenExtra=change?(Number(change[1].replace(',','.'))*(change[2].startsWith('c')?.01:1)):.45;
+  // Follow-up changes are relative to the previous proposal, including repeated requests.
+  for(const [key,room] of [['kitchenExtra','cocina'],['livingExtra','sala|comedor'],['bedroomExtra','dormitorios?|habitaciones?|cuartos?']]){
+   const change=s.match(new RegExp('(?:agrand[ae]|ampli[ae]|aument[ae]|reduce|reducir|achic[ae])(?:r)?\\s+(?:otra vez\\s+)?(?:la |el |los |las )?(?:'+room+')(?:\\s+(?:en|otros?|mas))?\\s*(\\d+(?:[.,]\\d+)?)?\\s*(cm|centimetros|m|metros)?'));
+   if(change){
+    const delta=change[1]?Number(change[1].replace(',','.'))*(change[2]?.startsWith('c')?.01:1):.45;
+    spec[key]=round(Number(spec[key]||0)+(/^(reduce|reducir|achic)/.test(change[0])?-delta:delta));
+   }
   }
+  const bedDelta=s.match(/(?:agrega|anade|suma|quita|elimina)\s+(?:otro\s+)?(\d+)?\s*(?:dormitorios?|habitaciones?|cuartos?)/);
+  if(bedDelta)spec.bedrooms=Number(spec.bedrooms)+(/^(quita|elimina)/.test(bedDelta[0])?-1:1)*Number(bedDelta[1]||1);
+  const feature=(key,terms)=>{
+   if(new RegExp('(?:sin|quita|elimina|retira)\\s+(?:(?:la|el)\\s+)?(?:'+terms+')').test(s))spec[key]=false;
+   else if(new RegExp('(?:'+terms+')').test(s))spec[key]=true;
+  };
+  feature('garage','garaje|garage|estacionamiento|parqueadero');
+  feature('laundry','lavanderia|cuarto de lavado');
+  feature('socialBath','bano social|medio bano');
+  feature('walkInCloset','vestidor|walk(?:ing| in)? closet');
+  feature('kitchenIsland','isla');
+  if(/cierra\s*(?:la\s*)?cocina|cocina\s*cerrada/.test(s))spec.openKitchen=false;
+  if(/sin\s*(?:suite|bano master)|dormitorio principal sin bano/.test(s))spec.mainSuite=false;
+  if(/accesible|silla de ruedas|movilidad reducida|accesibilidad/.test(s))spec.accessible=true;
+  if(/sin\s*criterio\s*accesible/.test(s))spec.accessible=false;
+  const city=s.match(/\b(?:en|ciudad de|canton)\s+(quito|guayaquil|cuenca|pasaje|loja|ambato|machala|yantzaza|zamora|sangolqui|ruminahui)\b/);
+  if(city)spec.location=city[1];
   return validateSpec(spec);
+ }
+ function integer(v,def,min,max,name){
+  const n=number(v,def,min,max,name);if(!Number.isInteger(n))throw Error(name+' debe ser entero.');return n;
  }
  function validateSpec(s){
   return{
    lotWidth:number(s.lotWidth,12,8,60,'Ancho del terreno'),
    lotDepth:number(s.lotDepth,20,12,80,'Fondo del terreno'),
-   floors:number(s.floors,1,1,2,'Número de plantas'),
-   bedrooms:number(s.bedrooms,3,1,4,'Dormitorios'),
+   floors:integer(s.floors,1,1,2,'Número de plantas'),
+   bedrooms:integer(s.bedrooms,3,1,4,'Dormitorios'),
    garage:Boolean(s.garage),
    frontSetback:number(s.frontSetback,3,0,12,'Retiro frontal orientativo'),
    backSetback:number(s.backSetback,2,0,12,'Retiro posterior orientativo'),
    sideSetback:number(s.sideSetback,.45,0,5,'Retiro lateral orientativo'),
-   kitchenExtra:number(s.kitchenExtra,0,0,1.8,'Ampliación de cocina'),
-   garageSpaces:number(s.garageSpaces,1,1,2,'Número de estacionamientos'),
+   kitchenExtra:number(s.kitchenExtra,0,-1.8,1.8,'Ampliación de cocina'),
+   livingExtra:number(s.livingExtra,0,-1.8,1.8,'Ampliación de sala'),
+   bedroomExtra:number(s.bedroomExtra,0,-1.8,1.8,'Ampliación de dormitorios'),
+   bathrooms:integer(s.bathrooms,0,0,4,'Baños (0 = propuesta del motor)'),
+   accessible:Boolean(s.accessible),location:String(s.location||'').slice(0,70),
+   garageSpaces:integer(s.garageSpaces,1,1,2,'Número de estacionamientos'),
    wallOuter:number(s.wallOuter,.20,.10,.45,'Espesor de muro exterior'),
    wallInner:number(s.wallInner,.15,.07,.35,'Espesor de muro interior'),
    furniture:s.furniture!==false,wallHatch:s.wallHatch!==false,dimensions:s.dimensions!==false,
@@ -83,9 +118,17 @@
   const minSum=items.reduce((s,item)=>s+item.min,0);
   if(depth<minSum)throw Error('El fondo edificable no permite las profundidades propuestas de '+items.map(x=>x.name).join(', ')+'. Amplía el terreno o modifica el programa.');
   const extra=depth-minSum,weight=items.reduce((s,item)=>s+(item.weight||1),0);
+  const amounts=items.map(item=>item.min+extra*(item.weight||1)/weight);
+  const expansion=items.reduce((n,item)=>n+(item.expand||0),0);
+  if(items.some(item=>item.expand)){
+   const available=items.reduce((n,item,i)=>n+(item.expand?0:amounts[i]-item.min),0);
+   if(expansion>available+.0001)throw Error('La ampliación solicitada no cabe sin reducir otros ambientes por debajo del objetivo. Amplía el terreno, reduce el programa o solicita menos incremento.');
+   items.forEach((item,i)=>{amounts[i]+=item.expand||(available?-(expansion*(amounts[i]-item.min)/available):0)});
+  }
+  if(amounts.some((value,i)=>value<items[i].min-.001))throw Error('La reducción deja un ambiente por debajo del objetivo dimensional. Solicita una reducción menor.');
   let y=0;
   return items.map((item,i)=>{
-   const dy=i===items.length-1?depth-y:item.min+extra*(item.weight||1)/weight;
+   const dy=i===items.length-1?depth-y:amounts[i];
    const start=round(y),end=i===items.length-1?round(depth):round(y+dy);
    const zone={name:item.name,y:start,depth:round(end-start),kind:item.kind||'room'};
    y+=dy;return zone;
@@ -103,9 +146,10 @@
   }else if(spec.garage){
    warnings.push('No cabe una plaza lateral estándar con este esquema: garaje pendiente de rediseñar; no se dibuja un espacio demasiado pequeño.');
   }
-  const corridor=1.2,rightWidth=clamp(houseWidth*.365,2.9,3.5),
+  const corridor=1.2+spec.wallInner,rightMinimum=2.8+(spec.wallOuter+spec.wallInner)/2,
+   rightWidth=clamp(houseWidth*.365,rightMinimum,3.5),
    leftWidth=houseWidth-corridor-rightWidth;
-  if(rightWidth<2.9-1e-7||leftWidth<3.0-1e-7)
+  if(rightWidth<rightMinimum-1e-7||leftWidth<2.6-1e-7)
    throw Error('El ancho edificable no permite una franja habitable y circulación de 1,20 m. Se requiere una solución arquitectónica diferente.');
   const floors=[],originX=spec.sideSetback,originY=spec.frontSetback;
   for(let floor=0;floor<spec.floors;floor++){
@@ -113,22 +157,22 @@
    let left,right;
    if(ground){
     left=[
-     {name:'SALA - COMEDOR',min:4,weight:2.4},
-     {name:'COCINA',min:2.7+spec.kitchenExtra,weight:1.5+spec.kitchenExtra},
-     {name:'LAVANDERÍA',min:1.8,weight:1},
+     {name:'SALA - COMEDOR',min:4,weight:2.4,expand:spec.livingExtra},
+     {name:'COCINA',min:2.7,weight:1.5,expand:spec.kitchenExtra},
+     ...(spec.laundry?[{name:'LAVANDERÍA',min:1.8,weight:1}]:[]),
      {name:dual?'ESTAR / ESTUDIO':'ESTAR FAMILIAR',min:2.1,weight:1.0}
     ];
     if(dual){
      right=[
       {name:'ESCALERA',min:3.9,weight:1.6,kind:'stairs'},
-      {name:'BAÑO SOCIAL',min:2.2,weight:1},
+      ...(spec.socialBath?[{name:'BAÑO SOCIAL',min:2.2,weight:1,kind:'bath'}]:[]),
       {name:'ESTUDIO',min:3.1,weight:1.3},
       {name:'BODEGA / SERVICIO',min:2.0,weight:.7}
      ];
     }else{
      const bedrooms=Array.from({length:spec.bedrooms},(_,i)=>({
        name:i===0&&spec.mainSuite?'DORMITORIO PRINCIPAL':'DORMITORIO '+(i+1),
-       min:3.25,weight:1.1,kind:'bedroom'}));
+       min:3.25,weight:1.1,expand:spec.bedroomExtra,kind:'bedroom'}));
      right=spec.mainSuite?[
        bedrooms[0],
        {name:spec.walkInCloset?'BAÑO MÁSTER / VESTIDOR':'BAÑO PRINCIPAL',min:2.35,weight:.72,kind:'bath'},
@@ -137,17 +181,30 @@
      ]:[...bedrooms,{name:'BAÑO',min:2.3,weight:.7,kind:'bath'}];
     }
    }else{
-    const nRight=Math.max(1,spec.bedrooms-1);
+    const nRight=Math.max(0,spec.bedrooms-1);
     right=[
-      ...Array.from({length:nRight},(_,i)=>({name:'DORMITORIO '+(i+2),min:3.25,weight:1.1,kind:'bedroom'})),
+      ...Array.from({length:nRight},(_,i)=>({name:'DORMITORIO '+(i+2),min:3.25,weight:1.1,expand:spec.bedroomExtra,kind:'bedroom'})),
       {name:'BAÑO COMPLETO',min:2.3,weight:.75,kind:'bath'}
     ];
     left=[
-     {name:'DORMITORIO PRINCIPAL',min:4.2,weight:2,kind:'bedroom'},
-     {name:'BAÑO PRINCIPAL / VESTIDOR',min:2.3,weight:1,kind:'bath'},
+     {name:spec.mainSuite?'DORMITORIO PRINCIPAL':'DORMITORIO 1',min:4.2,weight:2,expand:spec.bedroomExtra,kind:'bedroom'},
+     ...(spec.mainSuite?[{name:spec.walkInCloset?'BAÑO PRINCIPAL / VESTIDOR':'BAÑO PRINCIPAL',min:2.3,weight:1,kind:'bath'}]:[]),
      {name:'ESTAR / DISTRIBUIDOR',min:2.8,weight:1.4},
      {name:'TERRAZA / ESTUDIO',min:2,weight:.8}
     ];
+   }
+   if(spec.bathrooms){
+    left=left.filter(r=>r.kind!=='bath'&&!/BAÑO/.test(r.name));
+    right=right.filter(r=>r.kind!=='bath'&&!/BAÑO/.test(r.name));
+    const groundBath=spec.floors===2&&spec.socialBath&&spec.bathrooms>1?1:0;
+    const count=spec.floors===1?spec.bathrooms:(ground?groundBath:spec.bathrooms-groundBath);
+    for(let i=0;i<count;i++){
+     const suite=spec.mainSuite&&count>1&&i===0&&!(ground&&spec.floors===2);
+     const bath={name:suite?(spec.walkInCloset?'BAÑO MÁSTER / VESTIDOR':'BAÑO PRINCIPAL'):(ground&&spec.floors===2?'BAÑO SOCIAL':'BAÑO COMPARTIDO '+(i+1)),min:2.3,weight:.72,kind:'bath'};
+     if(suite&&spec.floors===2)left.splice(1,0,bath);
+     else if(suite)right.splice(1,0,bath);
+     else right.push(bath);
+    }
    }
    const leftParts=segments(buildDepth,left),rightParts=segments(buildDepth,right);
    const rooms=[
@@ -155,6 +212,11 @@
     ...rightParts.map(q=>({...q,x:leftWidth+corridor,width:rightWidth,area:round(rightWidth*q.depth),side:'right'})),
     {name:'PASILLO',x:leftWidth,y:0,width:corridor,depth:buildDepth,area:round(corridor*buildDepth),kind:'circulation',side:'center'}
    ];
+   for(const room of rooms){
+    room.clearWidth=round(room.kind==='circulation'?room.width-spec.wallInner:room.width-(spec.wallOuter+spec.wallInner)/2);
+    room.clearDepth=round(room.depth-(spec.wallOuter+spec.wallInner)/2);
+    room.netArea=round(room.clearWidth*room.clearDepth);
+   }
    floors.push({level:floor+1,x:originX+floor*(lotW+3),y:originY,width:houseWidth,depth:buildDepth,
     hallStart:leftWidth,hallWidth:corridor,rooms,leftParts,rightParts});
   }
@@ -164,9 +226,10 @@
    else warnings.push('Se solicitaron DOS estacionamientos, pero no caben en el terreno con estos retiros y programa. No se dibuja una segunda plaza inexistente.');
   }
   if(sideGarage)warnings.push('Estacionamiento lateral conceptual: comprobar maniobra de acceso, estructura, servidumbres y medidas locales.');
-  if(spec.mainSuite&&spec.floors===1)warnings.push('Suite principal con baño y vestidor conceptual combinados; revisar mobiliario sanitario, circulación y ventilación antes de aprobar el diseño.');
+  if(spec.mainSuite&&spec.floors===1&&(spec.bathrooms===0||spec.bathrooms>1))warnings.push('Suite principal con baño y vestidor conceptual combinados; revisar mobiliario sanitario, circulación y ventilación antes de aprobar el diseño.');
   if(spec.kitchenIsland&&leftWidth<3.7)warnings.push('Cocina con isla solicitada: el ancho de '+leftWidth.toFixed(2)+' m no permite una isla con circulaciones suficientes en este esquema. Se propone cocina lineal, pendiente de rediseño.');
 
+  if(spec.accessible)warnings.push('Criterio accesible: circulación libre y vanos ampliados; giro, altura, herrajes, baño adaptado y continuidad de ruta pendientes de verificar.');
   warnings.push('Retiros configurables, no equivalen a normativa municipal; verificar implantación, iluminación, ventilación, accesibilidad, estructura e instalaciones.');
   warnings.push('Esquema de anteproyecto con accesos y zonificación; la distribución, el mobiliario y las escaleras requieren comprobación profesional para obra.');
   const audit=[];
@@ -184,6 +247,17 @@
    {x:originX+houseWidth+garageGap,y:originY,width:garageWidth,depth:spec.garageSpaces===2&&buildDepth>=11.1?10.7:5.3,spaces:spec.garageSpaces===2&&buildDepth>=11.1?2:1}:null,
    references:{Plazola:'sin biblioteca autorizada vinculada',Neufert:'sin biblioteca autorizada vinculada'},
    provenance:'Geometría esquemática basada en reglas generales explícitas; NO se han consultado libros de Plazola ni Neufert.'};
+ }
+ function interpret(text,base={}){
+  const next=parsePrompt(text,base),before=validateSpec(base),s=normal(text);
+  const changes=Object.keys(next).filter(k=>JSON.stringify(next[k])!==JSON.stringify(before[k]));
+  const unsupported=[];
+  if(/\b(hospital|terminal|escuela|hotel|centro comercial|edificio de oficinas)\b/.test(s))unsupported.push('La generación automática actual resuelve vivienda rectangular de 1–2 plantas; esta tipología necesita un programa y un motor de distribución específicos.');
+  if(/\b(mueve|mover|traslada|intercambia|gira|rotar)\b/.test(s))unsupported.push('Ese cambio de posición libre se realiza con MOVER/ROTAR en CAD; el motor de distribución aún no lo interpreta.');
+  const levels=s.match(/(\d+|tres|cuatro|cinco)\s*(?:plantas|pisos|niveles)/);
+  if(levels&&(Number(levels[1])>2||['tres','cuatro','cinco'].includes(levels[1])))unsupported.push('El motor actual admite hasta dos plantas; no se ha aplicado ese número de niveles.');
+  const designIntent=/casa|vivienda|plano|terreno|lote|anteproyecto|disena|dibuja|genera/.test(s);
+  return{spec:next,changes,unsupported,canGenerate:unsupported.length===0&&(changes.length>0||designIntent)};
  }
  function toEntities(plan,options={}){
   const factor=options.units==='mm'?1000:options.units==='cm'?100:1;
@@ -322,5 +396,5 @@
   text(.35,.75,'TERRENO '+plan.spec.lotWidth+' × '+plan.spec.lotDepth+' m',.19,'AI-ARQ-TEXTOS',colors.lot);
   return out;
  }
- return {parsePrompt,validateSpec,design,toEntities};
+ return {parsePrompt,interpret,validateSpec,design,toEntities};
 });

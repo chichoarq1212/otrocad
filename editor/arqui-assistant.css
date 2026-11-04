@@ -10,8 +10,8 @@
  width:112px;height:148px;max-height:148px;filter:drop-shadow(0 4px 5px #08172a66);user-select:none;pointer-events:none}
 .arqui-mascot .jaimito-mascot-tag{font-size:10px;color:#fff;background:#185be8}
 .arqui-panel{
- pointer-events:auto;position:absolute;right:0;bottom:176px;
- width:min(420px,calc(100vw - 20px));max-height:min(680px,calc(100dvh - 198px));
+ pointer-events:auto;position:fixed;right:13px;bottom:calc(280px + env(safe-area-inset-bottom,0px));
+ width:min(420px,calc(100vw - 20px));max-height:min(680px,calc(100dvh - 300px));
  display:flex;flex-direction:column;overflow:hidden;
  border:1px solid #abc4e5;border-radius:12px;
  background:#f8fbff;color:#15335d;
@@ -37,7 +37,7 @@
 .arqui-tabs button{flex:1;font-size:11px}
 .arqui-tabs button.active{background:#185be8;color:#fff;border-color:#185be8}
 .arqui-pane{padding:9px 10px;overflow-y:auto;overscroll-behavior:contain;min-height:100px;scrollbar-width:thin}
-.arqui-chat{display:flex;flex-direction:column;gap:5px;max-height:116px;overflow-y:auto;
+.arqui-chat{display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto;
  overscroll-behavior:contain;background:#edf4ff;border:1px solid #d5e4f6;
  padding:7px;border-radius:7px}
 .arqui-msg{max-width:95%;border-radius:8px;padding:5px 8px;
@@ -90,21 +90,33 @@
  .arqui-mascot{width:87px;min-height:115px}
  .arqui-mascot img.arqui-portrait{width:84px;height:107px;max-height:107px}
  .arqui-mascot .jaimito-mascot-tag{font-size:9px;padding:4px 6px}
- .arqui-panel{right:1px;bottom:132px;width:min(374px,calc(100vw - 16px));
-  max-height:calc(100dvh - 163px)}
+ .arqui-panel{right:8px;bottom:calc(200px + env(safe-area-inset-bottom,0px));width:min(374px,calc(100vw - 16px));
+  max-height:calc(100dvh - 220px)}
 }
 @media(max-width:950px) and (orientation:landscape) and (max-height:500px){
  .arqui-root{right:8px;bottom:calc(45px + env(safe-area-inset-bottom,0px))}
  .arqui-mascot{width:68px;min-height:80px}
  .arqui-mascot img.arqui-portrait{width:65px;height:72px;max-height:72px}
  .arqui-mascot .jaimito-mascot-tag{font-size:7px;padding:3px 4px}
- .arqui-panel{right:78px;bottom:0;width:min(380px,calc(100vw - 105px));
-  max-height:calc(100dvh - 50px)}
+ .arqui-panel{right:86px;bottom:45px;width:min(380px,calc(100vw - 105px));
+  max-height:calc(100dvh - 60px)}
  .arqui-head{padding:5px 8px}
  .arqui-pane{padding:6px}
- .arqui-chat{max-height:68px}
+ .arqui-chat{max-height:92px}
  .arqui-form textarea{min-height:40px}
  #arquiPreview{max-height:128px}
 }
 @media(prefers-reduced-motion:reduce){.arqui-mascot{animation:none}}
 @media print{.arqui-root{display:none!important}}
+
+.arqui-details{margin:8px 0;padding:8px;border:1px solid #c4d7ee;border-radius:7px;background:#eef5ff}
+.arqui-details[hidden]{display:none!important}
+.arqui-details summary{font-weight:750;cursor:pointer;color:#204b83}
+.arqui-details[open] summary{margin-bottom:8px}
+.arqui-context{font-size:10px;color:#436286;margin:6px 0}
+.arqui-examples{display:flex;flex-wrap:wrap;gap:4px}
+.arqui-examples button{font-size:10px;padding:4px 6px;background:#fff}
+.arqui-reference-card{padding:9px;border:1px solid #c8daef;border-radius:7px;background:#fff;margin:7px 0}
+.arqui-reference-card strong{display:block;font-size:11px}
+.arqui-reference-card small{display:block;color:#607797;font-size:10px}
+.arqui-reference-card a{display:inline-block;margin-top:6px;color:#1558be;font-weight:700}
