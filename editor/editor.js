@@ -513,7 +513,8 @@ function refreshLayoutTabs(){
  };
  add('Model','▦ Modelo');
  paperLayoutsSafe().forEach(x=>add(x.name,'▤ '+x.name));
- const settings=$('#paperSetup');if(settings){settings.hidden=activeLayout==='Model';settings.title='Configurar tamaño de hoja y encuadre de '+activeLayout}
+ const settings=$('#paperSetup');if(settings){settings.hidden=activeLayout==='Model';settings.title='Configurar página de '+activeLayout+' para CAD y Civil 3D'}
+ const vButton=$('#paperViewports');if(vButton)vButton.hidden=activeLayout==='Model';
  const annotations=$('#toggleAnnotations');if(annotations){annotations.hidden=activeLayout!=='Model';annotations.textContent=hideModelAnnotations?'Textos: ocultos':'Textos: visibles';annotations.setAttribute('aria-pressed',String(hideModelAnnotations))}
  document.body.classList.toggle('cad-paper-active',activeLayout!=='Model');
 }
@@ -740,6 +741,89 @@ function renderPaperLayout(){
   ctx.fillStyle='#193f77';ctx.font='bold 12px system-ui';ctx.fillText(layout.name+' · '+Math.round(pw)+' × '+Math.round(ph)+' mm',x0+5,Math.max(14,y0-8));ctx.restore();
  }
  $('#dynamic').style.display='none';
+}
+function showCadViewportManager(){
+ const layout=paperLayoutsSafe().find(l=>l.name===activeLayout);
+ if(!layout)return;
+ const base=effectivePaperViewports(layout);
+ const rows=clone(base.length?base:[{layout:layout.name,id:2,status:1,center:{x:210,y:148},width:380,height:250,viewCenter:{x:0,y:0},viewHeight:10}]);
+ const dlg=document.createElement('dialog');dlg.className='cad-utility-dialog cad-paper-settings cad-viewport-manager';
+ dlg.innerHTML='<form method="dialog"><h3>Ventanas gráficas · CAD y Civil 3D</h3>'+
+ '<p>Configura las vistas del mismo Modelo dentro de la hoja. No cambia la geometría original ni los VIEWPORT importados.</p>'+
+ '<label>Ventana<select id="vpPick"></select></label>'+
+ '<div class="cad-viewports-grid">'+
+ '<label>Escala 1 : <input id="vpRatio" type="number" min="1" max="1000000" step="any"></label>'+
+ '<label>Centro X (Modelo)<input id="vpX" type="number" step="any"></label>'+
+ '<label>Centro Y (Modelo)<input id="vpY" type="number" step="any"></label>'+
+ '<label>Posición X en hoja (mm)<input id="vpPaperX" type="number" step="any"></label>'+
+ '<label>Posición Y en hoja (mm)<input id="vpPaperY" type="number" step="any"></label>'+
+ '<label>Ancho de ventana (mm)<input id="vpWidth" type="number" min="5" step="any"></label>'+
+ '<label>Alto de ventana (mm)<input id="vpHeight" type="number" min="5" step="any"></label></div>'+
+ '<button type="button" id="vpUseModel">Capturar última vista de Modelo</button>'+
+ '<button type="button" id="vpSplit">Dividir en dos ventanas</button>'+
+ '<button type="button" id="vpRestore">Restablecer ventanas originales</button>'+
+ '<p id="vpError" role="status"></p><div class="cad-utility-actions">'+
+ '<button type="button" id="vpCancel">Cancelar</button><button type="button" id="vpApply">Aplicar ventanas</button></div></form>';
+ document.body.append(dlg);
+ const q=id=>dlg.querySelector('#'+id),unitMm=units==='mm'?1:units==='cm'?10:1000;
+ let selected=0;
+ const fill=()=>{
+  q('vpPick').textContent='';
+  rows.forEach((v,i)=>{const op=document.createElement('option');op.value=String(i);op.textContent='Ventana '+(i+1);q('vpPick').append(op)});
+  q('vpPick').value=String(selected);
+  const v=rows[selected];
+  q('vpRatio').value=String(Math.max(1,Math.round(Number(v.viewHeight||1)*unitMm/Math.max(1,Number(v.height))*1000)/1000));
+  q('vpX').value=String(Number(v.viewCenter?.x)||0);q('vpY').value=String(Number(v.viewCenter?.y)||0);
+  q('vpPaperX').value=String(Number(v.center?.x)||0);q('vpPaperY').value=String(Number(v.center?.y)||0);
+  q('vpWidth').value=String(Number(v.width)||100);q('vpHeight').value=String(Number(v.height)||100);
+  q('vpSplit').disabled=rows.length>1;
+ };
+ const capture=()=>{
+  const ratio=Number(q('vpRatio').value),x=Number(q('vpX').value),y=Number(q('vpY').value),
+   px=Number(q('vpPaperX').value),py=Number(q('vpPaperY').value),
+   width=Number(q('vpWidth').value),height=Number(q('vpHeight').value);
+  if(![ratio,x,y,px,py,width,height].every(Number.isFinite)||ratio<1||ratio>1000000||width<5||height<5){
+   q('vpError').textContent='Comprueba escala, centros y tamaños de ventana.';return false;
+  }
+  const v=rows[selected];
+  rows[selected]={...v,layout:layout.name,id:Number(v.id)||selected+2,status:1,
+   center:{x:px,y:py},width,height,viewCenter:{x,y},viewHeight:height*ratio/unitMm,
+   viewCenterKnown:true,estimated:false,generated:true,manual:true};
+  q('vpError').textContent='';return true;
+ };
+ q('vpPick').onchange=()=>{
+  const index=Number(q('vpPick').value);if(!capture()){q('vpPick').value=String(selected);return}
+  selected=index;fill();
+ };
+ q('vpUseModel').onclick=()=>{
+  if(!lastModelCamera){q('vpError').textContent='Vuelve a Modelo, encuadra la zona y luego regresa a la presentación.';return}
+  q('vpX').value=String(lastModelCamera.center.x);q('vpY').value=String(lastModelCamera.center.y);
+  q('vpRatio').value=String(Math.max(1,Math.round(lastModelCamera.viewHeight*unitMm/Math.max(1,Number(q('vpHeight').value)))));
+  q('vpError').textContent='Vista de Modelo capturada; pulsa Aplicar.';
+ };
+ q('vpSplit').onclick=()=>{
+  if(!capture()||rows.length!==1)return;
+  const a=rows[0],half=Math.max(5,(a.width-5)/2);
+  const left={...a,center:{x:a.center.x-(half+5)/2,y:a.center.y},width:half};
+  const right={...a,id:3,center:{x:a.center.x+(half+5)/2,y:a.center.y},width:half,
+   viewCenter:{...a.viewCenter}};
+  rows.splice(0,1,left,right);selected=0;fill();
+ };
+ q('vpRestore').onclick=()=>{
+  layout.viewportFit=layout.source==='new'?'all':'imported';
+  delete layout.customViewports;saveLayoutState();render();
+  status.textContent='Ventanas originales restablecidas';dlg.close();
+ };
+ q('vpCancel').onclick=()=>dlg.close();
+ q('vpApply').onclick=()=>{
+  if(!capture())return;
+  if(rows.some(v=>!cadPaperViewportUsable(v,layout))){
+   q('vpError').textContent='Una ventana está fuera de la hoja. Ajusta su centro o sus dimensiones.';return;
+  }
+  layout.customViewports=clone(rows);layout.viewportFit='custom';saveLayoutState();render();
+  status.textContent='Presentación '+layout.name+' · '+rows.length+' ventana(s) a escala';dlg.close();
+ };
+ dlg.addEventListener('close',()=>dlg.remove());fill();dlg.showModal();
 }
 function showCadPaperSettings(){
  const layout=paperLayoutsSafe().find(l=>l.name===activeLayout);if(!layout)return;
@@ -1590,6 +1674,9 @@ function runCommand(raw){
  if(c==='MODEL'||c==='MODELO'){switchCadLayout('Model');return}
  if(c==='LAYOUT'||c==='PAPERSPACE'||c==='PAPEL'){if(paperLayoutsSafe().length)switchCadLayout(paperLayoutsSafe()[0].name);else createCadLayout();return}
  if(c==='LAYOUTNEW'||c==='NEWLAYOUT'){createCadLayout();return}
+ if(c==='PAGESETUP'||c==='PSETUP'||c==='CONFIGPAGINA'){if(activeLayout==='Model')createCadLayout();showCadPaperSettings();return}
+ if(c==='MVIEW'||c==='VPORTS'||c==='VIEWPORT'){if(activeLayout==='Model')createCadLayout();showCadViewportManager();return}
+ if(c==='PLOT'||c==='PRINT'){ $('#pdf').click();return }
  if(['ED','TEXTEDIT','DDEDIT','EDITTEXT','STYLE','TEXTSTYLE'].includes(c)){editSelectedText();return}
  if(c==='SELECTTEXT'||c==='QSELECTTEXT'){const ids=objects.map((o,i)=>o.type==='text'&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer)?i:-1).filter(i=>i>=0);applySelection(ids);showProperties();status.textContent=ids.length+' textos seleccionados · ejecuta ED para cambiar formato en conjunto';return}
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
@@ -2399,6 +2486,7 @@ try{const sheet=JSON.parse(localStorage.getItem('otrocad-layout-state')||'{}');
 refreshLayoutTabs();
 $('#paperCreate').onclick=createCadLayout;
 $('#paperSetup').onclick=showCadPaperSettings;
+$('#paperViewports').onclick=showCadViewportManager;
 $('#toggleAnnotations').onclick=()=>{hideModelAnnotations=!hideModelAnnotations;refreshLayoutTabs();saveLayoutState();render();status.textContent=hideModelAnnotations?'Textos de Modelo ocultos (no borrados)':'Textos de Modelo visibles'};
 window.addEventListener('beforeprint',()=>{printing=true;render()});window.addEventListener('afterprint',()=>{printing=false;render()});
 
