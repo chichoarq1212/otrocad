@@ -5,9 +5,9 @@
 (()=>{
 'use strict';
 if(window.OtroCadArqui)return;
-const planner=window.OtroCadArquiPlanner,refs=window.OtroCadArquiReferences,
+const planner=window.OtroCadArquiPlanner,professional=window.OtroCadArquiProfessional,refs=window.OtroCadArquiReferences,
  api=window.OtroCadCivilAPI,tabs=document.getElementById('tabs');
-if(!planner||!api||!tabs)return;
+if(!planner||!professional||!api||!tabs)return;
 const $=id=>document.getElementById(id);
 const allowed=new Set(['draw','modify','annotate','blocks','layers','view']);
 let plan=null,previewEntities=[],spec=planner.parsePrompt('Vivienda de 1 planta en un terreno 12x20 con 3 dormitorios y garaje');
@@ -26,23 +26,33 @@ root.innerHTML=[
  '<div class="arqui-pane" id="arquiDesignPane">',
  '<div class="arqui-chat" id="arquiMessages" role="log" aria-live="polite"></div>',
  '<form id="arquiForm" class="arqui-form"><label for="arquiPrompt">¿Qué deseas diseñar o modificar?</label>',
- '<textarea id="arquiPrompt" rows="3" maxlength="1200" placeholder="Diseña una vivienda de dos plantas en un terreno de 12x20 m, con tres dormitorios y garaje..."></textarea>',
- '<button id="arquiPropose" type="submit">Proponer distribución</button></form>',
+ '<textarea id="arquiPrompt" rows="4" maxlength="2200" placeholder="Quiero una casa en lote 12x20, 3 dormitorios, garaje, retiro frontal 3 m, posterior 2 m y laterales 1 m; muros exteriores 20 cm, interiores 15 cm, cocina con isla, amueblada, con hatch y cotas tipo concurso."></textarea>',
+ '<button id="arquiPropose" type="submit">Generar anteproyecto amueblado</button></form>',
  '<div class="arqui-grid">',
  '<label>Terreno ancho (m)<input id="arquiLotW" type="number" min="8" max="60" step=".1" value="12"></label>',
  '<label>Terreno fondo (m)<input id="arquiLotD" type="number" min="12" max="80" step=".1" value="20"></label>',
  '<label>Plantas<select id="arquiFloors"><option value="1">1 planta</option><option value="2">2 plantas</option></select></label>',
  '<label>Dormitorios<select id="arquiBeds"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>',
  '<label class="arqui-checkbox"><input id="arquiGarage" type="checkbox" checked> Garaje / parqueo</label>',
+ '<label>Plazas de parqueo<select id="arquiGarageCount"><option value="1">1 auto</option><option value="2">2 autos (tándem si cabe)</option></select></label>',
+ '<label>Retiro frontal (m)<input id="arquiSetFront" type="number" min="0" max="12" step=".1" value="3"></label>',
+ '<label>Retiro posterior (m)<input id="arquiSetBack" type="number" min="0" max="12" step=".1" value="2"></label>',
+ '<label>Retiro lateral (m)<input id="arquiSetSide" type="number" min="0" max="5" step=".1" value=".45"></label>',
+ '<label>Muro exterior (cm)<input id="arquiWallOuter" type="number" min="10" max="45" step="1" value="20"></label>',
+ '<label>Muro interior (cm)<input id="arquiWallInner" type="number" min="7" max="35" step="1" value="15"></label>',
+ '<label>Presentación<select id="arquiStyle"><option value="concurso">Concurso · amueblado</option><option value="profesional">Profesional · técnico</option><option value="esquematico">Esquemático</option></select></label>',
+ '<label class="arqui-checkbox"><input id="arquiFurniture" type="checkbox" checked> Dibujar mobiliario</label>',
+ '<label class="arqui-checkbox"><input id="arquiWallHatch" type="checkbox" checked> Hatch de muros</label>',
+ '<label class="arqui-checkbox"><input id="arquiDimensions" type="checkbox" checked> Cotas interiores y exteriores</label>',
  '<label>Origen X (modelo)<input id="arquiOriginX" type="number" step="any" value="0"></label>',
  '<label>Origen Y (modelo)<input id="arquiOriginY" type="number" step="any" value="0"></label>',
  '</div>',
- '<div class="arqui-preview-title"><strong>Vista previa · planta arquitectónica</strong><small id="arquiSummary"></small></div>',
+ '<div class="arqui-preview-title"><strong>Vista previa · anteproyecto tipo concurso</strong><small id="arquiSummary"></small></div>',
  '<svg id="arquiPreview" viewBox="0 0 360 225" role="img" aria-label="Plano conceptual con ambientes y pasillos"></svg>',
  '<div id="arquiWarnings" class="arqui-warnings" role="status"></div>',
  '<p id="arquiProgress" class="arqui-progress" role="status"></p>',
- '<div class="arqui-actions"><button id="arquiRecheck" type="button">Revisar medidas</button>',
- '<button id="arquiDraw" type="button">Dibujar en CAD</button>',
+ '<div class="arqui-actions"><button id="arquiRecheck" type="button">Revisar diseño</button>',
+ '<button id="arquiDraw" type="button">Dibujar plano completo en CAD</button>',
  '<button id="arquiStop" type="button" hidden>Cancelar dibujo</button>',
  '<button id="arquiErase" type="button">Retirar diseño IA</button></div>',
  '<p class="arqui-disclaimer">Anteproyecto editable, no plano aprobado. Revisar normativa municipal, accesibilidad, estructura, ventilación y seguridad. No se han consultado libros no incorporados.</p>',
@@ -65,7 +75,7 @@ toolbar.hidden=true;toolbar.onclick=()=>open();tabs.append(toolbar);
 function visible(){const tab=tabs.querySelector('[data-tab].active');return !!tab&&allowed.has(tab.dataset.tab)}
 function sync(){const state=visible();root.hidden=!state;toolbar.hidden=!state;if(!state)close()}
 function open(){if(!visible())return;root.hidden=false;panel.hidden=false;avatar.setAttribute('aria-expanded','true');
- if(!chat.childElementCount)message('bot','Soy El Arqui IA. Puedo proponer y dibujar una planta 2D con muros, accesos, ventanas, zonas, áreas y cotas. Reviso proporciones antes de dibujar. Mis criterios orientativos NO sustituyen Plazola, Neufert ni una norma vigente.');}
+ if(!chat.childElementCount)message('bot','¡Cuéntame tu proyecto como lo hablarías con otro arquitecto! Dime terreno, retiros, habitaciones, baños, parqueaderos y estilo. Te prepararé un anteproyecto amueblado con muros de espesor real, puertas, ventanas, hatch y cotas, listo para editar en CAD. Si algo no cabe, te explicaré por qué en vez de inventarlo.');}
 function close(){panel.hidden=true;avatar.setAttribute('aria-expanded','false')}
 avatar.onclick=()=>panel.hidden?open():close();$('arquiClose').onclick=close;
 tabs.addEventListener('click',()=>queueMicrotask(sync));
@@ -87,10 +97,28 @@ function toInputs(s){
  $('arquiLotW').value=s.lotWidth;$('arquiLotD').value=s.lotDepth;
  $('arquiFloors').value=String(s.floors);$('arquiBeds').value=String(s.bedrooms);
  $('arquiGarage').checked=s.garage;
+ $('arquiGarageCount').value=String(s.garageSpaces);
+ $('arquiSetFront').value=String(s.frontSetback);
+ $('arquiSetBack').value=String(s.backSetback);
+ $('arquiSetSide').value=String(s.sideSetback);
+ $('arquiWallOuter').value=String(Math.round(s.wallOuter*100));
+ $('arquiWallInner').value=String(Math.round(s.wallInner*100));
+ $('arquiStyle').value=s.style;
+ $('arquiFurniture').checked=s.furniture;
+ $('arquiWallHatch').checked=s.wallHatch;
+ $('arquiDimensions').checked=s.dimensions;
 }
 function fromInputs(){
  return planner.validateSpec({...spec,lotWidth:$('arquiLotW').value,lotDepth:$('arquiLotD').value,
-  floors:$('arquiFloors').value,bedrooms:$('arquiBeds').value,garage:$('arquiGarage').checked});
+  floors:$('arquiFloors').value,bedrooms:$('arquiBeds').value,garage:$('arquiGarage').checked,
+  garageSpaces:$('arquiGarageCount').value,
+  frontSetback:$('arquiSetFront').value,backSetback:$('arquiSetBack').value,
+  sideSetback:$('arquiSetSide').value,
+  wallOuter:Number($('arquiWallOuter').value)/100,
+  wallInner:Number($('arquiWallInner').value)/100,
+  furniture:$('arquiFurniture').checked,
+  wallHatch:$('arquiWallHatch').checked,dimensions:$('arquiDimensions').checked,
+  style:$('arquiStyle').value});
 }
 function makeSVG(tag,attrs={},parent=$('arquiPreview')){
  const node=document.createElementNS('http://www.w3.org/2000/svg',tag);
@@ -98,33 +126,7 @@ function makeSVG(tag,attrs={},parent=$('arquiPreview')){
  parent.append(node);return node;
 }
 function renderPreview(){
- const svg=$('arquiPreview');svg.replaceChildren();
- makeSVG('rect',{x:0,y:0,width:360,height:225,fill:'#162638',rx:7});
- if(!plan)return;
- const floorW=plan.spec.lotWidth,floorD=plan.spec.lotDepth;
- const cols=plan.floors.length;
- const scale=Math.min((340-(cols-1)*14)/(cols*floorW),192/floorD);
- for(let i=0;i<cols;i++){
-  const f=plan.floors[i],left=10+i*(floorW*scale+14),top=7;
-  const rect=(x,y,w,h,fill,stroke='#7389a3')=>makeSVG('rect',{
-    x:left+x*scale,y:top+y*scale,width:w*scale,height:h*scale,fill,stroke,'stroke-width':.8});
-  rect(0,0,floorW,floorD,'#1f324b','#7f9abd');
-  for(const room of f.rooms){
-   const isHall=room.kind==='circulation';
-   const fill=isHall?'#3c6485':room.kind==='bedroom'?'#285e58':room.kind==='stairs'?'#685446':
-    room.kind==='bath'?'#314f76':'#4d5365';
-   rect(f.x+room.x,f.y+room.y,room.width,room.depth,fill,'#aac3d1');
-   if(room.width*scale>28&&room.depth*scale>11){
-    const text=makeSVG('text',{x:left+(f.x+room.x+room.width/2)*scale,
-     y:top+(f.y+room.y+room.depth/2)*scale,fill:'#f1f7fa','font-size':8,
-     'font-family':'system-ui, sans-serif','text-anchor':'middle'});
-    text.textContent=room.kind==='circulation'?'PASILLO':room.name.length>14?room.name.slice(0,12)+'…':room.name;
-   }
-  }
-  if(i===0&&plan.garage)rect(plan.garage.x,plan.garage.y,plan.garage.width,plan.garage.depth,'#665e43','#ffcf52');
-  const title=makeSVG('text',{x:left,y:top+floorD*scale+11,fill:'#cbdff2','font-size':9});
-  title.textContent='PLANTA '+f.level;
- }
+ professional.preview(document,$('arquiPreview'),previewEntities);
 }
 function displayIssues(){
  const output=$('arquiWarnings');output.replaceChildren();
@@ -140,14 +142,24 @@ function makePreview(next,announce=false){
   const proposed=planner.design(next);
   const origin={x:Number($('arquiOriginX').value),y:Number($('arquiOriginY').value)};
   if(!Number.isFinite(origin.x)||!Number.isFinite(origin.y))throw Error('El origen X/Y debe ser numérico.');
-  const unit=api.getUnits();const shapes=planner.toEntities(proposed,{units:unit,origin,projectId:projectId||'arqui-preview'});
-  if(shapes.length>1500)throw Error('El programa genera demasiados objetos para el editor.');
+  const unit=api.getUnits();const shapes=professional.generate(proposed,{units:unit,origin,projectId:projectId||'arqui-preview'});
+  if(shapes.length>3300)throw Error('El programa genera demasiados objetos para el editor.');
   plan=proposed;previewEntities=shapes;spec=proposed.spec;
   toInputs(spec);renderPreview();displayIssues();
   $('arquiDraw').disabled=false;
   const rooms=plan.floors.reduce((n,f)=>n+f.rooms.filter(r=>r.kind!=='circulation').length,0);
   $('arquiSummary').textContent=plan.floors.length+' planta(s) · '+rooms+' espacios · '+shapes.length+' entidades';
-  if(announce)message('bot','Propuesta lista: '+plan.floors.length+' planta(s), '+rooms+' espacios, '+shapes.length+' entidades CAD. Revisa la vista previa y las observaciones. Pulsa «Dibujar en CAD» para aprobarla.');
+  if(announce){
+   const info=spec;
+   const areas=plan.floors.map(f=>f.rooms.filter(r=>r.kind!=='circulation').reduce((n,r)=>n+r.area,0).toFixed(1));
+   const brief='Te propongo '+info.floors+' planta(s) en un terreno de '+info.lotWidth+' × '+info.lotDepth+' m, con retiros de '+info.frontSetback+' m al frente, '+info.backSetback+' m atrás y '+info.sideSetback+' m laterales. ';
+   const detail='Organicé '+rooms+' espacios, '+info.bedrooms+' dormitorios y '+(plan.garage?plan.garage.spaces+' parqueo(s)':'sin plaza de estacionamiento dibujada')+
+    '. Muros exteriores de '+Math.round(info.wallOuter*100)+' cm e interiores de '+Math.round(info.wallInner*100)+' cm; '+(info.furniture?'mobiliario, ':'')+(info.wallHatch?'hachurado, ':'')+(info.dimensions?'cotas, ':'')+
+    'puertas y ventanas reales. Áreas por planta: '+areas.join(' / ')+' m². ';
+   const notes=plan.warnings.slice(0,2).join(' ');
+   message('bot',brief+detail+'He preparado '+shapes.length+' entidades CAD en modo '+info.style+'. '+(notes?'Observaciones: '+notes+' ':'')+
+    'Revisa la propuesta y pulsa «Dibujar plano completo en CAD». Después podrás modificarla aquí o con comandos de OtroCAD.');
+  }
   return true;
  }catch(error){
   plan=null;previewEntities=[];$('arquiDraw').disabled=true;
@@ -184,7 +196,7 @@ async function propose(text){
 $('arquiForm').addEventListener('submit',event=>{event.preventDefault();propose($('arquiPrompt').value)});
 $('arquiRecheck').onclick=()=>makePreview(fromInputs(),true);
 function keepInputsFresh(){if(!busy)makePreview(fromInputs(),false)}
-for(const id of ['arquiLotW','arquiLotD','arquiFloors','arquiBeds','arquiGarage','arquiOriginX','arquiOriginY'])
+for(const id of ['arquiLotW','arquiLotD','arquiFloors','arquiBeds','arquiGarage','arquiGarageCount','arquiSetFront','arquiSetBack','arquiSetSide','arquiWallOuter','arquiWallInner','arquiStyle','arquiFurniture','arquiWallHatch','arquiDimensions','arquiOriginX','arquiOriginY'])
  $(id).addEventListener('change',keepInputsFresh);
 $('arquiDraw').onclick=async()=>{
  if(busy||!plan||!previewEntities.length)return;
@@ -198,7 +210,7 @@ $('arquiDraw').onclick=async()=>{
  $('arquiDraw').disabled=true;$('arquiStop').hidden=false;
  const id=projectId||'arqui-'+Date.now().toString(36);
  const origin={x:Number($('arquiOriginX').value),y:Number($('arquiOriginY').value)};
- const shapes=planner.toEntities(plan,{units:api.getUnits(),origin,projectId:id});
+ const shapes=professional.generate(plan,{units:api.getUnits(),origin,projectId:id});
  // Architectural CAD layers remain individually editable through CAPAS.
  for(const [layer,color] of new Map(shapes.filter(x=>x.layer).map(x=>[x.layer,x.color])))
   api.ensureLayer?.(layer,color);
@@ -209,14 +221,14 @@ $('arquiDraw').onclick=async()=>{
   }else{
    const ctrl=new AbortController();activeStream=ctrl;
    await api.addObjectsAnimated(shapes,{
-    batchSize:10,delayMs:55,signal:ctrl.signal,
+    batchSize:32,delayMs:24,signal:ctrl.signal,
     onProgress:(done,total)=>{$('arquiProgress').textContent='Dibujando en vivo: '+done+' / '+total+' entidades CAD…'},
     message:'El Arqui IA · anteproyecto dibujado con '+shapes.length+' entidades'
    });
    $('arquiProgress').textContent='Plano creado · '+shapes.length+' entidades editables. Ctrl+Z deshace el proyecto.';
   }
   projectId=id;api.fit();
-  message('bot','He dibujado el anteproyecto en el Modelo. Puedes editar sus líneas, ventanas, puertas y textos. Verifica cotas, normativa y circulación antes de desarrollar el proyecto.');
+  message('bot','¡Tu anteproyecto ya está dibujado en el Modelo! Los muros con espesor y hatch, puertas, ventanas, mobiliario, cotas y rotulación están en capas editables. Si quieres cambios, pídeme «amplía la cocina 50 cm» o ajusta la propuesta. Revisa la normativa y los aspectos técnicos antes de construir.');
  }catch(error){message('bot',String(error.message||error));$('arquiProgress').textContent='No se aplicaron cambios completos.'}
  finally{busy=false;activeStream=null;$('arquiStop').hidden=true;$('arquiDraw').disabled=false}
 };
