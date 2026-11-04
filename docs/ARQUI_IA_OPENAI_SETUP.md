@@ -21,6 +21,8 @@ Referencias oficiales de API: https://developers.openai.com/api/docs/guides/stru
 
 ## Biblioteca Plazola y Neufert
 
+El editor ya incluye fichas públicas y reglas seleccionadas de NEC-HS-AU 2019, con su ámbito explícito. Las fichas bibliográficas no proporcionan páginas técnicas de los libros. Ver `docs/EL_ARQUI_IA.md` para el alcance de consulta y la recuperación de programas.
+
 No está autorizado ni implementado copiar o publicar automáticamente libros completos. Para incorporar fuentes del propietario con una edición identificada y derechos de uso:
 
 - **Fase local disponible:** importar extractos TXT/MD por capítulo desde la pestaña Biblioteca técnica. El navegador conserva los fragmentos localmente; el servicio externo solo recibe los pasajes relevantes si el usuario marca expresamente la autorización.
@@ -29,6 +31,6 @@ No está autorizado ni implementado copiar o publicar automáticamente libros co
 
 ## Alcance técnico
 
-La API generativa puede sugerir un **programa numérico** —terreno, plantas, dormitorios, garaje y condiciones orientativas—. No acepta JS arbitrario, comandos de shell ni escrituras directas al editor. El CAD local genera y controla la geometría, muestra la vista previa y requiere confirmación del operador.
+La API generativa puede sugerir un **programa numérico** —terreno, plantas, dormitorios, baños, garaje, muros, presentación, equipamiento y condiciones orientativas—. No acepta JS arbitrario, comandos de shell ni escrituras directas al editor. El CAD local genera y controla la geometría, muestra la vista previa y requiere confirmación del operador.
 
 Los dibujos generados son **anteproyectos 2D**. No sustituyen proyectos arquitectónicos aprobados, cálculos estructurales, coordinación MEP, BIM 3D o cumplimiento municipal. Se requiere supervisión profesional.

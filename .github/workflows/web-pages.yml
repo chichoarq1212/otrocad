@@ -85,6 +85,7 @@ jobs:
           node tests/cad-save-matchprop.test.cjs
           node --check tests/arqui-worker.test.cjs
           node tests/arqui-worker.test.cjs
+          node tests/arqui-conversation.test.cjs
           node --check tests/kelvin-portrait.test.cjs
           node tests/kelvin-portrait.test.cjs
           node --check tests/civil-topography-road.test.cjs

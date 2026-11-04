@@ -1,6 +1,27 @@
 # El Arqui IA — Arquitectura asistida en OtroCAD
 
-## Estado real — noviembre de 2026
+## Actualización del 4 de noviembre de 2026 · conversación y fuentes
+
+- El flujo comienza con un pedido en texto. Los ajustes se muestran en un desplegable después de generar la propuesta; no es necesario rellenar el formulario.
+- Interpreta medidas con `x`, `por` y números escritos, hasta cuatro dormitorios/baños, una o dos plantas, retiros y muros. Modifica cocina, sala y dormitorios con incrementos acumulativos medidos en la geometría; rechaza ampliaciones que no caben. Permite retirar lavandería, vestidor e isla, cerrar/abrir cocina y solicitar criterio accesible.
+- El número de baños solicitado se distribuye entre las plantas. Las peticiones sin operación reconocida o de tipologías no soportadas conservan la propuesta previa y explican el límite. No equivale a comprensión libre de cualquier encargo.
+- El programa, unidades y origen se incluyen en marcadores de las entidades generadas. Se recuperan del modelo y del autoguardado/formato interno que conserva propiedades. **La exportación e importación DWG/DXF actual no conserva estos metadatos de conversación**; sí conserva la geometría compatible. Los diseños anteriores sin programa embebido no permiten recuperar automáticamente sus requisitos.
+- Antes de regenerar se detectan cambios manuales dentro del grupo y se avisa de su sustitución. Las entidades ajenas se conservan. La regeneración todavía reemplaza el grupo completo, no es una edición semántica de cada muro.
+- La biblioteca incorpora fichas públicas de Neufert (nota editorial GG de la 16.ª edición, 2013) y Plazola (catálogo universitario UPAEP). Son referencias bibliográficas y tipológicas: **no se incorporaron los libros completos ni se extrajeron de ellos tablas dimensionales**.
+- Se verificaron reglas seleccionadas de la actualización NEC-HS-AU 2019 (Acuerdo 007-19; Registro Oficial 924): campo de aplicación pp. RO 12–13, circulación tabla 1 p. RO 19 y puertas tabla 7 p. RO 27. La revisión comprueba el ancho libre del pasillo entre caras de muro y mantiene pendientes marcos, altura, giros, mobiliario, ruta y normativa del predio. Las viviendas privadas reciben estos criterios como orientación salvo exigencia aplicable.
+- Las áreas útiles aproximadas descuentan espesores; los objetivos propios de habitaciones permanecen identificados como reglas de OtroCAD. Los retiros propuestos no se presentan como retiros legales de Quito u otra ciudad.
+- La conexión generativa externa sigue **sin configurar**. El Worker opcional ahora acepta el mismo programa ampliado que el motor local, pero publicar archivos estáticos no habilita por sí mismo una IA generativa.
+
+Fuentes públicas consultadas:
+
+- https://editorialgg.com/media/catalog/product/uploader/805aed1db5aeaa7db4a9ee52199428d4.pdf
+- https://ils.upaep.mx/bib/44210
+- https://www.registroficial.gob.ec/edicion-especial-no-924-6/
+- Reproducción consultada del documento primario publicado en RO 924: https://derechoecuador.com/uploads/content/pdf/2019/05/pdf190527055044_1558997918.pdf
+
+Validación: pruebas del intérprete y geometría, UI montada, recuperación del modelo, advertencia de cambios manuales, conservación de contenido ajeno, suite CAD existente y revisión visual en navegador.
+
+## Estado base previo — noviembre de 2026
 
 **Implementado en el editor web y en el paquete fuente offline:**
 
@@ -26,7 +47,7 @@
 
 ## Criterio profesional y límites
 
-El generador usa un **esquema determinista de anteproyecto**, no un algoritmo equivalente a Revit ni un sistema BIM paramétrico. Verifica dimensionalmente la circulación de 1,20 m, dormitorios esquemáticos de 2,80 m y 9 m² como **objetivos internos orientativos**, y evita dibujar un garaje que no cabe en el ancho disponible. Son criterios para detectar errores evidentes, **no son citas de una edición de Plazola, Neufert ni normas ecuatorianas**.
+El generador usa un **esquema determinista de anteproyecto**, no un algoritmo equivalente a Revit ni un sistema BIM paramétrico. Usa dormitorios de 2,80 m y 9 m² como **objetivos internos orientativos**, y evita dibujar un garaje que no cabe en el ancho disponible. Son criterios para detectar errores evidentes, **no son citas de una edición de Plazola, Neufert ni normas ecuatorianas**.
 
 El sistema NO ha sido alimentado con los libros completos de **Plazola** o **Neufert**. No debe afirmar que una planta «cumple Plazola» o «cumple Neufert» sin un ejemplar legítimo, edición identificada, pasajes relevantes y una comprobación explícita. Para una biblioteca de PDF grandes se necesitará indexación por capítulos/páginas, controles de derecho de uso, recuperación de fragmentos y referencias de página. Solo después deben incorporarse criterios derivados de esas fuentes a una revisión estructurada.
 

@@ -12,9 +12,9 @@ function element(tag='DIV'){
   classList:{toggle(){},add(){},remove(){},contains(){return false}},
   setAttribute(n,v){node.attributes[n]=String(v)},
   addEventListener(n,cb){node.listeners[n]=cb},
-  append(...ch){node.children.push(...ch)},
+  append(...ch){ch.forEach(c=>{c.parentNode=node});node.children.push(...ch)},
   appendChild(c){node.append(c)},
-  remove(){node.removed=true},
+  remove(){node.removed=true;if(node.parentNode)node.parentNode.children=node.parentNode.children.filter(c=>c!==node)},
   replaceChildren(...ch){node.children=[...ch]},
   get childElementCount(){return node.children.length},
   get firstChild(){return node.children[0]||null},
@@ -63,7 +63,8 @@ const store={entries:new Map(),getItem(k){return this.entries.get(k)||null},setI
 const window={OtroCadArquiPlanner:planner,OtroCadArquiProfessional:professional,OtroCadArquiReferences:refs,OtroCadCivilAPI:api,addEventListener(){}};
 const context={window,document,location:{href:'https://example.org/editor/'},localStorage:store,
  MutationObserver:class{observe(){}},queueMicrotask:cb=>cb(),URL,AbortController,
- confirm:()=>true,console,setTimeout,clearTimeout,Date,Number,Math};
+ confirm:text=>{confirmations.push(text);return true},console,setTimeout,clearTimeout,Date,Number,Math};
+const confirmations=[];
 const vm=require('node:vm');vm.createContext(context);
 vm.runInContext(script,context);
 assert.ok(window.OtroCadArqui,'Assistant must register global API');
@@ -93,6 +94,16 @@ async function main(){
  await nodes.arquiDraw.click();
  assert.equal(replacements,1,'Edits replace only previous AI design');
  assert.equal(animated,1,'Do not create duplicate designs');
+ const priorSpec=window.OtroCadArqui.preview().spec;
+ await window.OtroCadArqui.propose('Hola amigo');
+ assert.equal(window.OtroCadArqui.preview().spec,priorSpec,'Unrecognized request must preserve active preview');
+ assert.ok(nodes.arquiDetails.hidden===false,'Details become available after generation');
+ nodes.arquiTabLibrary.click();
+ assert.ok(nodes.arquiBuiltinSources.children.length>=4,'Sources must work without user uploads');
+ const drawn=data.find(x=>x.aiArchitect&&x.type==='line');drawn.a.x+=.1;
+ await window.OtroCadArqui.propose('amplía la cocina otros 25 cm');
+ await nodes.arquiDraw.click();
+ assert.ok(confirmations.some(x=>/cambios manuales/.test(x)),'Regeneration must disclose overwriting manual edits');
  assert.equal(data.filter(x=>x.aiArchitect).length>0,true);
  tab='civil';window.OtroCadArqui.sync();
  assert.equal(root.hidden,true,'El Arqui must not appear in Civil');
@@ -104,6 +115,15 @@ async function main(){
  await nodes.arquiErase.click();
  assert.equal(removals,1);
  assert.equal(data.length,0,'Only AI project entities should be removed');
+ // Reinitialize the assistant against the saved CAD objects, as when reopening the editor.
+ await window.OtroCadArqui.propose('Casa 12x20 de dos plantas');await nodes.arquiDraw.click();
+ const savedSpec=data.find(x=>x.aiDesignSpec).aiDesignSpec;
+ window.OtroCadArqui=null;vm.runInContext(script,context);
+ assert.equal(window.OtroCadArqui.preview().spec.kitchenExtra,savedSpec.kitchenExtra,'Reopen recovers the program from CAD metadata');
+ assert.equal(window.OtroCadArqui.preview().spec.floors,savedSpec.floors);
+ data.push({type:'line',layer:'USER',a:{x:0,y:0},b:{x:1,y:1}});
+ await window.OtroCadArqui.propose('sin hatch');await nodes.arquiDraw.click();
+ assert.equal(data.filter(x=>x.layer==='USER').length,1,'Unrelated CAD content survives regeneration');
  console.log('Arqui UI checks passed: Dibujo-only, official portrait, live CAD, change-in-place and safe remove.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
