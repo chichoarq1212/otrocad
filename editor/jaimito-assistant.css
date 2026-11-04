@@ -74,3 +74,25 @@
  .jaimito-note{display:none}
 }
 @media(prefers-reduced-motion:reduce){.jaimito-mascot{animation:none}}
+
+/* Kelvin is mutually exclusive with Jaimito, and shares the same compact UI. */
+.kelvin-mascot{min-height:115px;width:114px}
+.kelvin-illustration{display:flex;align-items:flex-end;justify-content:center;width:105px;min-height:103px;
+ pointer-events:none;filter:drop-shadow(0 3px 5px #001c3855)}
+.kelvin-illustration svg{height:103px;width:93px;display:block}
+.kelvin-mascot .jaimito-mascot-tag{font-size:9px;white-space:nowrap}
+.kelvin-root .jaimito-chat{bottom:148px}
+@media(max-width:760px){
+ .kelvin-mascot{min-height:87px;width:88px}
+ .kelvin-illustration{min-height:82px;width:82px}
+ .kelvin-illustration svg{height:82px;width:70px}
+ .kelvin-mascot .jaimito-mascot-tag{font-size:8px}
+ .kelvin-root .jaimito-chat{bottom:117px}
+}
+@media(max-width:950px) and (orientation:landscape) and (max-height:500px){
+ .kelvin-mascot{min-height:68px;width:70px}
+ .kelvin-illustration{min-height:62px;width:63px}
+ .kelvin-illustration svg{height:62px;width:55px}
+ .kelvin-mascot .jaimito-mascot-tag{font-size:7px}
+ .kelvin-root .jaimito-chat{bottom:0}
+}
