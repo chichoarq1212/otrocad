@@ -724,7 +724,7 @@ function showCadPaperSettings(){
  dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
 }
 function render(){
- if(activeLayout!=='Model'){renderPaperLayout();return}
+ if(activeLayout!=='Model'){cursorMeasureEl.hidden=true;$('#dynamic').style.display='none';renderPaperLayout();return}
  const oldPaperNotice=document.getElementById('cadLayoutNotice');if(oldPaperNotice)oldPaperNotice.hidden=true;
  const finish=$('#finish-poly');finish.hidden=tool!=='poly'||poly.length===0;finish.disabled=poly.length<2;
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':(getComputedStyle($('#stage')).backgroundColor||'#101820');ctx.fillRect(0,0,w,h);if(!printing)drawGrid(w,h);
