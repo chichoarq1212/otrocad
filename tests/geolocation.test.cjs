@@ -70,19 +70,20 @@ function startup(saved,objects=[]){
   Object.defineProperty(el,'innerHTML',{set(value){for(const m of String(value).matchAll(/id="([^"]+)"/g))node(m[1])}});
   nodes[id]=el;return el;
  }
- const stage=node('stage'),groups=node('groups');node('civil');
+ const stage=node('stage'),groups=node('groups');node('civil');node('tabs');let active=false;
  const api={getObjects:()=>objects,getView:()=>({center:{x:0,y:0},pixelsPerUnit:35}),getUnits:()=> 'm',
   setView:(center,scale)=>views.push({center,scale}),setStatus(){},repaint(){}};
  const window={proj4,OtroCadCivilAPI:api,OtroCadCivilCommands:{},addEventListener(){}};
- const document={getElementById:id=>nodes[id]||null,querySelector:()=>nodes.civil,createElement:()=>node('element-'+Object.keys(nodes).length)};
+ const document={getElementById:id=>nodes[id]||null,querySelector:selector=>selector.includes('.active')?(active?nodes.civil:null):nodes.civil,createElement:()=>node('element-'+Object.keys(nodes).length)};
  const context={window,document,localStorage:{getItem:()=>JSON.stringify(saved),setItem:(k,v)=>stored.set(k,v)},
   requestAnimationFrame(){},AbortController,setTimeout,clearTimeout};
  vm.runInNewContext(source,context);
- return {state:JSON.parse(stored.get('otrocad-geolocation-v1')),views,nodes,objects};
+ return {state:JSON.parse(stored.get('otrocad-geolocation-v1')),views,nodes,objects,map:window.OtroCadGeolocation,clickTab(tab){active=tab==='civil';nodes.tabs.listeners.click({target:{closest:()=>({dataset:{tab}})}})}};
 }
 const migrated=startup(legacy);
 assert.equal(migrated.state.region,'continental');assert.equal(migrated.state.configured,false);
-assert.equal(migrated.views.length,1);assert.ok(migrated.views[0].scale<.01,'Replace the old ocean view with an overview of Ecuador');
+assert.equal(migrated.views.length,0,'No automatic map or camera change at startup');assert.equal(migrated.map.isVisible(),false);migrated.clickTab('civil');assert.equal(migrated.map.isVisible(),true);assert.equal(migrated.views.length,1);assert.ok(migrated.views[0].scale<.01,'Replace the old ocean view with an overview of Ecuador');
+migrated.clickTab('mep');assert.equal(migrated.map.isVisible(),false,'Map is hidden outside Civil');assert.equal(migrated.nodes.stage.children[0].hidden,true);assert.equal(migrated.views.length,2,'Leaving the overview restores the CAD camera');migrated.clickTab('civil');assert.equal(migrated.views.length,3,'Returning to Civil restores the overview');
 const real=startup({...legacy,east:778000,north:9978000});
 assert.equal(real.state.configured,true);assert.equal(real.state.east,778000);assert.equal(real.views.length,0,'Preserve a real project reference and its view');
 const drawing=[{type:'line',a:{x:0,y:0},b:{x:5,y:2}}],copy=JSON.stringify(drawing);

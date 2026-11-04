@@ -425,6 +425,27 @@ function drawGrid(w,h){
 }
 function activeAnchor(){return tool==='poly'&&poly.length?poly[poly.length-1]:start}
 let offsetAwaitingDistance=false;
+let lineCoordinateMode='absolute',lineCoordinates={x:null,y:null};
+function usesLineCoordinates(){return ['line','poly'].includes(tool)&&lineCoordinateMode!=='polar'}
+function resetLineCoordinates(){lineCoordinates={x:null,y:null}}
+function coordinatePoint(x,y){
+ if(!Number.isFinite(x)||!Number.isFinite(y))return null;
+ const base=lineCoordinateMode==='relative'?(activeAnchor()||{x:0,y:0}):{x:0,y:0};
+ return {x:base.x+x,y:base.y+y};
+}
+function coordinateCorner(reference){
+ const base=lineCoordinateMode==='relative'?(activeAnchor()||{x:0,y:0}):{x:0,y:0};
+ const point={...reference};for(const axis of ['x','y'])if(lineCoordinates[axis]!==null&&Number.isFinite(lineCoordinates[axis]))point[axis]=base[axis]+lineCoordinates[axis];
+ return point;
+}
+function acceptDynamicPoint(point){
+ if(!point)return false;
+ if(!usesLineCoordinates()){commitEntity(point);return true}
+ const layer=$('#layer').value;if(lockedLayers.has(layer)){status.textContent='La capa actual está bloqueada';return false}
+ if(tool==='poly'){poly.push({...point});temp=null;resetLineCoordinates();render();updatePrompt();status.textContent='Vértice por coordenadas · Enter para terminar';return true}
+ if(!start){start={...point};temp={type:'line',a:{...point},b:{...point},...currentStyle(layer)};resetLineCoordinates();render();updatePrompt();status.textContent='Primer punto fijado por X/Y · indica el extremo';return true}
+ commitEntity(point);return true;
+}
 let rectangleDimensions={width:null,height:null},rectangleDirections={x:1,y:1};
 function resetRectangleDimensions(){rectangleDimensions={width:null,height:null};rectangleDirections={x:1,y:1}}
 function rectangleCorner(reference){
@@ -462,12 +483,15 @@ function toggleDynamicInput(){
  status.textContent='Entrada dinámica F12: '+(dynamicInputOn?'ACTIVADA':'DESACTIVADA');
 }
 function updateDynamic(){
- const panel=$('#dynamic'),rect=tool==='rect',offsetEntry=tool==='offset'&&offsetAwaitingDistance;
+ const panel=$('#dynamic'),rect=tool==='rect',offsetEntry=tool==='offset'&&offsetAwaitingDistance,cartesian=usesLineCoordinates()&&dynamicInputOn;
  panel.classList.toggle('cad-rect-input',rect);panel.classList.toggle('cad-offset-input',offsetEntry);
+ panel.classList.toggle('cad-coordinate-input',cartesian);
+ $('#dynCoordMode').hidden=!['line','poly'].includes(tool);
+ $('#dynCoordMode').value=lineCoordinateMode;
  $('#dynAngle').hidden=offsetEntry;$('#dynAngleLabel').hidden=offsetEntry;$('#acceptPoint').hidden=offsetEntry;
- $('#dynHint').hidden=!rect&&!offsetEntry;
- $('#dynLen').classList.toggle('is-locked',rect&&rectangleDimensions.width!==null);
- $('#dynAngle').classList.toggle('is-locked',rect&&rectangleDimensions.height!==null);
+ $('#dynHint').hidden=!rect&&!offsetEntry&&!cartesian;
+ $('#dynLen').classList.toggle('is-locked',(rect&&rectangleDimensions.width!==null)||(cartesian&&lineCoordinates.x!==null));
+ $('#dynAngle').classList.toggle('is-locked',(rect&&rectangleDimensions.height!==null)||(cartesian&&lineCoordinates.y!==null));
  const anchor=activeAnchor();
  if(offsetEntry){
   panel.style.display='flex';cursorMeasureEl.hidden=true;
@@ -477,6 +501,18 @@ function updateDynamic(){
   positionCursorInput(panel,cursor);
   return;
  }
+ if(cartesian&&!$('#cmd').value.trim()){
+  panel.style.display='flex';cursorMeasureEl.hidden=true;
+  const point=temp?.b||snapPoint(world(cursor)),base=lineCoordinateMode==='relative'?(anchor||{x:0,y:0}):{x:0,y:0};
+  $('#dynamic label').textContent=(lineCoordinateMode==='relative'?'ΔX':'X')+' ('+units+')';
+  $('#dynAngleLabel').textContent=(lineCoordinateMode==='relative'?'ΔY':'Y')+' ('+units+')';
+  $('#dynLen').setAttribute('aria-label','Coordenada X');$('#dynAngle').setAttribute('aria-label','Coordenada Y');
+  if(document.activeElement!==$('#dynLen')&&lineCoordinates.x===null)$('#dynLen').value=(point.x-base.x).toFixed(3);
+  if(document.activeElement!==$('#dynAngle')&&lineCoordinates.y===null)$('#dynAngle').value=(point.y-base.y).toFixed(3);
+  $('#dynHint').textContent=(anchor?'Extremo':'Primer punto')+' · Tab / ;: X ↔ Y · Enter: fijar'+(anchor?' · L '+distance(anchor,point).toFixed(3)+' '+units:'');
+  positionCursorInput(panel,cursor);return;
+ }
+ if(dynamicInputOn&&['line','poly'].includes(tool)&&lineCoordinateMode==='polar'&&!anchor&&!$('#cmd').value.trim()){panel.style.display='flex';positionCursorInput(panel,cursor);$('#dynamic label').textContent='LONGITUD ('+units+')';$('#dynAngleLabel').textContent='ÁNGULO';$('#dynLen').value='';$('#dynAngle').value='';cursorMeasureEl.hidden=true;return}
  if(!dynamicInputOn||!anchor||!temp||(rect&&$('#cmd').value.trim())){panel.style.display='none';cursorMeasureEl.hidden=true;return}
  panel.style.display='flex';
  $('#dynamic label').textContent=(rect?'ANCHO':'LONGITUD')+' ('+units+')';
@@ -504,6 +540,10 @@ function updateDynamic(){
  cursorMeasureEl.style.left=x+'px';cursorMeasureEl.style.top=y+'px';
 }
 function updateRectangleInput(axis,value){
+ if(usesLineCoordinates()){
+  lineCoordinates[axis==='width'?'x':'y']=cursorNumber(value);
+  if(temp)temp.b=coordinateCorner(temp.b);render();return;
+ }
  if(tool!=='rect'||!start)return;
  rectangleDimensions[axis]=cursorNumber(value);
  if(temp)temp.b=rectangleCorner(temp.b);
@@ -520,25 +560,29 @@ function handleCursorDimensionKey(event,active){
  if(event.ctrlKey||event.metaKey||event.altKey)return false;
  const rect=tool==='rect'&&start&&dynamicInputOn;
  const offset=tool==='offset'&&offsetAwaitingDistance;
- if(!rect&&!offset)return false;
+ const coordinates=usesLineCoordinates()&&dynamicInputOn;
+ if(!rect&&!offset&&!coordinates)return false;
  const input=active===$('#dynLen')||active===$('#dynAngle');
  if(['INPUT','TEXTAREA','SELECT'].includes(active?.tagName)&&!input)return false;
  if($('#cmd').value.trim())return false;
  if(event.key==='Escape'){event.preventDefault();cancelCurrentAction();stage.focus({preventScroll:true});return true}
- if(event.key==='F12'&&rect){event.preventDefault();stage.focus({preventScroll:true});toggleDynamicInput();return true}
+ if(event.key==='F12'&&(rect||coordinates)){event.preventDefault();stage.focus({preventScroll:true});toggleDynamicInput();return true}
  if(event.key==='Enter'){
+  if(coordinates&&!input&&lineCoordinates.x===null&&lineCoordinates.y===null)return false;
   event.preventDefault();
   if(offset)acceptOffsetDistance($('#dynLen').value);
-  else{const point=pointFromInputs();if(point){commitEntity(point);stage.focus({preventScroll:true})}else status.textContent='Rectángulo: ancho y alto deben ser distintos de cero'}
+  else{const point=pointFromInputs();if(point){acceptDynamicPoint(point);stage.focus({preventScroll:true})}else status.textContent=coordinates?'Ingresa X e Y válidos':'Rectángulo: ancho y alto deben ser distintos de cero'}
   return true;
  }
- if(event.key==='Tab'||(rect&&[';',','].includes(event.key))){
-  event.preventDefault();const next=rect&&active===$('#dynLen')?$('#dynAngle'):$('#dynLen');
+ if(event.key==='Tab'||((rect||coordinates)&&[';',','].includes(event.key))){
+  event.preventDefault();
+  if(coordinates&&input)lineCoordinates[active===$('#dynLen')?'x':'y']=cursorNumber(active.value);
+  const next=(rect||coordinates)&&active===$('#dynLen')?$('#dynAngle'):$('#dynLen');
   next.focus({preventScroll:true});next.select();return true;
  }
  if(!input&&/^[0-9.+-]$/.test(event.key)){
   event.preventDefault();const field=$('#dynLen');field.focus({preventScroll:true});field.value=event.key;
-  if(rect)updateRectangleInput('width',field.value);
+  if(rect||coordinates)updateRectangleInput('width',field.value);
   return true;
  }
  return false;
@@ -573,7 +617,7 @@ function showDraftSettings(){
  };
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
 }
-function updatePrompt(){if(activeLayout!=='Model'){promptEl.textContent='PRESENTACIÓN · hoja de impresión · vuelve a Modelo para editar';return}if(tool==='rect'&&start){promptEl.textContent='Esquina opuesta · ancho · Tab / ; · alto · Enter';return}if(tool==='offset'){promptEl.textContent=offsetAwaitingDistance?'OFFSET · distancia · Enter':'OFFSET · objeto · lado · Esc para terminar';return}promptEl.textContent=tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
+function updatePrompt(){if(activeLayout!=='Model'){promptEl.textContent='PRESENTACIÓN · hoja de impresión · vuelve a Modelo para editar';return}if(tool==='rect'&&start){promptEl.textContent='Esquina opuesta · ancho · Tab / ; · alto · Enter';return}if(usesLineCoordinates()){promptEl.textContent=(activeAnchor()?'Extremo':'Primer punto')+' · X/Y junto al cursor · Tab / ;: cambiar campo · Enter: fijar';return}if(tool==='offset'){promptEl.textContent=offsetAwaitingDistance?'OFFSET · distancia · Enter':'OFFSET · objeto · lado · Esc para terminar';return}promptEl.textContent=tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
 
 function isVisibleModelEntity(s){
  return (s.cadLayout||'Model')==='Model'&&!hiddenLayers.has(s.layer)&&!(hideModelAnnotations&&s.type==='text');
@@ -988,13 +1032,14 @@ function render(){
  const oldPaperNotice=document.getElementById('cadLayoutNotice');if(oldPaperNotice)oldPaperNotice.hidden=true;
  const finish=$('#finish-poly');finish.hidden=tool!=='poly'||poly.length===0;finish.disabled=poly.length<2;
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle=printing?'#ffffff':(getComputedStyle($('#stage')).backgroundColor||'#101820');ctx.fillRect(0,0,w,h);
- if(!printing){const map=window.OtroCadGeolocation;map?.draw(ctx,{world,screen,width:w,height:h,units});ctx.save();if(map?.getState().enabled)ctx.globalAlpha=.16;drawGrid(w,h);ctx.restore()}
+ if(!printing){const map=window.OtroCadGeolocation;map?.draw(ctx,{world,screen,width:w,height:h,units});ctx.save();if(map?.isVisible())ctx.globalAlpha=.16;drawGrid(w,h);ctx.restore()}
  // Imported CAD hatches are background fills; keep dimensions, walls and labels visible on top.
  objects.forEach((s,i)=>{if(s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
  objects.forEach((s,i)=>{if(!s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
  drawSelectionGrips();if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
  if(!printing&&temp)drawEntity(temp,false,true);
+ if(!printing)for(const item of window.OtroCadMep?.getPreview()||[])drawEntity(item,false,true);
  if(!printing&&tool==='poly'&&poly.length)drawEntity({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)},false);
  if(!printing&&start&&crossOn){const p=screen(start);ctx.strokeStyle=resolveCadColor({layer:'General',color:'#dce8f5'},canvasIsLight());ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(p.x-8,p.y);ctx.lineTo(p.x+8,p.y);ctx.moveTo(p.x,p.y-8);ctx.lineTo(p.x,p.y+8);ctx.stroke()}
  if(!printing&&crossOn){const p=cursor;ctx.strokeStyle='#5cb7e8aa';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(p.x,0);ctx.lineTo(p.x,h);ctx.moveTo(0,p.y);ctx.lineTo(w,p.y);ctx.stroke()}
@@ -1003,7 +1048,7 @@ function render(){
  if(cursorCommandEl)updateCursorCommand();
 }
 function resize(){const d=window.devicePixelRatio||1,r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);render()}
-function setTool(t,options={}){if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;resetRectangleDimensions();offsetAwaitingDistance=t==='offset'&&!options.offsetDistanceProvided;if(t==='offset'){clearSelection();offsetDistancePreset=!!options.offsetDistanceProvided;if(offsetAwaitingDistance)$('#dynLen').value=String(offsetDistance)}selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render();if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});$('#dynLen').select();status.textContent='OFFSET: escribe distancia y pulsa Enter'}}
+function setTool(t,options={}){if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;resetRectangleDimensions();resetLineCoordinates();window.OtroCadMep?.onToolChanged(t);offsetAwaitingDistance=t==='offset'&&!options.offsetDistanceProvided;if(t==='offset'){clearSelection();offsetDistancePreset=!!options.offsetDistanceProvided;if(offsetAwaitingDistance)$('#dynLen').value=String(offsetDistance)}selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render();if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});$('#dynLen').select();status.textContent='OFFSET: escribe distancia y pulsa Enter'}}
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(!isVisibleModelEntity(s)||lockedLayers.has(s.layer))continue;let d=1e9;
@@ -1227,7 +1272,7 @@ function createCenterline(){
  checkpoint();objects.push({type:'line',a:point(lo),b:point(hi),...currentStyle(layer),linetype:'DASHED'});save();applySelection([objects.length-1]);setTool('select');render();status.textContent='Eje creado entre líneas paralelas';
 }
 
-function pointFromInputs(){const anchor=activeAnchor();const ls=$('#dynLen').value.trim(),as=$('#dynAngle').value.trim();if(!anchor||!ls||!as)return null;const len=cursorNumber(ls),ang=cursorNumber(as);if(!Number.isFinite(len)||!Number.isFinite(ang))return null;if(tool==='rect'){if(Math.abs(len)<1e-9||Math.abs(ang)<1e-9)return null;return {x:anchor.x+(len<0?len:len*rectangleDirections.x),y:anchor.y+(ang<0?ang:ang*rectangleDirections.y)}}if(len<0)return null;const rad=ang*Math.PI/180;return round({x:anchor.x+len*Math.cos(rad),y:anchor.y+len*Math.sin(rad)})}
+function pointFromInputs(){if(usesLineCoordinates())return coordinatePoint(cursorNumber($('#dynLen').value),cursorNumber($('#dynAngle').value));const anchor=activeAnchor();const ls=$('#dynLen').value.trim(),as=$('#dynAngle').value.trim();if(!anchor||!ls||!as)return null;const len=cursorNumber(ls),ang=cursorNumber(as);if(!Number.isFinite(len)||!Number.isFinite(ang))return null;if(tool==='rect'){if(Math.abs(len)<1e-9||Math.abs(ang)<1e-9)return null;return {x:anchor.x+(len<0?len:len*rectangleDirections.x),y:anchor.y+(ang<0?ang:ang*rectangleDirections.y)}}if(len<0)return null;const rad=ang*Math.PI/180;return round({x:anchor.x+len*Math.cos(rad),y:anchor.y+len*Math.sin(rad)})}
 function currentStyle(layer){const picked=($('#drawColor')?.value||'#dce8f5').toLowerCase();const color=picked==='#dce8f5'&&layer!=='General'?(colors[layer]||picked):picked;return {layer,color,lineweight:Number($('#lineweight')?.value||.25),linetype:$('#linetype')?.value||'CONTINUOUS'}}
 function commitEntity(endPoint){
  if(!start)return;
@@ -1241,9 +1286,9 @@ function commitEntity(endPoint){
  else if(tool==='rect'||tool==='hatch'||tool==='ellipse')objects.push({type:tool,a:clone(start),b:clone(endPoint),...(tool==='hatch'?{hatchPattern:$('#hatchPattern')?.value||'ANSI31',hatchSpacing:Number($('#hatchSpacing')?.value||10)}:{}),...style});
  else if(tool==='circle')objects.push({type:'circle',a:clone(start),b:clone(endPoint),...style});
  else if(tool==='polygon'){const n=Math.max(3,Math.min(64,polySides));const r=distance(start,endPoint);const pts=[];for(let i=0;i<n;i++){const a=Math.atan2(endPoint.y-start.y,endPoint.x-start.x)+2*Math.PI*i/n;pts.push({x:start.x+r*Math.cos(a),y:start.y+r*Math.sin(a)})}objects.push({type:'polygon',pts,...style})}
- save();applySelection([objects.length-1]);start=null;temp=null;if(tool==='rect')resetRectangleDimensions();render();updatePrompt();
+ save();applySelection([objects.length-1]);start=null;temp=null;resetLineCoordinates();if(tool==='rect')resetRectangleDimensions();render();updatePrompt();
 }
-function finishPoly(){if(poly.length<2){status.textContent='La polilínea necesita al menos dos puntos';return false}if(lockedLayers.has($('#layer').value)){status.textContent='La capa actual está bloqueada';return false}checkpoint();objects.push({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)});save();poly=[];start=null;temp=null;render();updatePrompt();status.textContent='Polilínea terminada';return true}
+function finishPoly(){if(poly.length<2){status.textContent='La polilínea necesita al menos dos puntos';return false}if(lockedLayers.has($('#layer').value)){status.textContent='La capa actual está bloqueada';return false}if(window.OtroCadMep?.hasRoute()){if(!window.OtroCadMep.commitRoute(clone(poly)))return false;setTool('select');return true}checkpoint();objects.push({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)});save();poly=[];start=null;temp=null;resetLineCoordinates();render();updatePrompt();status.textContent='Polilínea terminada';return true}
 function doOffset(q){
  if(selected<0){
   const hit=selectAt(q);applySelection(hit>=0?[hit]:[]);
@@ -1265,7 +1310,8 @@ function doOffset(q){
  if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([]);render();status.textContent='OFFSET creado · selecciona otro objeto o Esc para terminar';
 }
 function handleTap(p){
- let q=snapPoint(world(p));q=constrain(q);
+ let q=snapPoint(world(p));q=constrain(q);if(usesLineCoordinates())q=coordinateCorner(q);
+ if(window.OtroCadMep?.placeAt(q))return;
  if(!['select','pan','move','copy','offset','trim','extend','explode','measure'].includes(tool)&&lockedLayers.has($('#layer').value)){status.textContent='La capa '+$('#layer').value+' está bloqueada';return}
  if(tool==='arc'){
   arcPoints.push(q);
@@ -1299,7 +1345,7 @@ function handleTap(p){
  if(tool==='select'){const hit=selectAt(q);applySelection(hit>=0?[hit]:[]);showProperties();render();return}
  if(tool==='pan'){return}
  if(tool==='offset'){if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});status.textContent='OFFSET: confirma la distancia con Enter';return}doOffset(q);return}
- if(tool==='poly'){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Polilínea: marca otro vértice o pulsa Enter';return}
+ if(tool==='poly'){poly.push(q);resetLineCoordinates();temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Polilínea: marca otro vértice o pulsa Enter';return}
  if(tool==='explode'){explodeAt(q);return}
  if(tool==='fillet'){
   const hit=selectAt(q);
@@ -1364,9 +1410,9 @@ function handleTap(p){
   if(tool==='copy')applySelection(created);else applySelection(targets);
   save();modifyTarget=-1;modifyTargets=[];moveBase=null;render();status.textContent=tool.toUpperCase()+' aplicado a '+targets.length+' objeto(s)';return;
  }
- if(!start){if(tool==='rect')resetRectangleDimensions();start=q;temp={type:tool,a:clone(q),b:clone(q),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';updatePrompt();render();return}
- let end=tool==='rect'?rectangleCorner(q):pointFromInputs();if(!end)end=q;else if(tool!=='rect'&&document.activeElement!==$('#dynLen')&&document.activeElement!==$('#dynAngle'))end=q;
- end=constrain(end);
+ if(!start){if(tool==='rect')resetRectangleDimensions();if(usesLineCoordinates())resetLineCoordinates();start=q;temp={type:tool,a:clone(q),b:clone(q),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';updatePrompt();render();return}
+ let end=tool==='rect'?rectangleCorner(q):usesLineCoordinates()?coordinateCorner(q):pointFromInputs();if(!end)end=q;else if(tool!=='rect'&&document.activeElement!==$('#dynLen')&&document.activeElement!==$('#dynAngle'))end=q;
+ if(!usesLineCoordinates())end=constrain(end);
  if(tool==='line'||tool==='dim'||tool==='dimaligned'||tool==='rect'||tool==='hatch'||tool==='circle'||tool==='ellipse'||tool==='polygon'){commitEntity(end)}
 }
 function transformEntityGeometry(s,transform,axisAligned){
@@ -1661,9 +1707,9 @@ canvas.addEventListener('pointermove',e=>{
  }
  if(selectionClickAnchor){selectionBox={a:selectionClickAnchor,b:p};render();return}
  if(selectionStart){if(distance(selectionStart,p)>4)selectionBox={a:selectionStart,b:p};render();return}
- if(tool==='poly'&&poly.length){const q=constrain(snapPoint(world(p)));temp={type:'line',a:clone(poly[poly.length-1]),b:q,...currentStyle($('#layer').value)};render()}
+ if(tool==='poly'&&poly.length){let q=constrain(snapPoint(world(p)));if(usesLineCoordinates())q=coordinateCorner(q);temp={type:'line',a:clone(poly[poly.length-1]),b:q,...currentStyle($('#layer').value)};render()}
  else if(tool==='arc'&&arcPoints.length){const q=snapPoint(world(p));temp={type:'line',a:clone(arcPoints[arcPoints.length-1]),b:q,...currentStyle($('#layer').value)};render()}
- else if(start){let q=constrain(snapPoint(world(p)));if(tool==='rect')q=rectangleCorner(q);temp={type:tool==='measure'?'line':tool,a:clone(start),b:q,...currentStyle($('#layer').value)};render()}
+ else if(start){let q=constrain(snapPoint(world(p)));if(tool==='rect')q=rectangleCorner(q);if(usesLineCoordinates())q=coordinateCorner(q);temp={type:tool==='measure'?'line':tool,a:clone(start),b:q,...currentStyle($('#layer').value)};render()}
  else render();
 });
 function finishSelectionWindow(box){
@@ -1785,11 +1831,11 @@ function runCommand(raw){
  const coordinate=parseCoordinate(textValue,coordinateBase);
  if(coordinate&&(/^[+-]?(?:\d|\.)/.test(textValue)||textValue.startsWith('@'))){
   const point=round(coordinate);
-  if(tool==='poly'){poly.push(point);temp=null;render();status.textContent='Polilínea: vértice añadido · Enter para terminar';return}
+  if(tool==='poly'){poly.push(point);resetLineCoordinates();temp=null;render();status.textContent='Polilínea: vértice añadido · Enter para terminar';return}
   if(tool==='measure'){handleTap(screen(point));return}
   if(tool==='arc'){arcPoints.push(point);if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);arcPoints=[];status.textContent='Arco creado'}else status.textContent='Arco: introduce el siguiente punto';render();return}
   if(tool==='leader'){if(!start){start=point;temp={type:'line',a:clone(point),b:clone(point),...currentStyle($('#layer').value)};status.textContent='Introduce el extremo de la directriz';render()}else{const label=prompt('Texto de la directriz','');checkpoint();objects.push({type:'leader',a:clone(start),b:point,text:label||'',...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);start=null;temp=null;render();status.textContent='Directriz creada'}return}
-  if(!start){if(tool==='rect')resetRectangleDimensions();start=point;temp={type:tool,a:clone(start),b:clone(start),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Punto inicial fijado · introduce el siguiente punto'}
+  if(!start){if(tool==='rect')resetRectangleDimensions();resetLineCoordinates();start=point;temp={type:tool,a:clone(start),b:clone(start),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Punto inicial fijado · introduce el siguiente punto'}
   else commitEntity(point);
   return;
  }
@@ -1840,7 +1886,8 @@ $('#measureArea').onclick=selectedArea;
 $('#finish-poly').onclick=finishPoly;
 $('#dynLen').addEventListener('input',()=>updateRectangleInput('width',$('#dynLen').value));
 $('#dynAngle').addEventListener('input',()=>updateRectangleInput('height',$('#dynAngle').value));
-$('#acceptPoint').onclick=()=>{const q=pointFromInputs();if(!q)return;if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)};
+$('#dynCoordMode').onchange=()=>{lineCoordinateMode=$('#dynCoordMode').value;resetLineCoordinates();stage.focus({preventScroll:true});render()};
+$('#acceptPoint').onclick=()=>{const q=pointFromInputs();if(!q)return;if(usesLineCoordinates()){acceptDynamicPoint(q);stage.focus({preventScroll:true});return}if(tool==='poly'&&poly.length){poly.push(q);temp=null;$('#dynLen').value='';$('#dynAngle').value='';render();status.textContent='Vértice añadido'}else commitEntity(q)};
 $('#undo').onclick=()=>{if(undo.length){backupPrevious();redo.push(clone(objects));objects=undo.pop();clearSelection();save();render()}};
 $('#redo').onclick=()=>{if(redo.length){backupPrevious();undo.push(clone(objects));objects=redo.pop();clearSelection();save();render()}};
 $('#newDrawing').onclick=async()=>{
@@ -2625,6 +2672,12 @@ window.OtroCadCivilAPI={
  getObjects:()=>objects,
  getSelectedObjects:()=>selectedItems().map(i=>objects[i]).filter(Boolean),
  getUnits:()=>units,
+ startDrawingTool:t=>{setTool(t);stage.focus({preventScroll:true});return tool===t},
+ getActiveTool:()=>tool,
+ getDraftPath:()=>clone(poly.concat(temp?.b?[temp.b]:[])),
+ getDraftPoint:()=>snapPoint(world(cursor)),
+ finishDrawing:()=>finishPoly(),
+ setCurrentLayer:(name,color)=>{if(lockedLayers.has(name)){status.textContent='La capa '+name+' está bloqueada';return false}window.OtroCadCivilAPI.ensureLayer(name,color);$('#layer').value=name;$('#drawColor').value=color||colors[name];return true},
  getView:()=>({center:world({x:canvas.clientWidth/2,y:canvas.clientHeight/2}),pixelsPerUnit:zoom}),
  repaint:()=>render(),
  setView:(center,pixelsPerUnit=zoom)=>{

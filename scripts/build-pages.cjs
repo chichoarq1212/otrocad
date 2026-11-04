@@ -22,7 +22,7 @@ const requiredFiles = [
   'editor/civil3d.js',
   'editor/jaimito-assistant.js',
   'editor/jaimito-assistant.css',
-  'editor/compact-chrome.css','editor/geolocation.js','editor/vendor/proj4/proj4.js','editor/vendor/proj4/LICENSE.md',
+  'editor/compact-chrome.css','editor/geolocation.js','editor/mep.js','editor/vendor/proj4/proj4.js','editor/vendor/proj4/LICENSE.md',
   'editor/assets/ing-jaimito-hd.webp',
   'editor/demo/vivienda.js',
   'editor/library/furnishings.js',

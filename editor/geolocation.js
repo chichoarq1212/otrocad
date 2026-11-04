@@ -71,7 +71,7 @@ if(typeof module==='object'&&module.exports){module.exports=helpers;return}
 const api=window.OtroCadCivilAPI,stage=document.getElementById('stage'),groups=document.getElementById('groups');
 if(!api||!stage||!groups||!projection)return;
 const key='otrocad-geolocation-v1',cache=new Map(),coverage=new Map();let pending=0,pendingCoverage=0,queued=false;
-let state=validate({}),migrateExample=false;
+let state=validate({}),migrateExample=false,overviewReturn=null,overviewView=null;
 try{const stored=JSON.parse(localStorage.getItem(key)||'{}');migrateExample=legacyExample(stored);state=validate(stored)}catch(_){}
 const attribution=document.createElement('div');attribution.id='cadMapAttribution';attribution.hidden=true;stage.append(attribution);
 const group=document.createElement('div');group.className='toolgroup';group.dataset.panel='civil';
@@ -83,9 +83,10 @@ const byId=id=>document.getElementById(id),styleSelect=byId('cadMapStyle');
 function persist(){try{localStorage.setItem(key,JSON.stringify(state))}catch(_){}styleSelect.value=state.enabled?state.style:'off'}
 function redraw(){if(!queued){queued=true;requestAnimationFrame(()=>{queued=false;api.repaint()})}}
 function restore(value){try{state=legacyExample(value)?validate({}):validate(value||{})}catch(_){state=validate({})}persist();redraw()}
-function setEnabled(enabled){state.enabled=enabled;state.userDisabled=!enabled;persist();attribution.hidden=!enabled;redraw()}
+function setEnabled(enabled){state.enabled=enabled;state.userDisabled=!enabled;persist();attribution.hidden=!isVisible();redraw()}
 function showEcuador(region='continental'){
  if(!state.configured&&api.getObjects().length){showSettings();api.setStatus('Ingresa las coordenadas reales del levantamiento para ubicar el plano en Ecuador.');return}
+ if(!state.configured&&!overviewReturn)overviewReturn=api.getView();
  const place=ECUADOR[region]||ECUADOR.continental,units=api.getUnits();let center;
  if(state.configured){center=utmToModel(projection('EPSG:4326',crs(state),[place.lon,place.lat]),state,units);state.enabled=true}
  else{const style=state.style;center=api.getView().center;state=ecuadorState(region,center);state.style=style}
@@ -134,7 +135,7 @@ function showSettings(){
    value.opacity=Number(form.elements.opacity.value)/100;const next=validate(value);
    const latlon=projection(crs(next),'EPSG:4326',[next.east,next.north]);
    if(!latlon.every(Number.isFinite)||Math.abs(latlon[1])>84)throw Error('La referencia no corresponde a una posición UTM válida.');
-   state=next;persist();dlg.close();if(form.elements.center.checked)centerMap();redraw();
+   state=next;overviewReturn=null;overviewView=null;persist();dlg.close();if(form.elements.center.checked)centerMap();redraw();
    api.setStatus('Mapa '+crs(state)+' · '+(state.mode==='utm'?'coordenadas UTM':'origen local vinculado')+' · geometría conservada');
   }catch(error){dlg.querySelector('[role="alert"]').textContent=error.message}
  };
@@ -192,8 +193,9 @@ function drawTile(ctx,image,p,source=[0,0,TILE,TILE]){
  ctx.save();ctx.beginPath();ctx.moveTo(se.x,se.y);ctx.lineTo(sw.x,sw.y);ctx.lineTo(ne.x,ne.y);ctx.closePath();ctx.clip();
  ctx.transform((se.x-sw.x)/TILE,(se.y-sw.y)/TILE,(se.x-ne.x)/TILE,(se.y-ne.y)/TILE,ne.x+sw.x-se.x,ne.y+sw.y-se.y);ctx.drawImage(image,...source,0,0,TILE,TILE);ctx.restore();
 }
+function isVisible(){return state.enabled&&!!document.querySelector('[data-tab="civil"].active')}
 function draw(ctx,view){
- attribution.hidden=!state.enabled;if(!state.enabled)return;
+ attribution.hidden=!isVisible();if(!isVisible())return;
  if(!state.configured&&api.getObjects().length){attribution.textContent='Georreferencia pendiente: abre Geolocalización e ingresa las coordenadas reales del plano.';attribution.style.bottom=(byId('layoutBar').offsetHeight+5)+'px';return}
  try{
   const {world,screen,width,height,units}=view;
@@ -226,11 +228,18 @@ function draw(ctx,view){
   attribution.style.bottom=(byId('layoutBar').offsetHeight+5)+'px';
  }catch(error){attribution.textContent=crs(state)+' · '+error.message}
 }
-window.OtroCadGeolocation={draw,getState:()=>({...state}),restore,clear:()=>restore(null),showSettings,setEnabled,showEcuador,
- formatCoordinate:(point,units)=>{if(!state.enabled)return '';if(!state.configured)return ' · Vista Ecuador · georreferencia del plano pendiente';const p=modelToUtm(point,state,units);return ' · E '+p[0].toFixed(2)+' · N '+p[1].toFixed(2)+' · '+crs(state)}};
+window.OtroCadGeolocation={draw,isVisible,getState:()=>({...state}),restore,clear:()=>restore(null),showSettings,setEnabled,showEcuador,
+ formatCoordinate:(point,units)=>{if(!isVisible())return '';if(!state.configured)return ' · Vista Ecuador · georreferencia del plano pendiente';const p=modelToUtm(point,state,units);return ' · E '+p[0].toFixed(2)+' · N '+p[1].toFixed(2)+' · '+crs(state)}};
 Object.assign(window.OtroCadCivilCommands,{C3DGEO:showSettings,GEOGRAPHICLOCATION:showSettings,GEOMAP:showSettings,GEOMAPOFF:()=>setEnabled(false),ECUADOR:()=>showEcuador(),GALAPAGOS:()=>showEcuador('galapagos')});
 window.addEventListener('online',()=>{for(const [id,item] of cache)if(item.status==='error')cache.delete(id);for(const [id,item] of coverage)if(item.available===null&&item.status!=='loading')coverage.delete(id);redraw()});
-document.querySelector('[data-tab="civil"]').addEventListener('click',()=>{if(!state.configured&&!state.enabled&&!state.userDisabled&&!api.getObjects().length)showEcuador()});
-if(migrateExample){state.enabled=false;if(!api.getObjects().length)showEcuador();else api.setStatus('Las coordenadas de ejemplo se retiraron: configura la ubicación real del plano.')}
+document.getElementById('tabs').addEventListener('click',event=>{
+ const tab=event.target.closest('[data-tab]');if(!tab)return;
+ if(tab.dataset.tab==='civil'){
+  if(!state.configured&&state.enabled&&!overviewReturn&&!api.getObjects().length){overviewReturn=api.getView();if(overviewView)api.setView(overviewView.center,overviewView.pixelsPerUnit);else showEcuador(state.region)}
+  else if(!state.configured&&!state.enabled&&!state.userDisabled&&!api.getObjects().length)showEcuador();
+ }else if(overviewReturn&&!state.configured){overviewView=api.getView();const previous=overviewReturn;overviewReturn=null;api.setView(previous.center,previous.pixelsPerUnit)}
+ attribution.hidden=!isVisible();redraw();
+});
+if(migrateExample){state.enabled=false;state.userDisabled=false}
 persist();redraw();
 })();

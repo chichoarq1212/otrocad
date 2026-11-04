@@ -29,11 +29,11 @@ const context={
  angle:(a,b)=>Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI,
  normalize:a=>(a%360+360)%360,
  screen:p=>({x:p.x*20,y:p.y*20}),
- status:{textContent:''},window:{}
+ world:p=>({...p}),snapPoint:p=>({...p}),status:{textContent:''},window:{}
 };
 vm.createContext(context);
 vm.runInContext(cad.slice(head,tail),context);
-vm.runInContext('updateDynamic()',context);
+vm.runInContext("lineCoordinateMode='polar';updateDynamic()",context);
 assert.match(stage.children[0].textContent,/5\.000 m/,'distance must follow actual point');
 assert.match(stage.children[0].textContent,/53\.1°/,'angle must follow cursor');
 assert.equal(stage.children[0].hidden,false,'measurement must be visible during drawing');
@@ -119,3 +119,21 @@ for(const cmd of ['C3DTIN','C3DCONTOURS','C3DPROFILE','C3DSECTION','C3DVOLUME','
  assert.match(civil,new RegExp(cmd+':'),'missing Civil command '+cmd);
 }
 console.log('Keyboard and cursor dimension regression passed: F12, cursor position, file shortcuts, Civil aliases and command spacing.');
+
+// Coordinates are editable before the first point and retain full input precision.
+context.tool='line';context.start=null;context.temp=null;context.document.activeElement=null;
+vm.runInContext("lineCoordinateMode='absolute';resetLineCoordinates();updateDynamic()",context);
+assert.equal(labels.get('#dynamic').style.display,'flex');
+assert.match(labels.get('#dynamic label').textContent,/X/);assert.match(labels.get('#dynAngleLabel').textContent,/Y/);
+press('1');labels.get('#dynLen').value='123.123456';vm.runInContext("updateRectangleInput('width','123.123456')",context);
+press(';');labels.get('#dynAngle').value='-20';vm.runInContext("updateRectangleInput('height','-20')",context);press('Enter');
+assert.equal(context.start.x,123.123456);assert.equal(context.start.y,-20);
+labels.get('#dynLen').focus();labels.get('#dynLen').value='0';vm.runInContext("updateRectangleInput('width','0')",context);press('Tab');
+labels.get('#dynAngle').value='30.987654';vm.runInContext("updateRectangleInput('height','30.987654')",context);press('Enter');
+assert.equal(context.objects.at(-1).b.x,0);assert.equal(context.objects.at(-1).b.y,30.987654);
+context.start={x:10,y:20};context.temp={b:{x:12,y:22}};
+vm.runInContext("lineCoordinateMode='relative';resetLineCoordinates();updateDynamic()",context);
+labels.get('#dynLen').focus();labels.get('#dynLen').value='-5';vm.runInContext("updateRectangleInput('width','-5')",context);press('Tab');
+labels.get('#dynAngle').value='0';vm.runInContext("updateRectangleInput('height','0')",context);press('Enter');
+assert.equal(context.objects.at(-1).b.x,5);assert.equal(context.objects.at(-1).b.y,20);
+console.log('Visible XY point entry passed: first point, second point, absolute, relative, zero, negative and precision.');

@@ -57,6 +57,8 @@ jobs:
         run: |
           node --check editor/editor.js
           node --check editor/civil3d.js
+          node --check editor/mep.js
+          node tests/mep.test.cjs
           node --check editor/geolocation.js
           node tests/geolocation.test.cjs
           node --check editor/jaimito-assistant.js

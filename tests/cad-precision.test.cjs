@@ -25,7 +25,7 @@ assert.equal(o.a.x,-5); assert.equal(o.b.y,9);
 const before = checkpoints;
 assert.equal(offset({x:0,y:0},{x:10,y:4},{x:5,y:2},2),undefined);
 assert.equal(checkpoints,before);
-const p={objects:[],start:{x:0,y:0},tool:'polygon',polySides:4,status:{textContent:''},lockedLayers:new Set(),distance:base.distance,$:()=>({value:'General'}),currentStyle:()=>({}),checkpoint:()=>{},save:()=>{},applySelection:()=>{},render:()=>{},updatePrompt:()=>{},clone:x=>JSON.parse(JSON.stringify(x))};
+const p={resetLineCoordinates(){},objects:[],start:{x:0,y:0},tool:'polygon',polySides:4,status:{textContent:''},lockedLayers:new Set(),distance:base.distance,$:()=>({value:'General'}),currentStyle:()=>({}),checkpoint:()=>{},save:()=>{},applySelection:()=>{},render:()=>{},updatePrompt:()=>{},clone:x=>JSON.parse(JSON.stringify(x))};
 vm.createContext(p);
 vm.runInContext(src.slice(src.indexOf('function commitEntity(endPoint)'),src.indexOf('function finishPoly()')),p);
 vm.runInContext('commitEntity({x:0,y:2})',p);
@@ -59,7 +59,7 @@ assert.equal(vm.runInContext('filletGeometry(l1,l2,{x:4,y:0},{x:0,y:4},10)',fill
 assert.equal(vm.runInContext('filletGeometry(l1,l2,{x:4,y:0},{x:0,y:4},0).arc',fillet),null);
 console.log('Empalme: tangencia, radio cero y radio excesivo verificados');
 
-const ui={objects:[{type:'line',a:{x:0,y:0},b:{x:5,y:0},layer:'General'},{type:'line',a:{x:0,y:0},b:{x:0,y:5},layer:'General'}], tool:'fillet',modifyTarget:-1,moveBase:null,status:{textContent:''}, lockedLayers:new Set(),snapPoint:p=>p,world:p=>p,constrain:p=>p,clone:x=>JSON.parse(JSON.stringify(x)),selectAt:p=>p.x>p.y?0:1,applySelection:()=>{},checkpoint:()=>{},save:()=>{},render:()=>{},prompt:()=> '1',$:()=>({value:'General'}),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
+const ui={usesLineCoordinates:()=>false,window:{},objects:[{type:'line',a:{x:0,y:0},b:{x:5,y:0},layer:'General'},{type:'line',a:{x:0,y:0},b:{x:0,y:5},layer:'General'}], tool:'fillet',modifyTarget:-1,moveBase:null,status:{textContent:''}, lockedLayers:new Set(),snapPoint:p=>p,world:p=>p,constrain:p=>p,clone:x=>JSON.parse(JSON.stringify(x)),selectAt:p=>p.x>p.y?0:1,applySelection:()=>{},checkpoint:()=>{},save:()=>{},render:()=>{},prompt:()=> '1',$:()=>({value:'General'}),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
 vm.createContext(ui);
 vm.runInContext(src.slice(src.indexOf('function lineIntersection('),src.indexOf('function trimOrExtend(')),ui);
 vm.runInContext(src.slice(src.indexOf('function handleTap(p){'),src.indexOf('function transformEntityGeometry(')),ui);

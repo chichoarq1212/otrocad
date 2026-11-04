@@ -140,7 +140,7 @@ const catalogScope={window:{}};vm.runInNewContext(fs.readFileSync('editor/librar
 const sofa=catalogScope.window.otroCadFurnitureCatalog.find(item=>item.id==='sofa');
 assert.ok(Math.abs(sofa.width-2.1336)<1e-6);assert.ok(sofa.shapes.length>1);
 console.log('Furniture checks passed: grouped selection and true-scale CC0 sofa');
-const tapScope={tool:'text',start:null,units:'m',objects:[],status:{textContent:''},lockedLayers:new Set(),snapPoint:p=>p,world:p=>p,constrain:p=>p,prompt:()=> 'SALA',clone:x=>JSON.parse(JSON.stringify(x)),currentStyle:()=>({layer:'Textos'}),checkpoint:()=>{},save:()=>{},applySelection:()=>{},render:()=>{},$:(id)=>({value:id==='#layer'?'General':''}),pointFromInputs:()=>null,document:{activeElement:null},commitEntity:p=>{tapScope.committed=p}};
+const tapScope={usesLineCoordinates:()=>false,window:{},tool:'text',start:null,units:'m',objects:[],status:{textContent:''},lockedLayers:new Set(),snapPoint:p=>p,world:p=>p,constrain:p=>p,prompt:()=> 'SALA',clone:x=>JSON.parse(JSON.stringify(x)),currentStyle:()=>({layer:'Textos'}),checkpoint:()=>{},save:()=>{},applySelection:()=>{},render:()=>{},$:(id)=>({value:id==='#layer'?'General':''}),pointFromInputs:()=>null,document:{activeElement:null},commitEntity:p=>{tapScope.committed=p}};
 vm.createContext(tapScope);vm.runInContext(source.slice(source.indexOf('function handleTap(p){'),source.indexOf('function transformEntityGeometry(')),tapScope);
 vm.runInContext('handleTap({x:2,y:3})',tapScope);assert.equal(tapScope.objects[0].text,'SALA');assert.equal(tapScope.objects[0].a.x,2);
 tapScope.tool='dimaligned';tapScope.start={x:0,y:0};vm.runInContext('handleTap({x:3,y:4})',tapScope);assert.equal(tapScope.committed.x,3);assert.equal(tapScope.committed.y,4);
