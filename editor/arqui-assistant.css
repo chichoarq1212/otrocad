@@ -37,7 +37,7 @@
 .arqui-tabs button{flex:1;font-size:11px}
 .arqui-tabs button.active{background:#185be8;color:#fff;border-color:#185be8}
 .arqui-pane{padding:9px 10px;overflow-y:auto;overscroll-behavior:contain;min-height:100px;scrollbar-width:thin}
-.arqui-chat{display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto;
+.arqui-chat{display:flex;flex-direction:column;gap:5px;max-height:100px;overflow-y:auto;
  overscroll-behavior:contain;background:#edf4ff;border:1px solid #d5e4f6;
  padding:7px;border-radius:7px}
 .arqui-msg{max-width:95%;border-radius:8px;padding:5px 8px;
@@ -63,7 +63,7 @@
  margin:10px 0 5px}
 .arqui-preview-title strong{font-size:11px}
 .arqui-preview-title small{font-size:9px;color:#6684a5;text-align:right}
-#arquiPreview{width:100%;display:block;aspect-ratio:360/225;border-radius:7px;background:#162638}
+#arquiPreview{width:100%;display:block;aspect-ratio:360/225;max-height:150px;border-radius:7px;background:#162638}
 .arqui-warnings{max-height:96px;overflow-y:auto;background:#fff7e4;border-left:3px solid #dcb336;
  font-size:10px;padding:4px 7px;margin:6px 0}
 .arqui-warnings p{margin:4px 0}

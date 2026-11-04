@@ -14,6 +14,7 @@ let plan=null,previewEntities=[],spec=planner.parsePrompt('Vivienda de 1 planta 
 let projectId=api.getObjects().filter(x=>x.aiArchitect&&x.aiProjectId).at(-1)?.aiProjectId||null;
 let activeStream=null,busy=false,pending=false,lastModelKey=null,baseline=null;
 const conversation=[];
+let draftTimer=null,draftDirty=false;
 const root=document.createElement('div');root.id='arquiAssistant';root.className='jaimito-root arqui-root';root.hidden=true;
 root.innerHTML=[
  '<button id="arquiMascot" class="jaimito-mascot arqui-mascot" type="button" aria-label="Abrir El Arqui IA" aria-controls="arquiPanel" aria-expanded="false">',
@@ -28,6 +29,8 @@ root.innerHTML=[
  '<div class="arqui-chat" id="arquiMessages" role="log" aria-live="polite"></div>',
  '<form id="arquiForm" class="arqui-form"><label for="arquiPrompt">¿Qué deseas diseñar o modificar?</label>',
  '<textarea id="arquiPrompt" rows="4" maxlength="2200" placeholder="Quiero una casa de 12 por 20 con tres dormitorios y dos baños. Después: amplía la cocina 50 cm."></textarea>',
+ '<div class="arqui-preview-title"><strong>Vista previa mientras escribes</strong><small id="arquiSummary" role="status"></small></div>',
+ '<svg id="arquiPreview" viewBox="0 0 360 225" role="img" aria-label="Vista previa local provisional del anteproyecto"></svg>',
  '<button id="arquiPropose" type="submit">Proponer / actualizar diseño</button></form>',
  '<div class="arqui-examples" aria-label="Ejemplos de pedidos"><button id="arquiExampleHome" type="button">Casa de 12 × 20</button><button id="arquiExampleEdit" type="button">Ampliar cocina</button><button id="arquiExampleRules" type="button">Revisar criterios</button></div>',
  '<p id="arquiContext" class="arqui-context">Describe tu idea. Las medidas que falten se mostrarán como supuestos editables.</p>',
@@ -53,8 +56,6 @@ root.innerHTML=[
  '<label>Origen X (modelo)<input id="arquiOriginX" type="number" step="any" value="0"></label>',
  '<label>Origen Y (modelo)<input id="arquiOriginY" type="number" step="any" value="0"></label>',
  '</div></details>',
- '<div class="arqui-preview-title"><strong>Vista previa · anteproyecto tipo concurso</strong><small id="arquiSummary"></small></div>',
- '<svg id="arquiPreview" viewBox="0 0 360 225" role="img" aria-label="Plano conceptual con ambientes y pasillos"></svg>',
  '<div id="arquiWarnings" class="arqui-warnings" role="status"></div>',
  '<p id="arquiProgress" class="arqui-progress" role="status"></p>',
  '<div class="arqui-actions"><button id="arquiRecheck" type="button">Revisar diseño</button>',
@@ -155,6 +156,38 @@ function restoreModel(){
 function renderPreview(){
  professional.preview(document,$('arquiPreview'),previewEntities);
 }
+function restoreAcceptedPreview(){
+ if(previewEntities.length)renderPreview();
+ if(plan){const rooms=plan.floors.reduce((n,f)=>n+f.rooms.filter(r=>r.kind!=='circulation').length,0);$('arquiSummary').textContent=plan.floors.length+' planta(s) · '+rooms+' espacios';}
+ else $('arquiSummary').textContent='Sin propuesta activa';
+}
+function updateDraftPreview(){
+ draftTimer=null;if(busy||pending)return;
+ const text=$('arquiPrompt').value.trim();
+ if(!text){draftDirty=false;restoreAcceptedPreview();$('arquiDraw').disabled=!plan||!previewEntities.length;$('arquiContext').textContent='Escribe tu idea para ver una vista previa local.';return}
+ try{
+  const interpreted=planner.interpret(text,fromInputs());
+  if(interpreted.unsupported.length||!interpreted.canGenerate)throw Error('Aún no puedo representar esta indicación en la vista previa local.');
+  const provisional=planner.design(interpreted.spec);
+  const origin={x:Number($('arquiOriginX').value),y:Number($('arquiOriginY').value)};
+  const shapes=professional.generate(provisional,{units:api.getUnits(),origin,projectId:'arqui-draft'});
+  if(shapes.length>3300)throw Error('La propuesta supera el tamaño de vista previa.');
+  professional.preview(document,$('arquiPreview'),shapes);
+  $('arquiSummary').textContent='BORRADOR LOCAL · '+provisional.floors.length+' planta(s)';
+  $('arquiContext').textContent='Vista provisional con lo reconocido localmente; puede omitir indicaciones. Pulsa Proponer para revisar antes de dibujar.';
+ }catch(error){
+  restoreAcceptedPreview();$('arquiSummary').textContent='Esperando una propuesta válida';
+  $('arquiContext').textContent='Vista anterior conservada. '+String(error.message||error);
+ }
+}
+$('arquiPrompt').addEventListener('input',()=>{
+ if(draftTimer)clearTimeout(draftTimer);
+ draftDirty=!!$('arquiPrompt').value.trim();
+ $('arquiDraw').disabled=draftDirty||!plan||!previewEntities.length;
+ if(!draftDirty){updateDraftPreview();return}
+ $('arquiSummary').textContent='Preparando vista previa…';
+ draftTimer=setTimeout(updateDraftPreview,350);
+});
 function displayIssues(){
  const output=$('arquiWarnings');output.replaceChildren();
  const warnings=plan?[...refs.review(plan).map(x=>x.message),...plan.audit.map(x=>x.message),...plan.warnings]:[];
@@ -201,11 +234,13 @@ async function propose(text){
  if(busy||pending)return;
  restoreModel();
  const prompt=String(text||'').trim();
+ if(draftTimer){clearTimeout(draftTimer);draftTimer=null}
+ if(draftDirty)restoreAcceptedPreview();
  if(!prompt){message('bot','Cuéntame qué quieres diseñar o qué cambio deseas sobre la propuesta.');return}
  message('user',prompt);
  const answer=refs.consult(prompt,plan);
- if(answer){message('bot',answer);return}
- pending=true;$('arquiPropose').disabled=true;$('arquiDraw').disabled=true;
+ if(answer){draftDirty=false;restoreAcceptedPreview();$('arquiDraw').disabled=!plan||!previewEntities.length;message('bot',answer);return}
+ draftDirty=true;pending=true;$('arquiPrompt').disabled=true;$('arquiPropose').disabled=true;$('arquiDraw').disabled=true;
  try{
   // Give the configured language model the user's actual words and the prior
   // validated proposal. Local keyword parsing must not reject or pre-edit a
@@ -240,9 +275,9 @@ async function propose(text){
    }
    next=interpreted.spec;
   }
-  makePreview(next,true);
+  if(makePreview(next,true))draftDirty=false;
  }catch(error){message('bot','No se pudo interpretar el encargo: '+String(error.message||error))}
- finally{pending=false;$('arquiPropose').disabled=false;$('arquiDraw').disabled=!plan||!previewEntities.length}
+ finally{pending=false;$('arquiPrompt').disabled=false;$('arquiPropose').disabled=false;$('arquiDraw').disabled=draftDirty||!plan||!previewEntities.length}
 }
 $('arquiForm').addEventListener('submit',event=>{event.preventDefault();propose($('arquiPrompt').value)});
 $('arquiExampleHome').onclick=()=>{$('arquiPrompt').value='Quiero una vivienda de 12 por 20 con tres dormitorios y garaje';propose($('arquiPrompt').value)};
@@ -253,7 +288,7 @@ function keepInputsFresh(){if(busy||pending)return;try{makePreview(fromInputs(),
 for(const id of ['arquiBaths','arquiAccessible','arquiLotW','arquiLotD','arquiFloors','arquiBeds','arquiGarage','arquiGarageCount','arquiSetFront','arquiSetBack','arquiSetSide','arquiWallOuter','arquiWallInner','arquiStyle','arquiFurniture','arquiWallHatch','arquiDimensions','arquiOriginX','arquiOriginY'])
  $(id).addEventListener('change',keepInputsFresh);
 $('arquiDraw').onclick=async()=>{
- if(busy||pending||!plan||!previewEntities.length)return;
+ if(busy||pending||draftDirty||!plan||!previewEntities.length)return;
  if(!visible()){message('bot','Abre el módulo DIBUJO para crear entidades arquitectónicas.');return}
  const current=api.getObjects();
  const previous=projectId?current.filter(x=>x.aiArchitect&&x.aiProjectId===projectId):[];

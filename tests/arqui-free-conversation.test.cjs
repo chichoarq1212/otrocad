@@ -8,13 +8,13 @@ const nodes={};
 const sent=[],messages=[],previews=[];
 let reply={spec:{lotWidth:15,lotDepth:10},reason:'Entendí que el terreno mide 15 por 10 y la vivienda 12 por 8. ¿Qué retiros deseas?',requiresReview:true};
 const ctx={
- busy:false,pending:false,plan:{},previewEntities:[{}],endpoint:{href:'https://arqui.example/api/arqui'},
+ busy:false,pending:false,draftTimer:null,draftDirty:false,restoreAcceptedPreview(){},plan:{},previewEntities:[{}],endpoint:{href:'https://arqui.example/api/arqui'},
  conversation:[{role:'user',content:'Primero imagino una casa acogedora'},{role:'assistant',content:'Cuéntame del terreno.'}],
  restoreModel(){},refs:{consult:()=>null,search:()=>[]},
  fromInputs:()=>({lotWidth:12,lotDepth:20,bedrooms:3}),
  planner:{interpret(){throw Error('Local interpreter must not run before remote')},validateSpec:s=>s},
  message:(role,content)=>{messages.push({role,content});ctx.conversation.push({role:role==='user'?'user':'assistant',content})},
- makePreview:(s)=>previews.push(s),
+ makePreview:(s)=>{previews.push(s);return true},
  $:id=>nodes[id]||(nodes[id]={disabled:false,checked:false}),
  fetch:async(_url,opts)=>{sent.push(JSON.parse(opts.body));return{ok:true,json:async()=>reply}},
  AbortController,setTimeout,clearTimeout,String,Error,Array
