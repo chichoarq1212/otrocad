@@ -138,12 +138,8 @@ function save(){
   localStorage.setItem('otrocad-drawing',JSON.stringify(objects));
   localStorage.setItem('otrocad-units',units);saved=true;
  }catch(e){storageWarning()}
- scheduleCadAutosave();return saved;
+ if(typeof scheduleCadAutosave==='function')scheduleCadAutosave();return saved;
 }
-window.addEventListener('visibilitychange',()=>{
- if(document.visibilityState==='hidden'&&cadAutosaveDirty)void persistCadProgress(true);
-});
-setInterval(()=>{if(cadAutosaveDirty)void persistCadProgress(true)},60000);
 
 function world(p){return{x:(p.x-canvas.clientWidth/2-offset.x)/zoom,y:(canvas.clientHeight/2+offset.y-p.y)/zoom}}
 function screen(p){if(layoutRenderTransform)return{x:layoutRenderTransform.tx+p.x*layoutRenderTransform.scale,y:layoutRenderTransform.ty-p.y*layoutRenderTransform.scale};return{x:canvas.clientWidth/2+offset.x+p.x*zoom,y:canvas.clientHeight/2+offset.y-p.y*zoom}}
@@ -2688,83 +2684,6 @@ function buildDxf(){
  add(0,'ENDSEC',0,'EOF');return rows.join('\r\n')+'\r\n';
 }
 $('#dxf').onclick=()=>{const data=buildDxf();if(data!==null)download('otrocad.dxf',data,'application/dxf')};
-// Consolidated DWG / DXF / native project saving. The existing DWG engine
-// must round-trip its own output before a potentially invalid file is offered.
-let cadLastFile=null;
-function safeDrawingFilename(name,format){
- const root=String(name||'OtroCAD-Proyecto').trim().replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')
-  .replace(/\.(dwg|dxf|json)$/i,'').replace(/[. ]+$/,'');
- if(!root||root.length>150)throw Error('Escribe un nombre válido (máximo 150 caracteres).');
- return root+'.'+format;
-}
-async function drawingContent(format){
- if(format==='json')return new Blob([JSON.stringify({
-   version:3,shapes:objects,units,layouts,viewports:layoutViewportRecords,
-   geolocation:window.OtroCadGeolocation?.getState()||null},null,2)],{type:'application/json'});
- const dxf=buildDxf();if(dxf===null)throw Error('No fue posible crear un archivo DXF válido.');
- if(format==='dxf')return new Blob([dxf],{type:'application/dxf'});
- if(format!=='dwg')throw Error('Formato de archivo no compatible.');
- const engine=await getDwgRuntime(),bytes=engine.dxf_to_dwg(new TextEncoder().encode(dxf));
- if(!(bytes instanceof Uint8Array)||bytes.length<6||
-  new TextDecoder().decode(bytes.subarray(0,6))!=='AC1032')
-  throw Error('El motor no produjo un DWG AC1032 válido. Guardar como DXF es la alternativa.');
- const reconstructed=engine.dwg_to_dxf(bytes),check=parseDxfEntities(new TextDecoder('utf-8').decode(reconstructed));
- const expected=parseDxfEntities(dxf);
- if(!check.length||check.length!==expected.length)
-  throw Error('El DWG no pasó la comprobación de entidades: '+check.length+' / '+expected.length+'. No se guardó un archivo potencialmente corrupto.');
- return new Blob([bytes],{type:'application/acad'});
-}
-async function saveDrawingAs(format='dwg',name='OtroCAD-Proyecto',reuse=false){
- if(!['dwg','dxf','json'].includes(format))throw Error('Formato desconocido: '+format);
- const filename=safeDrawingFilename(name,format),mime={dwg:'application/acad',dxf:'application/dxf',json:'application/json'}[format];
- let handle=reuse&&cadLastFile?.format===format?cadLastFile.handle:null;
- if(!handle&&typeof window.showSaveFilePicker==='function'&&!window.OtroCadAndroid){
-  try{handle=await window.showSaveFilePicker({
-   suggestedName:filename,types:[{description:'Archivo '+format.toUpperCase(),accept:{[mime]:['.'+format]}}],
-   excludeAcceptAllOption:false
-  })}catch(error){if(error.name==='AbortError')return{cancelled:true};throw error}
- }
- status.textContent='Guardando '+filename+'…';
- const blob=await drawingContent(format);
- if(handle){
-  const writer=await handle.createWritable();
-  try{await writer.write(blob);await writer.close()}catch(err){try{await writer.abort()}catch(_){}throw err}
- }else await download(filename,blob,mime);
- cadLastFile={handle:handle||null,format,name:filename};
- await persistCadProgress(true);
- status.textContent=handle?'Guardado: '+filename:'Archivo '+filename+' enviado a Descargas';
- window.OtroCadSaveUI?.updateCurrent?.(filename);
- return {filename,format,bytes:blob.size,mode:handle?'file':'download'};
-}
-window.OtroCadFileCore={
- saveAs:saveDrawingAs,
- async saveCurrent(){
-  if(cadLastFile?.handle)return saveDrawingAs(cadLastFile.format,cadLastFile.name,true);
-  return{requiresSaveAs:true};
- },
- filename:()=>cadLastFile?.name||null,
- persistProgress:()=>persistCadProgress(true),
- async restoreProgress(slot='autosave-latest'){
-  if(!['autosave-latest','autosave-previous'].includes(slot))throw Error('Punto de recuperación inválido.');
-  const data=cadRecoveryRestoreCandidate(await cadRecoveryRead(slot));
-  if(!data?.shapes?.length)throw Error('No hay copias automáticas para recuperar.');
-  if(!await protectDrawingBeforeReplacement())throw Error('No se pudo respaldar el plano actual.');
-  pushReplacementUndo();objects=clone(data.shapes);
-  if(['m','cm','mm'].includes(data.units))units=data.units;
-  if(Array.isArray(data.layouts))layouts=clone(data.layouts);
-  if(Array.isArray(data.viewports))layoutViewportRecords=clone(data.viewports);
-  activeLayout=layouts.some(x=>x.name===data.activeLayout)?data.activeLayout:'Model';
-  clearSelection();saveLayoutState();refreshLayoutTabs();save();render();
-  return {count:objects.length,date:data.savedAt};
- },
- getProgressDates:async()=>{
-  const data=await Promise.all(['autosave-latest','autosave-previous'].map(id=>cadRecoveryRead(id).catch(()=>null)));
-  return data.map(x=>x?.savedAt||null);
- },
- saveLocal:()=>{const ok=save();void persistCadProgress(true);return ok}
-};
-$('#saveAsDwg').onclick=()=>{if(window.OtroCadSaveUI)window.OtroCadSaveUI.open('dwg');else void saveDrawingAs('dwg').catch(e=>alert(e.message))};
-$('#saveAsDxf').onclick=()=>{if(window.OtroCadSaveUI)window.OtroCadSaveUI.open('dxf');else void saveDrawingAs('dxf').catch(e=>alert(e.message))};
 $('#pdf').onclick=()=>{
  if(activeLayout==='Model'){
   ensureCadLayout();
@@ -2891,5 +2810,86 @@ window.OtroCadCivilAPI={
  fit:()=>$('#fit').click()
 };
 
+// Consolidated DWG / DXF / native project saving. The existing DWG engine
+// must round-trip its own output before a potentially invalid file is offered.
+let cadLastFile=null;
+function safeDrawingFilename(name,format){
+ const root=String(name||'OtroCAD-Proyecto').trim().replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')
+  .replace(/\.(dwg|dxf|json)$/i,'').replace(/[. ]+$/,'');
+ if(!root||root.length>150)throw Error('Escribe un nombre válido (máximo 150 caracteres).');
+ return root+'.'+format;
+}
+async function drawingContent(format){
+ if(format==='json')return new Blob([JSON.stringify({
+   version:3,shapes:objects,units,layouts,viewports:layoutViewportRecords,
+   geolocation:window.OtroCadGeolocation?.getState()||null},null,2)],{type:'application/json'});
+ const dxf=buildDxf();if(dxf===null)throw Error('No fue posible crear un archivo DXF válido.');
+ if(format==='dxf')return new Blob([dxf],{type:'application/dxf'});
+ if(format!=='dwg')throw Error('Formato de archivo no compatible.');
+ const engine=await getDwgRuntime(),bytes=engine.dxf_to_dwg(new TextEncoder().encode(dxf));
+ if(!(bytes instanceof Uint8Array)||bytes.length<6||
+  new TextDecoder().decode(bytes.subarray(0,6))!=='AC1032')
+  throw Error('El motor no produjo un DWG AC1032 válido. Guardar como DXF es la alternativa.');
+ const reconstructed=engine.dwg_to_dxf(bytes),check=parseDxfEntities(new TextDecoder('utf-8').decode(reconstructed));
+ const expected=parseDxfEntities(dxf);
+ if(!check.length||check.length!==expected.length)
+  throw Error('El DWG no pasó la comprobación de entidades: '+check.length+' / '+expected.length+'. No se guardó un archivo potencialmente corrupto.');
+ return new Blob([bytes],{type:'application/acad'});
+}
+async function saveDrawingAs(format='dwg',name='OtroCAD-Proyecto',reuse=false){
+ if(!['dwg','dxf','json'].includes(format))throw Error('Formato desconocido: '+format);
+ const filename=safeDrawingFilename(name,format),mime={dwg:'application/acad',dxf:'application/dxf',json:'application/json'}[format];
+ let handle=reuse&&cadLastFile?.format===format?cadLastFile.handle:null;
+ if(!handle&&typeof window.showSaveFilePicker==='function'&&!window.OtroCadAndroid){
+  try{handle=await window.showSaveFilePicker({
+   suggestedName:filename,types:[{description:'Archivo '+format.toUpperCase(),accept:{[mime]:['.'+format]}}],
+   excludeAcceptAllOption:false
+  })}catch(error){if(error.name==='AbortError')return{cancelled:true};throw error}
+ }
+ status.textContent='Guardando '+filename+'…';
+ const blob=await drawingContent(format);
+ if(handle){
+  const writer=await handle.createWritable();
+  try{await writer.write(blob);await writer.close()}catch(err){try{await writer.abort()}catch(_){}throw err}
+ }else await download(filename,blob,mime);
+ cadLastFile={handle:handle||null,format,name:filename};
+ await persistCadProgress(true);
+ status.textContent=handle?'Guardado: '+filename:'Archivo '+filename+' enviado a Descargas';
+ window.OtroCadSaveUI?.updateCurrent?.(filename);
+ return {filename,format,bytes:blob.size,mode:handle?'file':'download'};
+}
+window.OtroCadFileCore={
+ saveAs:saveDrawingAs,
+ async saveCurrent(){
+  if(cadLastFile?.handle)return saveDrawingAs(cadLastFile.format,cadLastFile.name,true);
+  return{requiresSaveAs:true};
+ },
+ filename:()=>cadLastFile?.name||null,
+ persistProgress:()=>persistCadProgress(true),
+ async restoreProgress(slot='autosave-latest'){
+  if(!['autosave-latest','autosave-previous'].includes(slot))throw Error('Punto de recuperación inválido.');
+  const data=cadRecoveryRestoreCandidate(await cadRecoveryRead(slot));
+  if(!data?.shapes?.length)throw Error('No hay copias automáticas para recuperar.');
+  if(!await protectDrawingBeforeReplacement())throw Error('No se pudo respaldar el plano actual.');
+  pushReplacementUndo();objects=clone(data.shapes);
+  if(['m','cm','mm'].includes(data.units))units=data.units;
+  if(Array.isArray(data.layouts))layouts=clone(data.layouts);
+  if(Array.isArray(data.viewports))layoutViewportRecords=clone(data.viewports);
+  activeLayout=layouts.some(x=>x.name===data.activeLayout)?data.activeLayout:'Model';
+  clearSelection();saveLayoutState();refreshLayoutTabs();save();render();
+  return {count:objects.length,date:data.savedAt};
+ },
+ getProgressDates:async()=>{
+  const data=await Promise.all(['autosave-latest','autosave-previous'].map(id=>cadRecoveryRead(id).catch(()=>null)));
+  return data.map(x=>x?.savedAt||null);
+ },
+ saveLocal:()=>{const ok=save();void persistCadProgress(true);return ok}
+};
+$('#saveAsDwg').onclick=()=>{if(window.OtroCadSaveUI)window.OtroCadSaveUI.open('dwg');else void saveDrawingAs('dwg').catch(e=>alert(e.message))};
+$('#saveAsDxf').onclick=()=>{if(window.OtroCadSaveUI)window.OtroCadSaveUI.open('dxf');else void saveDrawingAs('dxf').catch(e=>alert(e.message))};
+window.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='hidden'&&cadAutosaveDirty)void persistCadProgress(true);
+});
+setInterval(()=>{if(cadAutosaveDirty)void persistCadProgress(true)},60000);
 new ResizeObserver(resize).observe(stage);setTool('line');resize();
 })();
