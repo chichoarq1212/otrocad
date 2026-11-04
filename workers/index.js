@@ -1,7 +1,7 @@
 /* OtroCAD unified static site + protected online El Arqui API.
  * Static content is served directly by Workers assets; only /api/* executes this Worker.
  */
-import arqui from './arqui-ai.js';
+import arqui from './arqui-online.js';
 export default {
  async fetch(request, env, ctx) {
   const {pathname}=new URL(request.url);
