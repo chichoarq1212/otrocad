@@ -25,7 +25,7 @@ function generate(points,kind,options={}){
  const meta={civilRoadMarking:kind,groupId,layer,color,lineweight:.24};
  const toCad=v=>({x:v.x*scale,y:v.y*scale});
  const line=(a,b,extra={})=>out.push({type:'line',a:toCad(a),b:toCad(b),...meta,...extra});
- const polygon=vertices=>out.push({type:'polygon',pts:vertices.map(toCad),...meta,importedHatch:false});
+ const polygon=vertices=>out.push({type:'polygon',pts:vertices.map(toCad),...meta,solidFill:true,hatchPattern:'SOLID',hatchOpacity:1,importedHatch:false});
  let total=0;
  const parts=[];
  for(let i=1;i<p.length;i++){
