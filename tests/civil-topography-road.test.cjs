@@ -89,7 +89,7 @@ assert.match(topoUI,/function showPolylineDialog\(\)/);
 assert.match(geo,/utmToModel:\(pair,units\)/);
 assert.match(civil,/OtroCadCivilPoints\.parse/);
 assert.match(roadUI,/SEÑALIZACIÓN VIAL/);
-assert.match(kelvin,/Ing\. Keeeeeeelvin/);
+assert.match(kelvin,/Ing\. Keeelvin/);
 assert.match(kelvin,/mep\.chooseSystem/);
 assert.match(kelvin,/window\.OTROCAD_KELVIN_AI_ENDPOINT/);
 assert.match(mep,/getQuantities:\(\)=>quantities/);
