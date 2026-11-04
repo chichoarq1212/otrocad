@@ -50,4 +50,38 @@ for(const item of ['cad-file-ui.js','cad-file-ui.css']){
  assert.ok(pack.includes("'editor/"+item+"'"));
  assert.ok(android.includes("'"+item+"'"));
 }
+const vm=require('node:vm');
+const styleSource=editor.slice(editor.indexOf('const matchState='),editor.indexOf('function setTool(',editor.indexOf('const matchState=')));
+assert.ok(styleSource.includes('function matchPropertiesAt('));
+const original={
+ type:'line',a:{x:1,y:2},b:{x:5,y:2},layer:'Capa origen',
+ color:'#ffcc00',lineweight:.5,linetype:'DASHED'
+};
+const dest={type:'line',a:{x:10,y:10},b:{x:20,y:12},layer:'Capa destino',
+ color:'#ffffff',lineweight:.13,linetype:'CONTINUOUS'};
+const destText={type:'text',a:{x:40,y:25},text:'NO MOVER',textFontFamily:'Arial',layer:'Texto',color:'#ffffee'};
+const objs=[original,dest,destText];
+let checkpoints=0,saves=0,renders=0,layerApplied='';
+const context={objects:objs,lockedLayers:new Set(['Bloqueada']),
+ status:{textContent:''},clone:v=>JSON.parse(JSON.stringify(v)),
+ checkpoint:()=>{checkpoints++},save:()=>{saves++},render:()=>{renders++},
+ selectAt:q=>q.index,window:{OtroCadCivilAPI:{ensureLayer:k=>{layerApplied=k}}}};
+vm.createContext(context);vm.runInContext(styleSource,context);
+vm.runInContext('matchPropertiesAt({index:0})',context);
+vm.runInContext('matchPropertiesAt({index:1})',context);
+assert.deepEqual(dest.a,{x:10,y:10});assert.deepEqual(dest.b,{x:20,y:12},
+ 'MA must preserve target coordinates');
+assert.equal(dest.layer,'Capa origen');
+assert.equal(dest.color,'#ffcc00');
+assert.equal(dest.lineweight,.5);
+assert.equal(dest.linetype,'DASHED');
+assert.equal(layerApplied,'Capa origen');
+assert.equal(checkpoints,1);assert.equal(saves,1);assert.equal(renders,1);
+vm.runInContext('matchPropertiesAt({index:2})',context);
+assert.equal(destText.layer,'Capa origen');
+assert.equal(destText.text,'NO MOVER');
+assert.equal(destText.textFontFamily,'Arial','MA must not transfer geometry or incompatible text fields');
+destText.layer='Bloqueada';vm.runInContext('matchPropertiesAt({index:2})',context);
+assert.equal(destText.layer,'Bloqueada');
+assert.equal(checkpoints,2,'Locked layer must not be changed or create undo checkpoint');
 console.log('CAD saving and MA checks passed: alias, keyboard, visual button, DWG validation, Save As and incremental IndexedDB recovery.');
