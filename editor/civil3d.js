@@ -282,7 +282,15 @@ function addButton(group,label,icon,handler,title){
  // Only developer-owned icon paths are rendered, never CSV/XML or user content.
  svg.innerHTML=civilIconPaths[icon]||civilIconPaths.tin;
  mark.append(svg);
- const caption=document.createElement('span');caption.className='civil-label';caption.textContent=label;
+ const shortLabels={
+  'Importar CSV / XYZ':'Importar puntos','Importar LandXML':'LandXML','Etiquetar cotas':'Etiquetar',
+  'Exportar puntos':'Exportar','Crear superficie TIN':'Crear TIN','Exportar TIN LandXML':'Exportar TIN',
+  'Curvas de nivel':'Curvas','Mapa de pendientes':'Pendientes','Definir alineamiento':'Alineamiento',
+  'Pendiente del eje':'Pend. eje','Perfil longitudinal':'Perfil','Sección transversal':'Sección',
+  'Volumen vs. cota':'Volúmenes','Borrar análisis':'Borrar análisis'
+ };
+ const caption=document.createElement('span');caption.className='civil-label';caption.textContent=shortLabels[label]||label;
+ b.setAttribute('aria-label',label);
  b.append(mark,caption);
  b.addEventListener('click',()=>{try{handler()}catch(error){console.error(error);alert(error.message||String(error))}});
  group.append(b);return b;
@@ -292,24 +300,32 @@ tab.addEventListener('click',()=>{
  tabs.querySelectorAll('[data-tab]').forEach(b=>{const active=b===tab;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active))});
  groups.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!=='civil');
 });
-const pointsGroup=addGroup('PUNTOS Y LEVANTAMIENTO');
+// Keep the compact Civil ribbon styling in sync even when another module activates a tab.
+function syncCivilRibbon(){
+ const active=tab.classList.contains('active')&&tab.getAttribute('aria-selected')==='true';
+ document.body.classList.toggle('cad-civil-active',active);
+}
+const civilRibbonObserver=new MutationObserver(syncCivilRibbon);
+civilRibbonObserver.observe(tabs,{subtree:true,attributes:true,attributeFilter:['class','aria-selected']});
+syncCivilRibbon();
+const pointsGroup=addGroup('PUNTOS');
 addButton(pointsGroup,'Importar CSV / XYZ','csv',()=>fileInput.click(),'Importar puntos X,Y,Z desde CSV, TXT o XYZ');
 addButton(pointsGroup,'Importar LandXML','landxml',()=>fileInput.click(),'Importar puntos CgPoint o Pnts desde LandXML');
 addButton(pointsGroup,'Etiquetar cotas','label',labelPoints,'Crear etiquetas de identificación y elevación');
 addButton(pointsGroup,'Exportar puntos','export',exportPoints,'Descargar puntos topográficos como CSV');
-const surfaceGroup=addGroup('SUPERFICIES Y TERRENO');
+const surfaceGroup=addGroup('SUPERFICIES');
 addButton(surfaceGroup,'Crear superficie TIN','tin',createTin,'Triangulación Delaunay desde puntos XYZ');
 addButton(surfaceGroup,'Exportar TIN LandXML','export',exportSurfaceLandXml,'Descargar superficie triangulada con vértices y caras en LandXML 1.2 (metros)');
 addButton(surfaceGroup,'Curvas de nivel','contours',createContours,'Generar curvas de nivel desde la superficie activa');
 addButton(surfaceGroup,'Mapa de pendientes','slope',slopeAnalysis,'Clasificar pendientes por porcentaje');
 addButton(surfaceGroup,'Visor 3D','view3d',openSurface3D,'Visualizar la superficie en perspectiva 3D interactiva');
-const designGroup=addGroup('DISEÑO LINEAL');
+const designGroup=addGroup('EJES Y PERFILES');
 addButton(designGroup,'Definir alineamiento','alignment',markAlignment,'Marcar una línea o polilínea seleccionada como alineamiento');
 addButton(designGroup,'Progresivas','stations',createStations,'Generar estacado y etiquetas de progresivas sobre el alineamiento');
 addButton(designGroup,'Pendiente del eje','grade',alignmentGrade,'Calcular la pendiente entre los extremos del alineamiento');
 addButton(designGroup,'Perfil longitudinal','profile',longitudinalProfile,'Extraer perfil de terreno sobre el alineamiento');
 addButton(designGroup,'Sección transversal','section',crossSection,'Extraer una sección transversal en una abscisa');
-const analysisGroup=addGroup('CÁLCULO Y CONTROL');
+const analysisGroup=addGroup('ANÁLISIS');
 addButton(analysisGroup,'Volumen vs. cota','volume',volumeAnalysis,'Calcular corte y relleno respecto a un plano horizontal');
 addButton(analysisGroup,'Borrar análisis','clear',clearAnalysis,'Eliminar TIN, curvas y análisis generados sin borrar puntos');
 function numberValue(v){const n=Number(String(v??'').trim().replace(',','.'));return Number.isFinite(n)?n:NaN}
