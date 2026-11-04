@@ -82,7 +82,7 @@ assert.equal(img.toString('ascii',12,16),'VP8X');
 assert.ok((img[20]&0x10)!==0,'User avatar must retain transparent alpha');
 assert.match(assistant,/El Arqui IA/);
 assert.match(assistant,/assets\/el-arqui\.webp/);
-assert.match(assistant,/data-tab="draw"/);
+assert.match(assistant,/allowed=new Set\(\['draw'/,'El Arqui appears only on architectural CAD tabs');
 assert.match(assistant,/api\.addObjectsAnimated/);
 assert.match(assistant,/api\.replaceObjects/);
 assert.match(assistant,/api\.removeObjects/);
