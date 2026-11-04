@@ -26,6 +26,17 @@ root.innerHTML=[
  '<div class="arqui-tabs" role="tablist"><button id="arquiTabDesign" class="active" type="button" aria-selected="true">Diseñar</button>',
  '<button id="arquiTabLibrary" type="button" aria-selected="false">Biblioteca técnica</button></div>',
  '<div class="arqui-pane" id="arquiDesignPane">',
+ '<details id="arquiAiSettings" class="arqui-details"><summary>🌐 Conectar mi IA · gratuita / cuenta propia</summary>',
+ '<div class="arqui-grid"><label>Servicio de IA<select id="arquiAiProvider">',
+ '<option value="none">Sin conexión · motor CAD local</option>',
+ '<option value="openrouter">OpenRouter · modelos gratuitos</option>',
+ '<option value="gemini">Gemini · nivel gratuito</option>',
+ '<option value="groq">Groq · cuenta personal</option>',
+ '<option value="openai">OpenAI API · puede generar cargos</option></select></label>',
+ '<label>Clave personal (solo en esta página)<input id="arquiAiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega tu clave API personal"></label></div>',
+ '<p class="arqui-disclaimer">Tu clave no se guarda ni se envía a OtroCAD o Cloudflare: el navegador contacta directamente al proveedor elegido. No equivale a iniciar sesión en ChatGPT o Gemini. Usa una clave gratuita y limitada.</p>',
+ '<p class="arqui-context"><a id="arquiAiHelp" href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer">Obtener clave personal</a> · <button type="button" id="arquiAiClear">Desconectar</button></p>',
+ '<p id="arquiAiState" class="arqui-context" role="status">Sin IA en línea conectada.</p></details>',
  '<div class="arqui-chat" id="arquiMessages" role="log" aria-live="polite"></div>',
  '<form id="arquiForm" class="arqui-form"><label for="arquiPrompt">¿Qué deseas diseñar o modificar?</label>',
  '<textarea id="arquiPrompt" rows="4" maxlength="2200" placeholder="Quiero una casa de 12 por 20 con tres dormitorios y dos baños. Después: amplía la cocina 50 cm."></textarea>',
@@ -90,22 +101,34 @@ avatar.onclick=()=>panel.hidden?open():close();$('arquiClose').onclick=close;
 tabs.addEventListener('click',()=>queueMicrotask(sync));
 const observer=new MutationObserver(sync);observer.observe(tabs,{subtree:true,attributes:true,attributeFilter:['class','aria-selected']});
 window.addEventListener('pageshow',sync);
+const userBridge=window.OtroCadUserAI;
+const aiSelect=$('arquiAiProvider'),aiKey=$('arquiAiKey');
 const endpoint=(()=>{
- const here=new URL(location.href);
- const auto=here.hostname.endsWith('.workers.dev')||here.hostname.startsWith('otrocad.');
- const raw=window.OTROCAD_ARQUI_AI_ENDPOINT||(auto?here.origin+'/api/arqui':'');
+ // Optional community self-hosted proxy; nunca requerir Cloudflare AI de OtroCAD.
+ const raw=window.OTROCAD_ARQUI_AI_ENDPOINT;
  if(typeof raw!=='string'||!raw)return null;
  try{const url=new URL(raw,location.href);return url.protocol==='https:'?url:null}catch(_){return null}
 })();
-$('arquiMode').textContent='IA generativa no conectada · modo local';
-if(endpoint&&typeof fetch==='function'){
- fetch(endpoint.href.replace(/\/api\/arqui$/, '/api/arqui/status'),{cache:'no-store'})
-  .then(r=>r.ok?r.json():null)
-  .then(info=>$('arquiMode').textContent=info?.online?
-   'IA en línea disponible · '+(info.provider==='openai'?'OpenAI':'Cloudflare AI'):
-   'IA generativa no conectada · modo local')
-  .catch(()=>$('arquiMode').textContent='IA generativa no conectada · modo local');
+function updateAiConnection(){
+ const provider=aiSelect.value,help=$('arquiAiHelp');
+ const known=userBridge?.providers?.[provider];
+ if(provider==='none'){
+  help.href='https://openrouter.ai/settings/keys';help.textContent='¿Cómo obtener una clave gratuita?';
+  $('arquiAiState').textContent='Sin conexión externa; el motor de dibujo sigue disponible.';
+  $('arquiMode').textContent='IA generativa no conectada · CAD local';
+  return;
+ }
+ if(!known){$('arquiAiState').textContent='Proveedor no disponible.';return}
+ help.href=known.help;help.textContent='Crear mi clave en '+known.label;
+ const active=!!aiKey.value.trim();
+ $('arquiAiState').textContent=active?'Cuenta propia preparada · '+known.label+' (solo durante esta página)':
+  'Falta pegar tu clave personal de '+known.label;
+ $('arquiMode').textContent=active?'IA personal lista · '+known.label:'IA generativa no conectada · falta clave';
 }
+aiSelect.addEventListener('change',updateAiConnection);
+aiKey.addEventListener('input',updateAiConnection);
+$('arquiAiClear').onclick=()=>{aiKey.value='';aiSelect.value='none';updateAiConnection()};
+updateAiConnection();
 function message(role,text){
  conversation.push({role:role==='user'?'user':'assistant',content:String(text).slice(0,2200)});
  while(conversation.length>12)conversation.shift();
@@ -257,7 +280,47 @@ async function propose(text){
   // free-form request before the model gets a chance to interpret it.
   let next,remoteAnswered=false;
   const current=fromInputs();
-  if(endpoint){
+  const personalProvider=aiSelect.value;
+  if(personalProvider!=='none'){
+   if(!userBridge?.request){
+    message('bot','El módulo de IA personal no está disponible. Tu plano anterior se conserva.');return;
+   }
+   if(!aiKey.value.trim()){
+    message('bot','Selecciona tu proveedor y pega tu clave desde «Conectar mi IA»; las opciones gratuitas no requieren pagar a OtroCAD.');return;
+   }
+   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
+   try{
+    const linked=$('arquiSendExcerpts').checked?refs.search(prompt,refs.get(),3):[];
+    const reply=await userBridge.request({
+     message:prompt,currentSpec:current,conversation:conversation.slice(0,-1).slice(-8),
+     referenceExcerpts:linked.map(x=>({source:x.source,title:x.title,text:x.excerpt}))
+    },{provider:personalProvider,key:aiKey.value},{fetch,signal:controller.signal});
+    const patch={...reply.spec};
+    if(patch.dimensionMeaning==='house'){
+     const w=Number(patch.houseWidth??current.houseWidth??current.lotWidth);
+     const d=Number(patch.houseDepth??current.houseDepth??current.lotDepth);
+     const patio=Number(patch.patioDepth??current.patioDepth??0);
+     const hasGarage=patch.garage===undefined?current.garage:patch.garage;
+     const front=Number(patch.frontSetback??(hasGarage?5.5:0));
+     patch.houseWidth=w;patch.houseDepth=d;patch.siteAssumed=true;
+     patch.lotWidth=w;patch.frontSetback=front;
+     patch.backSetback=patio;patch.lotDepth=Math.round((d+front+patio)*1000)/1000;
+     patch.sideSetback=0;
+    }
+    const candidate=planner.validateSpec({...current,...patch});
+    remoteAnswered=true;
+    $('arquiMode').textContent='IA en línea conectada · '+userBridge.providers[personalProvider].label;
+    if(reply.requiresReview){
+     message('bot',reply.reason||'Necesito aclarar un detalle antes de dibujar.');return;
+    }
+    next=candidate;
+    if(reply.reason)message('bot',reply.reason);
+   }catch(error){
+    message('bot','No se pudo completar la consulta a tu IA: '+String(error.message||error)+'. Tu plano anterior se conserva.');
+    return;
+   }finally{clearTimeout(timeout)}
+  }
+  if(!remoteAnswered&&endpoint){
    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
    try{
     const linked=$('arquiSendExcerpts').checked?refs.search(prompt,refs.get(),3):[];
