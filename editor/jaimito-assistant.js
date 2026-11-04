@@ -10,9 +10,10 @@ const tools=[
  ['C3DPOINTS','Importar puntos'],['C3DTIN','Crear TIN'],
  ['C3DCONTOURS','Curvas de nivel'],['C3DSLOPE','Pendientes'],
  ['C3DPROFILE','Perfil longitudinal'],['C3DSECTION','Sección transversal'],
- ['C3DVOLUME','Corte / relleno'],['C3DEXPORTTIN','Exportar LandXML']
+ ['C3DVOLUME','Corte / relleno'],['C3DEXPORTTIN','Exportar LandXML'],['C3DGEO','Geolocalización']
 ];
 const rules=[
+ [/geolocal|cartograf|utm|satelit|satélit|mapa vial|geomap/i,'C3DGEO','Abre Geolocalización y selecciona la zona WGS84 / UTM y el hemisferio del levantamiento. Puedes usar coordenadas UTM existentes o vincular un origen local a un punto UTM conocido, sin mover las entidades. El mapa necesita conexión y es una referencia visual.'],
  [/landxml|exportar|xml/i,'C3DEXPORTTIN','Exporta la superficie TIN a LandXML 1.2. Primero crea el terreno; el archivo contiene vértices y caras, no objetos de diseño dinámicos.'],
  [/csv|xyz|puntos|importar|levantamiento/i,'C3DPOINTS','Importa puntos X, Y, Z desde CSV, TXT, XYZ o LandXML. Necesitas al menos tres puntos no colineales. Comprueba cotas y unidades.'],
  [/triangul|superficie|tin|delaunay/i,'C3DTIN','Crea una TIN después de importar puntos XYZ. La triangulación disponible admite hasta 1.800 puntos; divide levantamientos mayores en sectores.'],
