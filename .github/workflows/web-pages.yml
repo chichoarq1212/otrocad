@@ -70,6 +70,11 @@ jobs:
           node --check tests/civil-road-ui.test.cjs
           node tests/civil-road-ui.test.cjs
           node --check editor/kelvin-assistant.js
+          node --check editor/arqui-planner.js
+          node --check editor/arqui-references.js
+          node --check editor/arqui-assistant.js
+          node --check tests/arqui-planner.test.cjs
+          node tests/arqui-planner.test.cjs
           node --check tests/kelvin-portrait.test.cjs
           node tests/kelvin-portrait.test.cjs
           node --check tests/civil-topography-road.test.cjs
