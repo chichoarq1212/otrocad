@@ -15,7 +15,7 @@ header{height:36px!important;min-height:36px!important;flex:0 0 36px;padding:3px
 #groups .toolgroup button{min-width:0!important;min-height:24px!important;height:24px!important;max-height:none!important;flex-direction:row!important;justify-content:flex-start!important;align-items:center!important;gap:4px!important;padding:1px 5px!important;border-radius:4px!important;box-shadow:none!important;font-size:10.5px!important;font-weight:550;line-height:18px!important;white-space:nowrap!important;transform:none!important}
 #groups .toolgroup button .ico{width:20px!important;height:20px!important;min-width:20px;flex:0 0 20px;border-radius:4px!important;font-size:17px!important;box-shadow:none!important}
 #groups .toolgroup button .ico svg{width:17px!important;height:17px!important;filter:none!important}
-#groups .civil-tool .civil-label{max-width:none;font-size:10.5px!important;line-height:18px!important;white-space:nowrap!important}
+#groups .civil-tool .civil-label{max-width:none!important;flex:0 0 auto;font-size:10.5px!important;line-height:18px!important;white-space:nowrap!important}
 #groups .toolgroup select,#groups .toolgroup input{height:23px!important;padding:2px 5px!important;font-size:11px}
 #groups .cad-option{gap:1px;font-size:8px;line-height:10px;flex-direction:row;align-items:center}
 #multiSelectToggle .multi-label{max-width:none;white-space:nowrap;line-height:18px;font-size:10px}
