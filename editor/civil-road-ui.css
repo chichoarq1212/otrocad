@@ -1,0 +1,79 @@
+/* Technical road-signage inspector; keeps OtroCAD's blueprint blue / yellow grip aesthetic. */
+#civilRoadPanel[hidden],.civil-road-panel [hidden]{display:none!important}
+.civil-road-panel{
+ position:fixed;z-index:125;right:12px;top:140px;bottom:49px;
+ width:min(365px,calc(100vw - 24px));max-height:calc(100dvh - 170px);
+ display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;
+ border-radius:11px;border:1px solid #a5bfdf;background:#f8fbff;color:#173665;
+ box-shadow:0 12px 38px #071d4169;
+ font:12px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.civil-road-panel *{box-sizing:border-box}
+.civil-road-panel .road-head{display:flex;align-items:center;gap:12px;
+ background:#174caa;color:white;padding:10px 12px;flex:0 0 auto}
+.civil-road-panel .road-head>div{display:flex;flex:1;flex-direction:column}
+.civil-road-panel .road-head strong{font-size:13px;letter-spacing:.5px}
+.civil-road-panel .road-head small{font-size:10px;color:#dae9ff}
+.civil-road-panel .road-head button{background:#ffffff20;color:white;
+ border:1px solid #adc6ef;border-radius:6px;width:27px;height:27px;
+ padding:0;font-size:22px}
+.civil-road-panel .road-scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:10px 12px}
+.civil-road-panel .road-step{font-size:11px;font-weight:800;color:#3b638f;margin:8px 0 6px}
+.civil-road-panel .road-axis{display:flex;align-items:center;gap:5px;
+ background:#eef4ff;border:1px solid #d2e1f6;border-radius:7px;padding:7px}
+.civil-road-panel #roadAxisText{flex:1;min-width:0;font-size:11px}
+.civil-road-panel #roadAxisText.road-no-axis{color:#8a4b21}
+.civil-road-panel button{touch-action:manipulation;cursor:pointer;
+ border-radius:6px;border:1px solid #bdd0ec;padding:6px 8px;
+ background:#fff;color:#19467d;font:600 11px system-ui,sans-serif}
+.civil-road-panel button:hover{background:#e9f2ff;border-color:#8eafde}
+.civil-road-panel button:focus-visible{outline:2px solid #e6b93a;outline-offset:1px}
+.civil-road-panel button:disabled{opacity:.55;cursor:not-allowed}
+.civil-road-panel .road-categories{display:flex;gap:5px;margin:8px 0 7px}
+.civil-road-panel .road-category{flex:1;text-align:center}
+.civil-road-panel .road-category.active{background:#185be8;color:#fff;border-color:#185be8}
+.civil-road-panel .road-tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.civil-road-panel .road-preset{display:flex;align-items:center;text-align:left;gap:7px;min-height:37px}
+.civil-road-panel .road-preset.active{background:#fff5c7;border-color:#e3b62f;color:#133d79}
+.civil-road-panel .road-preset .ico{width:25px;height:25px;display:grid;place-items:center;
+ border-radius:5px;color:#185be8;background:#ebf3ff;flex:0 0 25px}
+.civil-road-panel .road-preset .ico svg{height:21px;width:21px}
+.civil-road-panel .road-preset span:last-child{flex:1;white-space:normal;line-height:1.3}
+.civil-road-panel .road-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.civil-road-panel .road-fields label{display:flex;flex-direction:column;gap:4px;
+ min-width:0;font-size:10px;font-weight:700;color:#395c87}
+.civil-road-panel .road-fields input,.civil-road-panel .road-fields select{
+ width:100%;min-width:0;min-height:31px;border:1px solid #b9cce5;
+ border-radius:6px;background:white;color:#173665;padding:5px 7px;
+ font:12px ui-monospace,Consolas,monospace;
+}
+.civil-road-panel .road-preview-heading{display:flex;justify-content:space-between;align-items:center;
+ margin:9px 0 5px;font-weight:750}
+.civil-road-panel .road-preview-heading small{font-size:10px;font-weight:500;color:#647d9e}
+.civil-road-panel #roadPreview{display:block;width:100%;height:auto;aspect-ratio:340/152;
+ background:#19283a;border-radius:6px;overflow:hidden;touch-action:none}
+.civil-road-panel .road-status{min-height:30px;margin:7px 0;padding:7px;
+ background:#e9f3ff;border-radius:6px;color:#20476f;font-size:11px}
+.civil-road-panel .road-warning{border-left:3px solid #d5ab24;padding:4px 7px;
+ color:#6a5b3c;background:#fff8e3;font-size:10px;margin:7px 0 0}
+.civil-road-panel .road-actions{display:flex;justify-content:flex-end;gap:8px;
+ padding:8px 11px;border-top:1px solid #dae6f4;background:#f1f6ff;flex:0 0 auto}
+.civil-road-panel #roadApply{background:#185be8;color:white;border-color:#185be8;font-weight:800}
+.civil-road-panel #roadApply:disabled{background:#8ba4cb;border-color:#8ba4cb}
+body.cad-civil-active #groups .civil-road-ribbon .civil-tool{min-width:100px!important}
+@media(max-width:760px){
+ .civil-road-panel{top:128px;bottom:calc(55px + env(safe-area-inset-bottom,0px));
+ right:8px;width:min(340px,calc(100vw - 16px));max-height:calc(100dvh - 145px)}
+ .civil-road-panel .road-scroll{padding:8px}
+ .civil-road-panel .road-tool-grid{gap:4px}
+ .civil-road-panel .road-preset{min-height:35px}
+}
+@media(max-width:950px) and (orientation:landscape) and (max-height:500px){
+ .civil-road-panel{top:45px;bottom:5px;right:7px;width:min(320px,calc(100vw - 14px));
+  max-height:calc(100dvh - 50px)}
+ .civil-road-panel .road-head{padding:6px 9px}
+ .civil-road-panel .road-scroll{padding:6px 9px}
+ .civil-road-panel .road-step{margin:5px 0 4px}
+ .civil-road-panel #roadPreview{max-height:95px}
+}
+@media print{.civil-road-panel{display:none!important}}
