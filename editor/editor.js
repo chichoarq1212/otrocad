@@ -829,18 +829,34 @@ function showCadPaperSettings(){
  const layout=paperLayoutsSafe().find(l=>l.name===activeLayout);if(!layout)return;
  const sizes=[['A4',297,210],['A3',420,297],['A2',594,420],['A1',841,594],['A0',1189,841],['Carta',279.4,215.9],['Oficio',355.6,215.9]];
  const dialog=document.createElement('dialog');dialog.className='cad-utility-dialog cad-paper-settings';
- dialog.innerHTML='<form method="dialog"><h3>Configuración de presentación</h3><p>Define el formato de hoja y la ventana del modelo. Las entidades originales no se desplazan ni se eliminan.</p>'+
+ dialog.innerHTML='<form method="dialog"><h3>Configuración de página · CAD y Civil 3D</h3><p>Una sola presentación técnica para arquitectura, topografía y Civil 3D. El Modelo y sus entidades originales no se modifican.</p>'+
  '<label>Formato de papel<select id="paperSize">'+sizes.map(x=>'<option value="'+x[0]+'">'+x[0]+'</option>').join('')+'<option value="custom">Personalizado</option></select></label>'+
  '<label>Orientación<select id="paperOrientation"><option value="landscape">Horizontal</option><option value="portrait">Vertical</option></select></label>'+
  '<label>Ancho (mm)<input id="paperWidth" type="number" min="30" max="2000" step="0.1"></label>'+
  '<label>Alto (mm)<input id="paperHeight" type="number" min="30" max="2000" step="0.1"></label>'+
  '<label>Margen guía (mm)<input id="paperMargin" type="number" min="0" max="100" step="1"></label>'+
- '<label>Ventana de dibujo<select id="paperFit"><option value="imported">Conservar VIEWPORT importados</option><option value="all">Encuadrar todo el modelo</option><option value="manual">Usar vista seleccionada desde Modelo</option></select></label>'+'<label>Escala de la vista (si se encuadra el modelo)<select id="paperScale"><option value="fit">Ajustar a la hoja</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option></select></label>'+'<label class="paper-check"><input type="checkbox" id="paperModelText"> Mostrar anotaciones de Modelo dentro de la ventana</label>'+'<button type="button" id="paperCopyModelView">Usar el último encuadre visible de Modelo</button>'+'<p>Para elegir una planta concreta: vuelve a Modelo, haz zoom sobre ella, regresa a esta hoja y pulsa este botón.</p>'+
+ '<label>Ventana de dibujo<select id="paperFit"><option value="imported">Conservar VIEWPORT importados</option><option value="all">Encuadrar todo el modelo</option><option value="manual">Usar vista seleccionada desde Modelo</option><option value="custom">Usar ventanas configuradas (MVIEW)</option></select></label>'+'<label>Escala de la vista (si se encuadra el modelo)<select id="paperScale"><option value="fit">Ajustar a la hoja</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option><option value="1000">1:1000</option><option value="2000">1:2000</option><option value="5000">1:5000</option></select></label>'+'<label>Estilo de impresión<select id="paperPlotStyle"><option value="color">Color</option><option value="grayscale">Escala de grises</option><option value="monochrome">Monocromático (negro)</option></select></label>'+
+ '<label class="paper-check"><input type="checkbox" id="paperTemplate"> Incluir marco y cajetín técnico en esta hoja</label>'+
+ '<label>Proyecto<input id="paperProjectName" type="text" maxlength="60"></label>'+
+ '<label>Nombre de la lámina<input id="paperSheetTitle" type="text" maxlength="60"></label>'+
+ '<label>Número de plano<input id="paperSheetNumber" type="text" maxlength="15"></label>'+
+ '<label>Revisión<input id="paperRevision" type="text" maxlength="12"></label>'+
+ '<label class="paper-check"><input type="checkbox" id="paperModelText"> Mostrar anotaciones de Modelo dentro de la ventana</label>'+
+ '<button type="button" id="paperViewportManager">▣ Editar ventanas y escalas (MVIEW)</button>'+
+ '<button type="button" id="paperCopyModelView">Usar el último encuadre visible de Modelo</button>'+'<p>Para elegir una planta: encuádrela en Modelo, regresa a esta hoja y captura esa vista. El cajetín se imprime en PDF; la exportación DWG/DXF todavía no lo convierte en entidades nativas de papel.</p>'+
  '<p id="paperWarning" role="status"></p><div class="cad-utility-actions"><button type="button" id="paperCancel">Cancelar</button><button type="button" id="paperApply">Aplicar</button></div></form>';
  document.body.append(dialog);
  const byId=id=>dialog.querySelector('#'+id);
  byId('paperWidth').value=layout.paperWidth||420;byId('paperHeight').value=layout.paperHeight||297;byId('paperMargin').value=layout.margin??10;
- byId('paperFit').value=['all','manual'].includes(layout.viewportFit)?layout.viewportFit:'imported';byId('paperScale').value=String(layout.plotScale||'fit');byId('paperModelText').checked=!layout.hideModelText;
+ byId('paperFit').value=['all','manual','custom'].includes(layout.viewportFit)?layout.viewportFit:'imported';
+ byId('paperScale').value=String(layout.plotScale||'fit');byId('paperModelText').checked=!layout.hideModelText;
+ byId('paperPlotStyle').value=['color','grayscale','monochrome'].includes(layout.plotStyle)?layout.plotStyle:'color';
+ byId('paperTemplate').checked=Boolean(layout.sheetTemplate);
+ byId('paperProjectName').value=layout.projectName||'PROYECTO';
+ byId('paperSheetTitle').value=layout.sheetTitle||'PLANO GENERAL';
+ byId('paperSheetNumber').value=layout.sheetNumber||'01';
+ byId('paperRevision').value=layout.revision||'00';
+ byId('paperViewportManager').onclick=()=>{dialog.close();showCadViewportManager()};
  const found=sizes.find(p=>Math.abs(Math.max(layout.paperWidth,layout.paperHeight)-p[1])<1&&Math.abs(Math.min(layout.paperWidth,layout.paperHeight)-p[2])<1);
  byId('paperSize').value=found?found[0]:'custom';byId('paperOrientation').value=layout.paperWidth>=layout.paperHeight?'landscape':'portrait';
  const resizeFromPreset=()=>{const preset=sizes.find(p=>p[0]===byId('paperSize').value);if(!preset)return;const vertical=byId('paperOrientation').value==='portrait';byId('paperWidth').value=vertical?preset[2]:preset[1];byId('paperHeight').value=vertical?preset[1]:preset[2]};
@@ -856,7 +872,14 @@ function showCadPaperSettings(){
   const pw=Number(byId('paperWidth').value),ph=Number(byId('paperHeight').value),margin=Number(byId('paperMargin').value);
   if(!Number.isFinite(pw)||!Number.isFinite(ph)||pw<30||ph<30||pw>2000||ph>2000||!Number.isFinite(margin)||margin<0||margin>=Math.min(pw,ph)/3){byId('paperWarning').textContent='Revisa las medidas y los márgenes de impresión.';return}
   if(byId('paperFit').value==='manual'&&!selectedModelView){byId('paperWarning').textContent='Primero selecciona una vista desde Modelo con el botón azul.';return}
-  layout.paperWidth=pw;layout.paperHeight=ph;layout.margin=margin;layout.viewportFit=byId('paperFit').value;layout.plotScale=byId('paperScale').value;layout.hideModelText=!byId('paperModelText').checked;
+  if(byId('paperFit').value==='custom'&&!layout.customViewports?.length){byId('paperWarning').textContent='Primero configura las ventanas en MVIEW.';return}
+  layout.paperWidth=pw;layout.paperHeight=ph;layout.margin=margin;layout.viewportFit=byId('paperFit').value;
+  layout.plotScale=byId('paperScale').value;layout.hideModelText=!byId('paperModelText').checked;
+  layout.plotStyle=byId('paperPlotStyle').value;layout.sheetTemplate=byId('paperTemplate').checked;
+  layout.projectName=byId('paperProjectName').value.trim().slice(0,60);
+  layout.sheetTitle=byId('paperSheetTitle').value.trim().slice(0,60);
+  layout.sheetNumber=byId('paperSheetNumber').value.trim().slice(0,15);
+  layout.revision=byId('paperRevision').value.trim().slice(0,12);
   if(selectedModelView)layout.manualView=selectedModelView;
   saveLayoutState();render();status.textContent='Hoja '+layout.name+' · '+pw+' × '+ph+' mm';dialog.close();
  };
@@ -1671,8 +1694,8 @@ function runCommand(raw){
  if(c==='BG'||c==='BACKGROUND'||c==='CANVASCOLOR'){const name=(parts[1]||'').toLowerCase();if(CAD_THEMES[name])applyCanvasTheme(name);else status.textContent='BACKGROUND WHITE | BLACK | DARK | GRAPHITE | SLATE | BLUEGRAY';return}
  if(c==='HATCHPATTERN'){const p=parts[1];if(['ANSI31','CROSS','GRID','SOLID'].includes(p)){$('#hatchPattern').value=p;status.textContent='HATCHPATTERN '+p}else status.textContent='HATCHPATTERN ANSI31 | CROSS | GRID | SOLID';return}
  if(c==='PR'||c==='PROPERTIES'||c==='CTRL+1'){$('#properties').classList.toggle('open');showProperties();return}
- if(c==='MODEL'||c==='MODELO'){switchCadLayout('Model');return}
- if(c==='LAYOUT'||c==='PAPERSPACE'||c==='PAPEL'){if(paperLayoutsSafe().length)switchCadLayout(paperLayoutsSafe()[0].name);else createCadLayout();return}
+ if(c==='MODEL'||c==='MODELO'||c==='MSPACE'){switchCadLayout('Model');return}
+ if(c==='LAYOUT'||c==='PAPERSPACE'||c==='PAPEL'||c==='PSPACE'){if(paperLayoutsSafe().length)switchCadLayout(paperLayoutsSafe()[0].name);else createCadLayout();return}
  if(c==='LAYOUTNEW'||c==='NEWLAYOUT'){createCadLayout();return}
  if(c==='PAGESETUP'||c==='PSETUP'||c==='CONFIGPAGINA'){if(activeLayout==='Model')createCadLayout();showCadPaperSettings();return}
  if(c==='MVIEW'||c==='VPORTS'||c==='VIEWPORT'){if(activeLayout==='Model')createCadLayout();showCadViewportManager();return}
@@ -2452,7 +2475,7 @@ $('#saveAsDxf').onclick=async()=>{
 };
 $('#pdf').onclick=()=>{
  if(activeLayout==='Model'){
-  if(!paperLayoutsSafe().length){layouts.push({name:'Layout1',paperWidth:420,paperHeight:297,margin:10,viewportFit:'all',source:'new'})}
+  ensureCadLayout();
   switchCadLayout(paperLayoutsSafe()[0].name);
  }
  const layout=paperLayoutsSafe().find(l=>l.name===activeLayout),styleId='cadDynamicPageSize';
@@ -2483,7 +2506,7 @@ try{const sheet=JSON.parse(localStorage.getItem('otrocad-layout-state')||'{}');
  if(typeof sheet.activeLayout==='string'&&layouts.some(l=>l.name===sheet.activeLayout))activeLayout=sheet.activeLayout;
  hideModelAnnotations=Boolean(sheet.hideModelAnnotations);
 }catch(e){console.warn('Configuración de papel omitida:',e)}
-refreshLayoutTabs();
+ensureCadLayout();refreshLayoutTabs();
 $('#paperCreate').onclick=createCadLayout;
 $('#paperSetup').onclick=showCadPaperSettings;
 $('#paperViewports').onclick=showCadViewportManager;
