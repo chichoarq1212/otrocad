@@ -4,18 +4,18 @@
  z-index:85;pointer-events:none;isolation:isolate;font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 .jaimito-root button,.jaimito-root input{font:inherit}
 .jaimito-mascot{pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:end;
- width:112px;min-height:136px;border:0!important;background:transparent!important;box-shadow:none!important;
+ width:98px;min-height:124px;border:0!important;background:transparent!important;box-shadow:none!important;
  padding:0!important;cursor:pointer;overflow:visible;touch-action:manipulation;transform-origin:bottom right;
  animation:jaimito-enter .3s ease both}
 .jaimito-mascot:hover{transform:translateY(-3px)}
 .jaimito-mascot:focus-visible{outline:2px solid #ffd64d;outline-offset:3px;border-radius:10px}
-.jaimito-mascot img{display:block;width:108px;max-height:138px;object-fit:contain;object-position:center bottom;
+.jaimito-mascot img{display:block;width:94px;max-height:120px;object-fit:contain;object-position:center bottom;
  pointer-events:none;filter:drop-shadow(0 4px 5px #001c3840)}
 .jaimito-mascot-tag{white-space:nowrap;margin-top:-9px;border:1px solid #9fc0ef;
  background:#185be8;color:#fff;font:700 11px/1.2 system-ui,sans-serif;
  padding:5px 8px;border-radius:999px;box-shadow:0 3px 9px #0d214b45}
 .jaimito-mascot-tag b{color:#ffdc53}
-.jaimito-chat{position:absolute;right:4px;bottom:153px;width:min(352px,calc(100vw - 24px));
+.jaimito-chat{position:absolute;right:4px;bottom:140px;width:min(352px,calc(100vw - 24px));
  max-height:min(530px,calc(100dvh - 205px));min-height:170px;display:flex;flex-direction:column;
  overflow:hidden;border-radius:13px;border:1px solid #9bb9e6;background:#f9fbff;
  box-shadow:0 12px 40px #0c254e65;pointer-events:auto;color:#173665}
@@ -53,10 +53,10 @@
 @keyframes jaimito-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:760px){
  .jaimito-root{right:8px;bottom:calc(68px + env(safe-area-inset-bottom,0px))}
- .jaimito-mascot{width:87px;min-height:111px}
- .jaimito-mascot img{width:82px;max-height:104px}
+ .jaimito-mascot{width:80px;min-height:101px}
+ .jaimito-mascot img{width:74px;max-height:94px}
  .jaimito-mascot-tag{font-size:9px;padding:4px 6px}
- .jaimito-chat{right:1px;bottom:125px;width:min(330px,calc(100vw - 18px));
+ .jaimito-chat{right:1px;bottom:115px;width:min(330px,calc(100vw - 18px));
   max-height:calc(100dvh - 173px)}
 }
 @media(max-width:950px) and (orientation:landscape) and (max-height:500px){
