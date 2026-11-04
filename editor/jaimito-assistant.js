@@ -42,7 +42,7 @@ root.innerHTML=[
 ].join('');
 document.body.append(root);
 const avatar=$('jaimitoAvatar'),avatarButton=$('jaimitoAvatarButton'),panel=$('jaimitoPanel'),messages=$('jaimitoMessages');
-avatar.src=window.OtroCadJaimitoAvatar||'../icon-192.png';
+avatar.src=window.OtroCadJaimitoAvatar||'assets/ing-jaimito.webp';
 avatar.addEventListener('error',()=>{if(!avatar.dataset.fallback){avatar.dataset.fallback='1';avatar.src='../icon-192.png'}});
 let opened=false,hiddenByUser=false,busy=false;
 try{hiddenByUser=!!JSON.parse(localStorage.getItem(key)||'{}').hidden}catch(_){}
