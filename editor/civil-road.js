@@ -106,6 +106,7 @@ return {path,generate,unit};
 });
 (()=>{
 'use strict';
+if(typeof window==='undefined')return;
 const math=window.OtroCadCivilRoadMath,api=window.OtroCadCivilAPI,groups=document.getElementById('groups');
 if(!math||!api||!groups)return;
 const group=document.createElement('div');group.className='toolgroup';group.dataset.panel='civil';group.hidden=true;
