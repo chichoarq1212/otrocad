@@ -54,7 +54,8 @@
   let y=0;
   return items.map((item,i)=>{
    const dy=i===items.length-1?depth-y:item.min+extra*(item.weight||1)/weight;
-   const zone={name:item.name,y:round(y),depth:round(dy),kind:item.kind||'room'};
+   const start=round(y),end=i===items.length-1?round(depth):round(y+dy);
+   const zone={name:item.name,y:start,depth:round(end-start),kind:item.kind||'room'};
    y+=dy;return zone;
   });
  }
