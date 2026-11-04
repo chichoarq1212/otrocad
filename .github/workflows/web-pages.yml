@@ -63,6 +63,8 @@ jobs:
           node --check editor/civil-topography.js
           node --check editor/civil-road.js
           node --check editor/kelvin-assistant.js
+          node --check tests/kelvin-portrait.test.cjs
+          node tests/kelvin-portrait.test.cjs
           node --check tests/civil-topography-road.test.cjs
           node tests/civil-topography-road.test.cjs
           node --check editor/geolocation.js
