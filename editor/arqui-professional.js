@@ -221,9 +221,9 @@ function generate(plan,options={}){
   // Site boundary and labeled setbacks; no invented legal compliance.
   for(const [ax,ay,bx,by] of [[0,0,w,0],[w,0,w,d],[w,d,0,d],[0,d,0,0]])
    ln(ax,ay,bx,by,'AI-ARQ-TERRENO',art.site,'lot');
-  text(.25,.5,'TERRENO '+compact(w)+' × '+compact(d)+' m',.23,'AI-ARQ-TERRENO',art.site);
-  text(.25,Math.max(.8,s.frontSetback/2),'RETIRO FRONTAL '+compact(s.frontSetback)+' m',.17,'AI-ARQ-TERRENO',art.site);
-  if(s.backSetback>0)text(.25,d-s.backSetback/2,'RETIRO POSTERIOR '+compact(s.backSetback)+' m',.17,'AI-ARQ-TERRENO',art.site);
+  text(.25,.5,(s.siteAssumed?'PARCELA HIPOTÉTICA ':'TERRENO ')+compact(w)+' × '+compact(d)+' m',.23,'AI-ARQ-TERRENO',art.site);
+  text(.25,Math.max(.8,s.frontSetback/2),(s.siteAssumed?'FRANJA DE PARQUEO ':'RETIRO FRONTAL ')+compact(s.frontSetback)+' m',.17,'AI-ARQ-TERRENO',art.site);
+  if(s.backSetback>0)text(.25,d-s.backSetback/2,(s.siteAssumed?'PATIO POSTERIOR ':'RETIRO POSTERIOR ')+compact(s.backSetback)+' m',.17,'AI-ARQ-TERRENO',art.site);
   if(s.sideSetback>0)text(.35,Math.max(1.25,d/2),'LATERAL '+compact(s.sideSetback)+' m',.15,'AI-ARQ-TERRENO',art.site);
  }
  function northAndTitle(){
@@ -256,8 +256,10 @@ function generate(plan,options={}){
   door(entry,Y,1.0,'h',1);
   window(frontLeft,Y,Math.min(1.35,L*.55),'h',wallOut);
   window(frontRight,Y,Math.min(1.15,(W-R)*.56),'h',wallOut);
-  wallWithGaps('h',X,X+W,Y+D,wallOut,[{center:frontLeft,width:Math.min(1.25,L*.50)}],true);
-  window(frontLeft,Y+D,Math.min(1.25,L*.50),'h',wallOut);
+  const rearDoor=!!(s.rearDoor&&f.level===1);
+  wallWithGaps('h',X,X+W,Y+D,wallOut,[{center:frontLeft,width:rearDoor?1.0:Math.min(1.25,L*.50)}],true);
+  if(rearDoor)door(frontLeft,Y+D,1.0,'h',-1);
+  else window(frontLeft,Y+D,Math.min(1.25,L*.50),'h',wallOut);
   const left=f.rooms.filter(r=>r.side==='left'),right=f.rooms.filter(r=>r.side==='right');
   for(const [side,zones] of [['left',left],['right',right]]){
    const outerX=side==='left'?X:X+W;
@@ -305,16 +307,31 @@ function generate(plan,options={}){
   rect(x,y,w,d,'parking','AI-ARQ-GARAJE',art.site,.08);
   for(const [ax,ay,bx,by] of [[x,y,x+w,y],[x+w,y,x+w,y+d],[x+w,y+d,x,y+d],[x,y+d,x,y]])
    ln(ax,ay,bx,by,'AI-ARQ-GARAJE',art.site,'parking');
-  const cx=x+w/2,spaces=g.spaces===2&&d>10?2:1;
+  const sideBySide=g.layout==='side-by-side'&&g.spaces===2;
+  const spaces=sideBySide?2:(g.spaces===2&&d>10?2:1);
   for(let i=0;i<spaces;i++){
-   const cy=y+(i+.5)*(d/spaces);
+   const cx=sideBySide?x+(i+.5)*w/spaces:x+w/2;
+   const cy=sideBySide?y+d/2:y+(i+.5)*(d/spaces);
    rect(cx-.83,cy-1.68,1.66,3.32,'car','AI-ARQ-MOBILIARIO',art.furniture,.12);
    rect(cx-.65,cy-.9,1.30,1.16,'windscreen','AI-ARQ-MOBILIARIO',art.furniture,.10);
    for(const yy of [cy-1.13,cy+.9]){
     ln(cx-.93,yy,cx-.79,yy,'AI-ARQ-MOBILIARIO',art.furniture,'wheel');
     ln(cx+.79,yy,cx+.93,yy,'AI-ARQ-MOBILIARIO',art.furniture,'wheel');
    }
-   text(x+.24,y+i*d/spaces+.2,'PARQUEO '+(i+1),.14,'AI-ARQ-GARAJE',art.title);
+   text(sideBySide?x+i*w/spaces+.24:x+.24,sideBySide?y+.22:y+i*d/spaces+.2,'PARQUEO '+(i+1),.14,'AI-ARQ-GARAJE',art.title);
+  }
+ }
+ if(plan.patio){
+  const q=plan.patio;
+  rect(q.x,q.y,q.width,q.depth,'backyard','AI-ARQ-PATIO',art.site,.035);
+  for(const [ax,ay,bx,by] of [[q.x,q.y,q.x+q.width,q.y],[q.x+q.width,q.y,q.x+q.width,q.y+q.depth],
+    [q.x+q.width,q.y+q.depth,q.x,q.y+q.depth],[q.x,q.y+q.depth,q.x,q.y]])
+   ln(ax,ay,bx,by,'AI-ARQ-PATIO',art.site,'patio-boundary');
+  text(q.x+.25,q.y+q.depth*.48,'PATIO POSTERIOR · '+compact(q.depth)+' m',.21,'AI-ARQ-PATIO',art.title);
+  if(q.laundry){
+   const lw=Math.min(2.4,q.width*.28),ld=Math.min(1.5,q.depth*.58);
+   rect(q.x+q.width-lw-.25,q.y+q.depth-ld-.25,lw,ld,'laundry','AI-ARQ-PATIO',art.furniture,.12);
+   text(q.x+q.width-lw-.20,q.y+q.depth-ld+.10,'LAVANDERÍA',.15,'AI-ARQ-PATIO',art.title);
   }
  }
  if(s.style!=='esquematico')northAndTitle();
