@@ -789,6 +789,7 @@ console.log('Viewport import preservation passed: zero-width and disabled paper 
   objects:[{type:'line',a:{x:0,y:0},b:{x:8,y:0}}],layouts:[{name:'P-03'}],layoutViewportRecords:[{id:2}],activeLayout:'P-03',hideModelAnnotations:true,
   undo:[],redo:[],clone:x=>JSON.parse(JSON.stringify(x)),clearSelection(){},saveLayoutState(){},
   refreshLayoutTabs(){},render(){},save:()=>true,status:{textContent:''},offset:{x:10,y:-10},zoom:3,
+  defaultCadLayout:()=>({name:'Presentación 1',paperWidth:420,paperHeight:297,source:'new'}),
   confirm:()=>true,protectDrawingBeforeReplacement:async()=>approvedSafety,
   $:key=>(buttons[key] ||= {}),selectionStart:null,selectionBox:null,selected:0,poly:[],arcPoints:[],
   modifyTargets:[],lastImportReport:['previo'],lastConvertedDxf:'data',pushReplacementUndo:()=>newScope.undo.push(JSON.parse(JSON.stringify(newScope.objects)))
@@ -800,7 +801,8 @@ console.log('Viewport import preservation passed: zero-width and disabled paper 
  approvedSafety=true;
  await buttons['#newDrawing'].onclick();
  assert.equal(newScope.objects.length,0,'Nuevo dibujo abre lienzo vacío');
- assert.equal(newScope.layouts.length,0,'Nuevo dibujo limpia los layouts activos');
+ assert.equal(newScope.layouts.length,1,'Nuevo dibujo crea una única presentación, sin conservar las hojas anteriores');
+ assert.equal(newScope.layouts[0].name,'Presentación 1');
  assert.equal(newScope.undo.length,1,'El cambio sigue siendo reversible en memoria');
  assert.equal(newScope.undo[0][0].b.x,8);
  assert.equal(newScope.status.textContent,'Dibujo nuevo creado · plano anterior respaldado');
