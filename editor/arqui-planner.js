@@ -126,8 +126,15 @@
       {name:'BODEGA / SERVICIO',min:2.0,weight:.7}
      ];
     }else{
-     right=[...Array.from({length:spec.bedrooms},(_,i)=>({name:i===0&&spec.mainSuite?'DORMITORIO PRINCIPAL':'DORMITORIO '+(i+1),min:3.25,weight:1.1,kind:'bedroom'})),
-      {name:'BAÑO',min:2.3,weight:.7,kind:'bath'}];
+     const bedrooms=Array.from({length:spec.bedrooms},(_,i)=>({
+       name:i===0&&spec.mainSuite?'DORMITORIO PRINCIPAL':'DORMITORIO '+(i+1),
+       min:3.25,weight:1.1,kind:'bedroom'}));
+     right=spec.mainSuite?[
+       bedrooms[0],
+       {name:spec.walkInCloset?'BAÑO MÁSTER / VESTIDOR':'BAÑO PRINCIPAL',min:2.35,weight:.72,kind:'bath'},
+       ...bedrooms.slice(1),
+       {name:'BAÑO COMPARTIDO',min:2.3,weight:.72,kind:'bath'}
+     ]:[...bedrooms,{name:'BAÑO',min:2.3,weight:.7,kind:'bath'}];
     }
    }else{
     const nRight=Math.max(1,spec.bedrooms-1);
@@ -157,6 +164,7 @@
    else warnings.push('Se solicitaron DOS estacionamientos, pero no caben en el terreno con estos retiros y programa. No se dibuja una segunda plaza inexistente.');
   }
   if(sideGarage)warnings.push('Estacionamiento lateral conceptual: comprobar maniobra de acceso, estructura, servidumbres y medidas locales.');
+  if(spec.mainSuite&&spec.floors===1)warnings.push('Suite principal con baño y vestidor conceptual combinados; revisar mobiliario sanitario, circulación y ventilación antes de aprobar el diseño.');
   if(spec.kitchenIsland&&leftWidth<3.7)warnings.push('Cocina con isla solicitada: el ancho de '+leftWidth.toFixed(2)+' m no permite una isla con circulaciones suficientes en este esquema. Se propone cocina lineal, pendiente de rediseño.');
 
   warnings.push('Retiros configurables, no equivalen a normativa municipal; verificar implantación, iluminación, ventilación, accesibilidad, estructura e instalaciones.');
