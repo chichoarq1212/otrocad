@@ -1365,6 +1365,7 @@ $('#cmd').addEventListener('keydown',e=>{
  else if(e.key==='Escape'){e.preventDefault();cancelCurrentAction();$('#cmd').blur();stage.focus({preventScroll:true})}
 });
 $('#cmdRun').addEventListener('click',()=>{submitCommand();$('#cmd').blur()});
+$('#keyboardHelpBtn').addEventListener('click',showCadKeyboardHelp);
 document.addEventListener('pointerdown',e=>{if(contextMenuEl&&!contextMenuEl.contains(e.target))hideCadContextMenu()});
 contextMenuEl.addEventListener('contextmenu',e=>e.preventDefault());
 
