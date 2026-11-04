@@ -2,7 +2,7 @@
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,selectedSet=new Set(),modifyTargets=[],poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
 let lastCommand='',cursorCommandEl=null,contextMenuEl=null,activeFurniture=null;
-let activeLayout='Model',layouts=[],layoutViewportRecords=[],hideModelAnnotations=false,layoutRenderTransform=null,lastModelCamera=null;
+let activeLayout='Model',layouts=[],layoutViewportRecords=[],hideModelAnnotations=false,layoutRenderTransform=null,lastModelCamera=null,activePaperPlotStyle=null;
 function newGroupId(){return 'bloque-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}
 let rightClickMode='context',rightClickDuringCommand='enter';
 try{const prefs=JSON.parse(localStorage.getItem('otrocad-mouse-preferences')||'{}');if(['context','repeat'].includes(prefs.mode))rightClickMode=prefs.mode;if(['enter','context'].includes(prefs.active))rightClickDuringCommand=prefs.active}catch(e){}
@@ -346,7 +346,14 @@ function cadTextBoundsWorld(s){
 }
 
 function drawEntity(s,sel=false,preview=false){
- ctx.save();const drawZoom=layoutRenderTransform?.scale||zoom;const color=resolveCadColor(s,canvasIsLight());ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
+ ctx.save();const drawZoom=layoutRenderTransform?.scale||zoom;let color=resolveCadColor(s,canvasIsLight());
+ if(activePaperPlotStyle==='monochrome')color='#111111';
+ else if(activePaperPlotStyle==='grayscale'){
+  const match=color.match(/^#([0-9a-f]{6})$/i);
+  if(match){const n=parseInt(match[1],16),gray=Math.round(.2126*((n>>16)&255)+.7152*((n>>8)&255)+.0722*(n&255));
+   color='#'+[gray,gray,gray].map(v=>Math.min(215,Math.max(40,v)).toString(16).padStart(2,'0')).join('');}
+ }
+ ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
  const a=s.a&&screen(s.a),b=s.b&&screen(s.b);
  if(s.type==='point'){ctx.beginPath();ctx.moveTo(a.x-4,a.y);ctx.lineTo(a.x+4,a.y);ctx.moveTo(a.x,a.y-4);ctx.lineTo(a.x,a.y+4);ctx.stroke()}
  else if(s.type==='line'){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
@@ -483,6 +490,15 @@ function updatePrompt(){if(activeLayout!=='Model'){promptEl.textContent='PRESENT
 function isVisibleModelEntity(s){
  return (s.cadLayout||'Model')==='Model'&&!hiddenLayers.has(s.layer)&&!(hideModelAnnotations&&s.type==='text');
 }
+function defaultCadLayout(){
+ return {name:'Presentación 1',paperWidth:420,paperHeight:297,margin:10,source:'new',
+  viewportFit:'all',plotScale:'fit',plotStyle:'color',sheetTemplate:true,
+  projectName:'PROYECTO',sheetTitle:'PLANO GENERAL',sheetNumber:'01',revision:'00'};
+}
+function ensureCadLayout(){
+ const found=paperLayoutsSafe();if(found.length)return found[0];
+ const sheet=defaultCadLayout();layouts=[sheet];return sheet;
+}
 function paperLayoutsSafe(){
  return Array.isArray(layouts)?layouts.filter(x=>x&&typeof x.name==='string'&&x.name&&x.name!=='Model'):[];
 }
@@ -512,12 +528,8 @@ function switchCadLayout(name){
  return true;
 }
 function createCadLayout(){
- const suggested='Layout'+(paperLayoutsSafe().length+1);
- const name=prompt('Nombre de la presentación',suggested);if(name===null)return;
- const clean=name.trim().slice(0,48);
- if(!clean||clean.toLowerCase()==='model'||paperLayoutsSafe().some(l=>l.name.toLowerCase()===clean.toLowerCase())){alert('Escribe un nombre de presentación distinto de los existentes.');return}
- layouts.push({name:clean,paperWidth:420,paperHeight:297,margin:10,source:'new',viewportFit:'all'});
- switchCadLayout(clean);
+ // One shared CAD/Civil presentation by default; never discard existing DWG layouts.
+ const layout=ensureCadLayout();switchCadLayout(layout.name);
 }
 function modelExtentsForPaper(){
  const modelObjects=objects.filter(o=>(o.cadLayout||'Model')==='Model'),geometry=modelObjects.filter(o=>o.type!=='text');const p=(geometry.length?geometry:modelObjects).flatMap(boundsPoints);
@@ -578,6 +590,8 @@ function manualCadPaperView(layout){
   generated:true,manual:true,paperRegionEstimated:true,estimated:false};
 }
 function effectivePaperViewports(layout){
+ if(layout.viewportFit==='custom'&&Array.isArray(layout.customViewports)&&layout.customViewports.length)
+  return layout.customViewports.filter(v=>v&&Number(v.width)>0&&Number(v.height)>0&&Number(v.viewHeight)>0);
  if(layout.viewportFit==='manual'){const manual=manualCadPaperView(layout);if(manual)return [manual]}
  const imported=layout.viewportFit!=='all'?layoutViewportRecords.filter(v=>v.layout===layout.name&&v.id!==1):[];
  const ext=modelExtentsForPaper(),fallbackArea=cadPaperMissingViewportArea(layout);
@@ -613,10 +627,12 @@ function effectivePaperViewports(layout){
   const provisional=modelPaperViewportEstimate(implied,layout);
   return provisional?[{...provisional,generated:true,estimated:true,paperRegionEstimated:true,viewportMissing:true}]:[];
  }
- const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin),height=Math.max(5,layout.paperHeight-2*margin);
+ const margin=Math.max(0,Number(layout.margin)||0),width=Math.max(5,layout.paperWidth-2*margin);
+ const titleband=layout.sheetTemplate?Math.max(28,Math.min(38,Number(layout.paperHeight)*.12)):0;
+ const height=Math.max(5,layout.paperHeight-2*margin-titleband);
  const unitMm=units==='mm'?1:units==='cm'?10:1000,scaleRatio=Number(layout.plotScale);
  const modelHeight=scaleRatio>0?Math.max(1e-6,height*scaleRatio/unitMm):Math.max(ext.height*1.10,ext.width*height/Math.max(width,1)*1.10,1e-6);
- return[{layout:layout.name,center:{x:layout.paperWidth/2,y:layout.paperHeight/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
+ return[{layout:layout.name,center:{x:layout.paperWidth/2,y:margin+titleband+height/2},width,height,viewCenter:ext.center,viewHeight:modelHeight,id:2,status:1,generated:true}];
 }
 function describePaperLayoutState(layout,viewports){
  const paperCount=objects.filter(x=>x.cadLayout===layout.name).length;
@@ -650,6 +666,42 @@ function showPaperLayoutNotice(layout,viewports){
   notice.textContent=layout.name+': '+info.message+' · Papel: '+info.paperCount+' entidades; VIEWPORT: '+info.importedCount;
  }
 }
+function drawUnifiedSheetTemplate(layout,paperPoint,scale){
+ // Page-only graphic: it never moves or replaces CAD/Civil entities.
+ const w=Number(layout.paperWidth)||420,h=Number(layout.paperHeight)||297;
+ const m=Math.max(5,Math.min(12,Number(layout.margin)||10));
+ const band=Math.max(28,Math.min(38,h*.12)),usableW=Math.max(75,w-2*m);
+ const blockW=Math.min(185,usableW),x=w-m-blockW,y=m,top=y+band;
+ const rect=(px,py,rw,rh)=>{
+  const p=paperPoint({x:px,y:py+rh});ctx.strokeRect(p.x,p.y,rw*scale,rh*scale);
+ };
+ const line=(x1,y1,x2,y2)=>{
+  const a=paperPoint({x:x1,y:y1}),b=paperPoint({x:x2,y:y2});
+  ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+ };
+ const label=(value,px,py,size=3.1,bold=false)=>{
+  const p=paperPoint({x:px,y:py});
+  ctx.font=(bold?'700 ':'400 ')+Math.max(7,size*scale)+'px Arial,sans-serif';
+  ctx.fillText(String(value||'').slice(0,65),p.x,p.y);
+ };
+ ctx.save();ctx.strokeStyle='#1e293b';ctx.fillStyle='#15243a';
+ ctx.lineWidth=Math.max(.6,.26*scale);ctx.setLineDash([]);
+ rect(m,m,w-2*m,h-2*m);rect(x,y,blockW,band);
+ const split1=x+blockW*.60,split2=x+blockW*.84;
+ line(x,top-band*.48,x+blockW,top-band*.48);
+ line(split1,y,split1,top);line(split2,y,split2,top);
+ label('PROYECTO / PROJECT',x+3,top-4,2.5);
+ label(layout.projectName||'PROYECTO',x+3,top-10,3.5,true);
+ label(layout.sheetTitle||'PLANO GENERAL',x+3,y+7,3.6,true);
+ label('PLANO',split1+2,top-4,2.5);
+ label(layout.sheetNumber||'01',split1+3,y+7,4.2,true);
+ label('REV.',split2+2,top-4,2.5);
+ label(layout.revision||'00',split2+3,y+7,4.2,true);
+ label('OTROCAD · CAD / CIVIL 3D',m+3,m+4,2.4);
+ const scaleName=Number(layout.plotScale)>0?'1:'+Number(layout.plotScale):'AJUSTAR';
+ label('ESCALA '+scaleName,x+3,y+3,2.5);
+ ctx.restore();
+}
 function renderPaperLayout(){
  const layout=paperLayoutsSafe().find(x=>x.name===activeLayout);if(!layout){activeLayout='Model';render();return}
  const w=canvas.clientWidth,h=canvas.clientHeight;
@@ -662,6 +714,7 @@ function renderPaperLayout(){
  ctx.fillStyle='#fff';ctx.fillRect(x0,y0,paperW,paperH);ctx.restore();
  ctx.save();ctx.beginPath();ctx.rect(x0,y0,paperW,paperH);ctx.clip();
  const vps=effectivePaperViewports(layout);
+ activePaperPlotStyle=['color','monochrome','grayscale'].includes(layout.plotStyle)?layout.plotStyle:'color';
  showPaperLayoutNotice(layout,vps);
  for(const vp of vps){
   const center=paperPoint(vp.center),vw=Number(vp.width)*scale,vh=Number(vp.height)*scale;
@@ -679,6 +732,8 @@ function renderPaperLayout(){
  for(const o of objects)if(o.cadLayout===activeLayout&&o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
  for(const o of objects)if(o.cadLayout===activeLayout&&!o.importedHatch&&!hiddenLayers.has(o.layer))drawEntity(o);
  layoutRenderTransform=null;ctx.restore();
+ activePaperPlotStyle=null;
+ if(layout.sheetTemplate)drawUnifiedSheetTemplate(layout,paperPoint,scale);
  if(!printing){
   ctx.save();const margin=Math.max(0,Math.min(Number(layout.margin)||0,Math.min(pw,ph)/4))*scale;
   ctx.strokeStyle='#9eacbe';ctx.setLineDash([4,4]);ctx.strokeRect(x0+margin,y0+margin,Math.max(0,paperW-2*margin),Math.max(0,paperH-2*margin));ctx.setLineDash([]);
@@ -1574,7 +1629,7 @@ $('#redo').onclick=()=>{if(redo.length){backupPrevious();undo.push(clone(objects
 $('#newDrawing').onclick=async()=>{
  if((objects.length||layouts.length||layoutViewportRecords.length)&&!confirm('¿Crear un dibujo nuevo? Primero se conservará una copia recuperable del dibujo actual.'))return;
  if(!await protectDrawingBeforeReplacement()){status.textContent='Nuevo dibujo cancelado: el plano original no se modificó';return}
- pushReplacementUndo();objects=[];layouts=[];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;
+ pushReplacementUndo();objects=[];layouts=[defaultCadLayout()];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;
  clearSelection();start=null;temp=null;poly=[];arcPoints=[];modifyTarget=-1;modifyTargets=[];drag=null;selectionStart=null;selectionBox=null;
  offset={x:0,y:0};zoom=35;lastConvertedDxf=null;lastImportReport=[];
  saveLayoutState();refreshLayoutTabs();const stored=save();render();
@@ -1594,7 +1649,7 @@ $('#recover').onclick=async()=>{
  clearSelection();saveLayoutState();refreshLayoutTabs();const stored=save();render();
  status.textContent=stored?'Copia anterior recuperada':'Copia recuperada · almacenamiento local pendiente';
 };
-$('#demoHouse').onclick=async()=>{if(objects.length&&!confirm('¿Abrir la vivienda de demostración? Primero se protegerá el dibujo actual.'))return;try{const demo=clone(window.otroCadDemo);if(!Array.isArray(demo.shapes)||!demo.shapes.length)throw Error('La demostración está vacía.');if(!await protectDrawingBeforeReplacement())return;pushReplacementUndo();objects=demo.shapes;units='m';layouts=[];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();clearSelection();save();$('#fit').click();status.textContent='Vivienda de demostración · '+objects.length+' entidades editables'}catch(e){alert('No se pudo abrir la demostración: '+e.message)}};
+$('#demoHouse').onclick=async()=>{if(objects.length&&!confirm('¿Abrir la vivienda de demostración? Primero se protegerá el dibujo actual.'))return;try{const demo=clone(window.otroCadDemo);if(!Array.isArray(demo.shapes)||!demo.shapes.length)throw Error('La demostración está vacía.');if(!await protectDrawingBeforeReplacement())return;pushReplacementUndo();objects=demo.shapes;units='m';layouts=[defaultCadLayout()];layoutViewportRecords=[];activeLayout='Model';hideModelAnnotations=false;saveLayoutState();refreshLayoutTabs();clearSelection();save();$('#fit').click();status.textContent='Vivienda de demostración · '+objects.length+' entidades editables'}catch(e){alert('No se pudo abrir la demostración: '+e.message)}};
 $('#open').onclick=()=>$('#file').click();
 let dwgRuntimePromise=null;
 async function getDwgRuntime(){
