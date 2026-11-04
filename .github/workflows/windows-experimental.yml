@@ -68,6 +68,7 @@ jobs:
           Get-FileHash $installer.FullName -Algorithm SHA256
       - name: Publicar instalador experimental
         if: github.event_name == 'push'
+        continue-on-error: true # GitHub token may lack releases:write; keep downloadable workflow artifact.
         uses: softprops/action-gh-release@v2
         with:
           tag_name: windows-experimental-${{ github.run_id }}-${{ github.run_attempt }}
@@ -79,6 +80,7 @@ jobs:
             Instalador experimental sin firma. Icono oficial OtroCAD en EXE, accesos directos y NSIS. Incluye runtime DWG WebAssembly local. La compilación instala, abre y prueba dibujo y recuperación con red bloqueada. Sigue pendiente la validación en un PC físico.
           files: desktop/release/*-Setup.exe
       - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('desktop/release/*-Setup.exe') != ''
         with:
           name: OtroCAD-Windows-experimental
           path: desktop/release/*-Setup.exe
