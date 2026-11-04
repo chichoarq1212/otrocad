@@ -29,7 +29,7 @@
  }
  function parsePrompt(text,base={}){
   const s=clean(text);
-  const parsed=parseLocal(text,base);
+  const parsed={...base,...parseLocal(text,base)};
   const house=s.match(/\b(?:casa|vivienda|construccion)\s*(?:de\s*)?(\d{1,3}(?:[.,]\d+)?)\s*(?:m(?:etros?)?)?\s*(?:[x×]|por)\s*(\d{1,3}(?:[.,]\d+)?)/);
   const site=s.match(/\b(?:terreno|lote|solar|predio)\s*(?:(?:es|de|mide)\s*)?\d{1,3}(?:[.,]\d+)?\s*(?:m(?:etros?)?)?\s*(?:[x×]|por)\s*\d{1,3}/);
   const patio=s.match(/\bpatio\s*(?:(?:trasero|posterior)\s*)?(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?\s*(?:de\s*)?(?:fondo|profundidad)?/)||
@@ -38,12 +38,14 @@
   if(/(?:puerta\s*(?:trasera|posterior)|salir\s+(?:al?|hacia\s+el)\s*patio)/.test(s))parsed.rearDoor=true;
   if(/\b(?:lavanderia|area de lavado)\b/.test(s)&&/\bpatio\b/.test(s))parsed.patioLaundry=true;
   if(/(?:bano\s+compartido|comparten\s+(?:un\s+)?bano)/.test(s)&&/(?:bano\s*(?:master|principal)|suite)/.test(s)){
-   parsed.bathrooms=2;parsed.mainSuite=true;
+   parsed.bathrooms=2;parsed.mainSuite=true;parsed.socialBath=false;
   }
   if(/(?:parque|parquear|parqueadero|garaje|estacionamiento).{0,25}?\b2\s*(?:carros|autos|vehiculos|puestos|plazas)/.test(s)||
     /\b2\s*(?:carros|autos|vehiculos)\b/.test(s)&&/\bparque\b/.test(s)){
    parsed.garage=true;parsed.garageSpaces=2;
   }
+  if(site){parsed.dimensionMeaning='site';parsed.siteAssumed=false;
+   if(base.dimensionMeaning==='house'){parsed.frontSetback=3;parsed.backSetback=2;parsed.sideSetback=.45;}}
   if(house&&!site){
    parsed.dimensionMeaning='house';
    parsed.houseWidth=decimal(house[1]);parsed.houseDepth=decimal(house[2]);
@@ -89,7 +91,7 @@
     hallStart:leftW,hallWidth:hall,rooms,leftParts:partsL,rightParts:partsR};
   }
   const ground=makeFloor(1,[
-    {name:'SALA - COMEDOR',depth:round(D*.49)},
+    {name:'SALA - COMEDOR',depth:round(clamp(D*.49+Number(s.livingExtra||0)-Number(s.kitchenExtra||0),3.15,D-2.9))},
     {name:s.kitchenIsland?'COCINA CON ISLA':'COCINA',depth:round(D*.51)}
    ],[
     {name:'ESCALERA',kind:'stairs',depth:round(D*.47)},
