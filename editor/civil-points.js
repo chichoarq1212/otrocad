@@ -17,8 +17,13 @@
   else if(comma>=0)n=t.replace(',','.');
   return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?$/.test(n)?Number(n):NaN;
  };
- const guessSeparator=line=>line.includes('\t')?'\t':line.includes(';')?';':
-   (line.match(/,/g)||[]).length>=2?',':'whitespace';
+ const guessSeparator=line=>{
+  if(line.includes('\t'))return '\t';
+  if(line.includes(';'))return ';';
+  const decimals=(line.match(/(?:^|\s)[+-]?\d+,\d+(?=\s|$)/g)||[]).length;
+  if(decimals>=2)return 'whitespace'; // decimal comma with spaces between columns
+  return (line.match(/,/g)||[]).length>=2?',':'whitespace';
+ };
  const split=(line,separator)=>{
   if(separator==='whitespace')return line.trim().split(/\s+/);
   // Read quoted delimited fields; preserve free-form descriptions.
@@ -62,6 +67,13 @@
   const hasHeader=opts.hasHeader===undefined?
    headers.includes('north')&&headers.includes('east')&&headers.includes('elevation'):Boolean(opts.hasHeader);
   let map=columnsForOrder(opts.order,rows[0].length);
+  if(!hasHeader&&(!opts.order||opts.order==='auto')){
+   const sample=rows[0],first=validNumber(sample[0]),second=validNumber(sample[1]);
+   if(sample.length===3&&first>1000000&&second>=100000&&second<=900000)
+    map={north:0,east:1,elevation:2};
+   if(sample.length===4&&first>1000000&&second>=100000&&second<=900000)
+    map={north:0,east:1,elevation:2,description:3};
+  }
   if(hasHeader&&(opts.order===undefined||opts.order==='auto')){
    const fromHeader={};headers.forEach((name,i)=>{if(name&&fromHeader[name]===undefined)fromHeader[name]=i});
    map=fromHeader;
