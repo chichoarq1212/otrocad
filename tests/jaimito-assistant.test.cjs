@@ -51,7 +51,7 @@ function node(id,tag='DIV'){
 }
 const tab=node('civil','BUTTON');tab.dataset.tab='civil';tab.setAttribute('aria-selected','false');
 const tabs=node('tabs');const stage=node('stage');const body=node('body');
-const doc={body,getElementById:id=>nodes[id]||null,createElement:tag=>node('anonymous-'+Object.keys(nodes).length,tag.toUpperCase()),
+const doc={body,getElementById:id=>nodes[id]||null,createElement:tag=>node(tag==='div'&&!nodes.jaimitoAssistant?'jaimitoAssistant':'anonymous-'+Object.keys(nodes).length,tag.toUpperCase()),
  addEventListener(){},activeElement:null};
 let pointsOpened=0,tinStarted=0;
 const window={
