@@ -70,7 +70,7 @@ assert.equal(nodes.jaimitoAvatar.src,'assets/ing-jaimito.webp','Use provided tra
 tab.classList.add('active');tab.setAttribute('aria-selected','true');
 window.OtroCadJaimito.sync();
 assert.equal(nodes.jaimitoAssistant.hidden,false,'Show mascot only on Civil tab');
-assert.equal(nodes.jaimitoRibbon.hidden,false,'Allow reopening assistant from Civil ribbon');
+assert.equal(tabs.children.find(x=>x.id==='jaimitoRibbon').hidden,false,'Allow reopening assistant from Civil ribbon');
 window.OtroCadJaimito.open();
 assert.equal(nodes.jaimitoPanel.hidden,false,'Chat must open from mascot/ribbon');
 assert.match(nodes.jaimitoMessages.children[0].children[1].textContent,/Soy el Ing\. Jaimito/);
