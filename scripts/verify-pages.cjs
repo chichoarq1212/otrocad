@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
 const root=path.join(process.cwd(),'dist');
-const required=['index.html','editor/index.html','editor/editor.js','editor/civil3d.js','editor/jaimito-assistant.js','editor/jaimito-assistant.css','editor/compact-chrome.css','editor/geolocation.js','editor/mep.js','editor/vendor/proj4/proj4.js','editor/vendor/proj4/LICENSE.md','editor/assets/ing-jaimito-hd.webp','descargas/index.html','tutorial/index.html','herramientas/index.html','ios/index.html','sw.js','manifest.webmanifest','icon.svg','apple-touch-icon.png','icon-192.png','icon-512.png','editor-preview.svg'];
+const required=['index.html','editor/index.html','editor/editor.js','editor/civil3d.js','editor/jaimito-assistant.js','editor/jaimito-assistant.css','editor/compact-chrome.css','editor/geolocation.js','editor/mep.js','editor/mep-ribbon.css','editor/mep-thermal.js','editor/mep-thermal-ui.js','editor/mep-thermal-ui.css','editor/civil-road.js','editor/civil-road-ui.js','editor/civil-ribbon.css','editor/vendor/proj4/proj4.js','editor/vendor/proj4/LICENSE.md','editor/assets/ing-jaimito-hd.webp','descargas/index.html','tutorial/index.html','herramientas/index.html','ios/index.html','sw.js','manifest.webmanifest','icon.svg','apple-touch-icon.png','icon-192.png','icon-512.png','editor-preview.svg'];
 for(const file of required){if(!fs.existsSync(path.join(root,file)))throw Error('Missing '+file);}
 const pages=['index.html','descargas/index.html','tutorial/index.html','herramientas/index.html','ios/index.html','editor/index.html'];
 for(const page of pages){
@@ -22,13 +22,13 @@ if(manifest.display!=='standalone')throw Error('PWA must be standalone');
 console.log('Local links, pages, assets, and PWA manifest verified');
 
 // Ensure the only advertised Android download is the current, direct .apk asset.
-const apk='https://github.com/chichoarq1212/otrocad/releases/download/android-0.5.6-test/OtroCAD-Android-0.5.6-test.apk';
+const apk='https://github.com/chichoarq1212/otrocad/releases/download/android-0.5.7-test/OtroCAD-Android-0.5.7-alpha.apk';
 for(const page of ['index.html','descargas/index.html']){
  const html=fs.readFileSync(path.join(root,page),'utf8');
- if(!html.includes('href="'+apk+'"'))throw Error('Direct APK 0.5.6 link missing in '+page);
- if(/android-hybrid-test-|OtroCAD-Android-0\.5\.4-test\.apk/.test(html))throw Error('Outdated Android APK still advertised in '+page);
+ if(!html.includes('href="'+apk+'"'))throw Error('Direct APK 0.5.7 link missing in '+page);
+ if(/android-hybrid-test-|OtroCAD-Android-0\.(?:5\.4|5\.6)-test\.apk/.test(html))throw Error('Outdated Android APK still advertised in '+page);
 }
-console.log('Direct current APK 0.5.6 links verified in home and downloads');
+console.log('Direct current APK 0.5.7 links verified in home and downloads');
 
 // Safari iOS needs real PNG Apple touch icon, standalone manifest and touch-friendly CAD editing.
 const icon=fs.readFileSync(path.join(root,'apple-touch-icon.png'));
