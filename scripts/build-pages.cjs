@@ -36,6 +36,7 @@ const requiredFiles = [
   'editor/arqui-planner.js',
   'editor/arqui-house-layout.js',
   'editor/arqui-user-ai.js',
+  'editor/arqui-oauth.js',
   'editor/arqui-references.js',
   'editor/arqui-assistant.js',
   'editor/arqui-professional.js',
