@@ -1,0 +1,84 @@
+/* OtroCAD engineering thermal load calculator; blue/yellow and CAD-friendly. */
+.mep-thermal-dialog{
+ width:min(960px,96vw);max-width:96vw;max-height:94dvh;
+ padding:0;border-radius:12px;border:1px solid #a6c0e4;
+ background:#f7fbff;color:#193b6b;
+ box-shadow:0 20px 65px #06172e99;
+ font:12px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;
+ overflow:hidden;
+}
+.mep-thermal-dialog::backdrop{background:#081b34ad}
+.mep-thermal-dialog *{box-sizing:border-box}
+.mep-thermal-dialog button,.mep-thermal-dialog input{
+ font:inherit;
+}
+.mep-thermal-dialog button{
+ border:1px solid #abc5e8;background:#fff;color:#174877;
+ padding:7px 10px;border-radius:6px;
+ cursor:pointer;touch-action:manipulation;font-weight:650;
+}
+.mep-thermal-dialog button:focus-visible,.mep-thermal-dialog input:focus-visible{
+ outline:2px solid #dbb339;outline-offset:1px;
+}
+.mep-thermal-dialog button:disabled{opacity:.5;cursor:not-allowed}
+.mep-thermal-dialog .thermal-head{display:flex;align-items:center;gap:8px;
+ background:#174caa;color:#fff;padding:11px 14px}
+.mep-thermal-dialog .thermal-head>div{flex:1;display:flex;flex-direction:column}
+.mep-thermal-dialog .thermal-head strong{font-size:14px;letter-spacing:.3px}
+.mep-thermal-dialog .thermal-head small{font-size:10px;color:#cfe4ff}
+.mep-thermal-dialog #thermalClose{font-size:20px;font-weight:700;color:#fff;
+ background:#ffffff26;border-color:#ffffff77;padding:0;width:30px;height:30px}
+.mep-thermal-dialog .thermal-tabs{display:flex;gap:6px;padding:9px 12px;
+ background:#eaf3ff;border-bottom:1px solid #d3e1f4}
+.mep-thermal-dialog .thermal-tabs button{flex:1}
+.mep-thermal-dialog .thermal-tabs button.active{background:#185be8;color:#fff;border-color:#185be8}
+.mep-thermal-dialog .thermal-content{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);
+ min-height:260px;max-height:calc(94dvh - 150px);overflow:hidden}
+.mep-thermal-dialog .thermal-fields,.mep-thermal-dialog .thermal-results{
+ overflow-y:auto;overscroll-behavior:contain;padding:12px 15px}
+.mep-thermal-dialog .thermal-fields{border-right:1px solid #d5e1f2}
+.mep-thermal-dialog .thermal-fieldset{margin:0 0 10px;border:1px solid #d4e2f3;
+ border-radius:8px;padding:10px;background:#fff}
+.mep-thermal-dialog .thermal-fieldset legend{color:#26548b;font-weight:800;
+ font-size:11px;padding:0 5px}
+.mep-thermal-dialog .thermal-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mep-thermal-dialog .thermal-field-grid label{min-width:0;display:flex;flex-direction:column;
+ gap:4px;font-size:11px;font-weight:650;color:#3c5d85}
+.mep-thermal-dialog .thermal-field-grid input{width:100%;min-width:0;min-height:31px;
+ padding:5px 7px;border:1px solid #b8cce9;border-radius:5px;background:#fff;color:#173665;
+ font:12px ui-monospace,Consolas,monospace}
+.mep-thermal-dialog .thermal-results h4{font-size:13px;margin:0 0 6px;color:#194e90}
+.mep-thermal-dialog .thermal-description{font-size:11px;color:#526d90;margin:0 0 8px}
+.mep-thermal-dialog .thermal-table{width:100%;border-collapse:collapse;font-size:11px}
+.mep-thermal-dialog .thermal-table td{padding:7px 5px;border-bottom:1px solid #dce8f7;
+ vertical-align:top}
+.mep-thermal-dialog .thermal-table td:last-child{text-align:right;font-weight:750;
+ font-variant-numeric:tabular-nums;color:#1854ae;white-space:normal}
+.mep-thermal-dialog .thermal-table tr:nth-last-child(-n+2){background:#eaf2ff}
+.mep-thermal-dialog .thermal-warning{font-size:10px;line-height:1.5;color:#70531f;
+ border-left:3px solid #e0b634;background:#fff6df;padding:8px;margin:12px 0 4px}
+.mep-thermal-dialog .thermal-source{font-size:10px;color:#637b97}
+.mep-thermal-dialog .thermal-error{min-height:0;color:#b34530;font-size:11px;font-weight:700}
+.mep-thermal-dialog .thermal-footer{display:flex;justify-content:flex-end;gap:8px;
+ flex-wrap:wrap;padding:10px 13px;border-top:1px solid #d6e1f3;background:#f0f6ff}
+.mep-thermal-dialog #thermalInsert{background:#185be8;color:#fff;border-color:#185be8;font-weight:800}
+.mep-thermal-dialog #thermalExport{background:#ffdf7c;color:#183b6a;border-color:#dab95f}
+body.cad-mep-active #groups>.mep-thermal-group button{min-width:117px!important}
+@media(max-width:760px){
+ .mep-thermal-dialog{width:min(600px,97vw);max-width:97vw;max-height:92dvh}
+ .mep-thermal-dialog .thermal-content{display:flex;flex-direction:column;
+  overflow-y:auto;max-height:calc(92dvh - 160px)}
+ .mep-thermal-dialog .thermal-fields,.mep-thermal-dialog .thermal-results{
+  overflow-y:visible;flex:0 0 auto;padding:9px}
+ .mep-thermal-dialog .thermal-fields{border-right:0;border-bottom:1px solid #d5e1f2}
+ .mep-thermal-dialog .thermal-field-grid{gap:7px}
+ .mep-thermal-dialog .thermal-footer{padding:7px}
+}
+@media(max-width:950px) and (orientation:landscape) and (max-height:500px){
+ .mep-thermal-dialog{max-height:96dvh}
+ .mep-thermal-dialog .thermal-content{max-height:calc(96dvh - 115px)}
+ .mep-thermal-dialog .thermal-head{padding:5px 10px}
+ .mep-thermal-dialog .thermal-tabs{padding:4px}
+ .mep-thermal-dialog .thermal-footer{padding:5px}
+}
+@media print{.mep-thermal-dialog{display:none!important}}
