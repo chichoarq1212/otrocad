@@ -617,4 +617,22 @@ function openSurface3D(){
  canvas.addEventListener('wheel',e=>{e.preventDefault();scaleZoom=Math.max(.25,Math.min(5,scaleZoom*(e.deltaY<0?1.12:.89)));draw()},{passive:false});
  close.onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();requestAnimationFrame(draw);
 }
+// Console aliases mirror the tools that are actually implemented in OtroCAD Civil.
+// They are available with the canvas focused, without adding extra mobile toolbar rows.
+window.OtroCadCivilCommands={
+ C3DPOINTS:()=>fileInput.click(),
+ C3DLANDXML:()=>fileInput.click(),
+ C3DTIN:createTin,
+ C3DCONTOURS:createContours,
+ C3DSLOPE:slopeAnalysis,
+ C3D3D:openSurface3D,
+ C3DALIGN:markAlignment,
+ C3DSTATIONS:createStations,
+ C3DGRADE:alignmentGrade,
+ C3DPROFILE:longitudinalProfile,
+ C3DSECTION:crossSection,
+ C3DVOLUME:volumeAnalysis,
+ C3DEXPORTTIN:exportSurfaceLandXml,
+ C3DCLEAR:clearAnalysis
+};
 })();
