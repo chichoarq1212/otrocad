@@ -1,0 +1,16 @@
+.civil-topo-dialog{width:min(610px,94vw);max-width:94vw;max-height:88dvh;overflow:auto;box-sizing:border-box;padding:16px;background:#f6faff;color:#173665;border:1px solid #abc4ee;border-radius:12px;box-shadow:0 16px 35px #001e3d55}
+.civil-topo-dialog::backdrop{background:#08172ab0}
+.civil-topo-dialog h3{margin:0 0 7px;color:#185be8;font-size:18px}
+.civil-topo-dialog p{font-size:12px;line-height:1.5}
+.civil-topo-dialog label{font-size:12px;font-weight:700;display:grid;gap:4px}
+.civil-topo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.civil-topo-dialog input,.civil-topo-dialog select,.civil-topo-dialog textarea{box-sizing:border-box;width:100%;min-width:0;padding:8px;border:1px solid #b2cbea;border-radius:6px;color:#173665;background:white;font:13px system-ui,sans-serif}
+.civil-topo-dialog textarea{min-height:135px;margin:8px 0;resize:vertical;font:12px ui-monospace,Consolas,monospace}
+.civil-topo-dialog .civil-topo-check{display:flex;align-items:center;gap:8px;margin-top:8px}
+.civil-topo-dialog .civil-topo-check input{width:16px;height:16px}
+.civil-topo-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.civil-topo-dialog button{padding:8px 12px;border:1px solid #abc5e5;color:#174779;background:#fff;border-radius:7px}
+.civil-topo-dialog button.primary{background:#185be8;color:white;border-color:#185be8;font-weight:800}
+.civil-topo-preview{max-height:125px;min-height:28px;overflow:auto;white-space:pre;font:12px/1.5 ui-monospace,Consolas,monospace;background:#e9f1fe;padding:8px;border-radius:6px}
+.civil-topo-report{padding:7px;background:#e9f1fe;border-radius:6px;white-space:pre-wrap;font-size:12px}
+@media(max-width:550px){.civil-topo-grid{grid-template-columns:1fr}.civil-topo-dialog{padding:12px}}
