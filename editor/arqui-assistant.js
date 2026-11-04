@@ -125,6 +125,7 @@ function updateAiConnection(){
   'Falta pegar tu clave personal de '+known.label;
  $('arquiMode').textContent=active?'IA personal lista · '+known.label:'IA generativa no conectada · falta clave';
 }
+if(!aiSelect.value)aiSelect.value='none';
 aiSelect.addEventListener('change',updateAiConnection);
 aiKey.addEventListener('input',updateAiConnection);
 $('arquiAiClear').onclick=()=>{aiKey.value='';aiSelect.value='none';updateAiConnection()};
@@ -280,7 +281,7 @@ async function propose(text){
   // free-form request before the model gets a chance to interpret it.
   let next,remoteAnswered=false;
   const current=fromInputs();
-  const personalProvider=aiSelect.value;
+  const personalProvider=typeof aiSelect==='undefined'||!aiSelect?'none':(aiSelect.value||'none');
   if(personalProvider!=='none'){
    if(!userBridge?.request){
     message('bot','El módulo de IA personal no está disponible. Tu plano anterior se conserva.');return;
