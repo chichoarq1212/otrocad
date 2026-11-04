@@ -63,7 +63,7 @@ assert.ok(plan.filter(e=>e.type==='line').every(e=>
  [e.a?.x,e.a?.y,e.b?.x,e.b?.y].every(Number.isFinite)));
 const mm=thermal.plan({x:0,y:0},{length:5,width:4,height:3,door:1.1,panelMm:100,units:'mm'});
 assert.ok(mm.some(e=>e.type==='line'&&e.b.x===5000));
-assert.throws(()=>thermal.plan({x:0,y:0},{length:2,width:2,door:2}),/Puerta/);
+assert.throws(()=>thermal.plan({x:0,y:0},{length:2,width:2,door:2}),/puerta/i);
 const mep=fs.readFileSync('editor/mep.js','utf8');
 const ui=fs.readFileSync('editor/mep-thermal-ui.js','utf8');
 const kelvin=fs.readFileSync('editor/kelvin-assistant.js','utf8');
