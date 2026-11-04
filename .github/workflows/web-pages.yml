@@ -70,6 +70,8 @@ jobs:
           node tests/cad-precision.test.cjs
           node --check tests/keyboard-dynamic.test.cjs
           node tests/keyboard-dynamic.test.cjs
+          node --check tests/unified-layout.test.cjs
+          node tests/unified-layout.test.cjs
           node tests/storage-dxf.test.cjs
           node tests/dwg-integration.test.cjs
           node tests/build-version.test.cjs
