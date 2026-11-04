@@ -148,7 +148,8 @@ function previewSVG(entities){
   if(item.pts)all.push(...item.pts);
  }
  const xx=all.map(p=>Number(p.x)).filter(Number.isFinite),yy=all.map(p=>Number(p.y)).filter(Number.isFinite);
- const minX=Math.min(...xx,0),maxX=Math.max(...xx,1),minY=Math.min(...yy,0),maxY=Math.max(...yy,1);
+ const minX=xx.length?Math.min(...xx):0,maxX=xx.length?Math.max(...xx):1;
+ const minY=yy.length?Math.min(...yy):0,maxY=yy.length?Math.max(...yy):1;
  const dx=Math.max(.05,maxX-minX),dy=Math.max(.05,maxY-minY);
  const scale=Math.min(316/dx,110/dy);
  const x=v=>170+(v-(minX+maxX)/2)*scale;
