@@ -5,5 +5,6 @@ const context={window:{},colors:{General:'#ffffff'},zoom:35,units:'m',confirm:()
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('editor/demo/vivienda.js','utf8'),context);
 context.objects=context.window.otroCadDemo.shapes;
+vm.runInContext(source.slice(source.indexOf('function dimensionGeometry(s){'),source.indexOf('function gripDescriptors(s){')),context);
 vm.runInContext(source.slice(source.indexOf('function buildDxf(){'),source.indexOf("\n$('#dxf').onclick")),context);
 fs.writeFileSync(target,vm.runInContext('buildDxf()',context));
