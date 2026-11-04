@@ -26,7 +26,7 @@ assert.equal(saved[0].b.x,20000,'road units must preserve millimeters');
 assert.throws(()=>road.generate([{x:0,y:0},{x:50000,y:0}],'dashed',{dash:.2,gap:.2}),/divide el eje/i,
  'long dashed roads must not freeze the browser');
 assert.doesNotMatch(ui,/\bprompt\s*\(/,'Road wizard should not interrupt users with prompt()');
-assert.match(ui,/id='civilRoadPanel'|id="civilRoadPanel"/,'road properties panel exists');
+assert.match(ui,/panel\.id='civilRoadPanel'/,'road properties panel exists');
 assert.match(ui,/roadUseSelection/,'user can select an axis without closing panel');
 assert.match(ui,/roadCategories/,'types grouped in familiar road categories');
 assert.match(ui,/roadPreview/,'road geometry preview present');
