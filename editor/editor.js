@@ -108,7 +108,43 @@ function selectedItems(){const out=new Set(selectedSet);if(selected>=0)out.add(s
 function applySelection(indices,additive=false){const next=additive?new Set(selectedItems()):new Set(),groups=new Set();for(const i of indices)if(i>=0&&i<objects.length){next.add(i);if(objects[i]?.groupId)groups.add(objects[i].groupId)}if(groups.size)objects.forEach((o,j)=>{if(groups.has(o.groupId)&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer))next.add(j)});selectedSet=next;selected=next.size?[...next].sort((a,b)=>a-b).at(-1):-1}
 function clearSelection(){selected=-1;selectedSet.clear()}
 function deleteSelection(){const ids=selectedItems();if(!ids.length)return;checkpoint();ids.sort((a,b)=>b-a).forEach(i=>objects.splice(i,1));clearSelection();save();render();status.textContent=ids.length===1?'Objeto eliminado':ids.length+' objetos eliminados'}
-function save(){try{localStorage.setItem('otrocad-drawing',JSON.stringify(objects));localStorage.setItem('otrocad-units',units);return true}catch(e){storageWarning();return false}}
+let cadAutosaveDirty=0,cadAutosaveTimer=null,cadAutosaveRunning=false,cadLastIndexedSave=0,cadLastCheckpointAt=0;
+function scheduleCadAutosave(){
+ cadAutosaveDirty++;
+ if(cadAutosaveTimer)clearTimeout(cadAutosaveTimer);
+ cadAutosaveTimer=setTimeout(()=>{cadAutosaveTimer=null;void persistCadProgress();},6500);
+}
+async function persistCadProgress(force=false){
+ if(cadAutosaveRunning||(!force&&!cadAutosaveDirty))return false;
+ cadAutosaveRunning=true;
+ const startVersion=cadAutosaveDirty,snapshot=cadRecoverySnapshot();
+ try{
+  if(Date.now()-cadLastCheckpointAt>=180000){
+   const current=await cadRecoveryRead('autosave-latest').catch(()=>null);
+   if(current?.shapes)await cadRecoveryWrite('autosave-previous',current);
+   cadLastCheckpointAt=Date.now();
+  }
+  await cadRecoveryWrite('autosave-latest',snapshot);
+  cadLastIndexedSave=Date.now();
+  if(cadAutosaveDirty===startVersion)cadAutosaveDirty=0;
+  window.OtroCadSaveUI?.updateProgress?.(cadLastIndexedSave);
+  return true;
+ }catch(error){console.warn('No se pudo guardar punto de recuperación en IndexedDB',error);return false}
+ finally{cadAutosaveRunning=false}
+}
+function save(){
+ let saved=false;
+ try{
+  localStorage.setItem('otrocad-drawing',JSON.stringify(objects));
+  localStorage.setItem('otrocad-units',units);saved=true;
+ }catch(e){storageWarning()}
+ scheduleCadAutosave();return saved;
+}
+window.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='hidden'&&cadAutosaveDirty)void persistCadProgress(true);
+});
+setInterval(()=>{if(cadAutosaveDirty)void persistCadProgress(true)},60000);
+
 function world(p){return{x:(p.x-canvas.clientWidth/2-offset.x)/zoom,y:(canvas.clientHeight/2+offset.y-p.y)/zoom}}
 function screen(p){if(layoutRenderTransform)return{x:layoutRenderTransform.tx+p.x*layoutRenderTransform.scale,y:layoutRenderTransform.ty-p.y*layoutRenderTransform.scale};return{x:canvas.clientWidth/2+offset.x+p.x*zoom,y:canvas.clientHeight/2+offset.y-p.y*zoom}}
 function pointer(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
@@ -1806,7 +1842,7 @@ document.addEventListener('keydown',e=>{
  if(document.querySelector('dialog[open]'))return;
  if((e.ctrlKey||e.metaKey)&&!e.altKey){
   const k=e.key.toLowerCase();
-  const shortcut={s:'#saveAsDwg',o:'#open',n:'#newDrawing',p:'#pdf'}[k];
+  const shortcut={s:'#save',o:'#open',n:'#newDrawing',p:'#pdf'}[k];
   if(shortcut){e.preventDefault();$(shortcut).click();return}
   if(k==='1'){e.preventDefault();$('#propertiesBtn').click();return}
   if(k==='e'&&e.shiftKey){e.preventDefault();$('#saveAsDxf').click();return}
@@ -1949,7 +1985,10 @@ $('#newDrawing').onclick=async()=>{
  saveLayoutState();refreshLayoutTabs();const stored=save();render();
  status.textContent=stored?'Dibujo nuevo creado · plano anterior respaldado':'Dibujo nuevo creado · comprueba el almacenamiento antes de salir';
 };
-$('#save').onclick=()=>{if(save())status.textContent='Copia local guardada en este navegador'};
+$('#save').onclick=async()=>{
+ const result=await window.OtroCadFileCore.saveCurrent().catch(error=>{alert('No se pudo guardar: '+error.message);return null});
+ if(result?.requiresSaveAs)window.OtroCadSaveUI?.open('dwg');
+};
 $('#recover').onclick=async()=>{
  const previous=await cadReadLastBackup();
  if(!previous){alert('No hay una copia anterior disponible en el navegador.');return}
@@ -2649,34 +2688,83 @@ function buildDxf(){
  add(0,'ENDSEC',0,'EOF');return rows.join('\r\n')+'\r\n';
 }
 $('#dxf').onclick=()=>{const data=buildDxf();if(data!==null)download('otrocad.dxf',data,'application/dxf')};
-$('#saveAsDwg').onclick=async()=>{
- const data=buildDxf();if(data===null)return;
- const button=$('#saveAsDwg');button.disabled=true;const original=button.textContent;button.textContent='Preparando DWG…';
- try{
-  const engine=await getDwgRuntime();
-  const bytes=engine.dxf_to_dwg(new TextEncoder().encode(data));
-  if(!(bytes instanceof Uint8Array)||bytes.length<6||new TextDecoder().decode(bytes.subarray(0,6))!=='AC1032')throw Error('El motor no produjo un DWG binario AC1032 válido.');
-  const checkBytes=engine.dwg_to_dxf(bytes);
-  const check=parseDxfEntities(new TextDecoder('utf-8').decode(checkBytes));
-  const expected=parseDxfEntities(data);
-  if(!check.length||check.length!==expected.length)throw Error('La validación DWG detectó diferencias de entidades ('+expected.length+' originales, '+check.length+' al reabrir). No se descargó el archivo.');
-  const blob=new Blob([bytes],{type:'application/acad'});
-  if(typeof window.showSaveFilePicker==='function'&&!window.OtroCadAndroid){
-   try{const handle=await window.showSaveFilePicker({suggestedName:'otrocad.dwg',types:[{description:'Dibujo AutoCAD DWG',accept:{'application/acad':['.dwg']}}]});const stream=await handle.createWritable();await stream.write(blob);await stream.close();status.textContent='DWG AC1032 guardado y reabierto para validación';return}catch(error){if(error.name==='AbortError')return;throw error}
-  }
-  await download('otrocad.dwg',blob,'application/acad');
-  status.textContent='DWG AC1032 generado y reabierto para validación';
- }catch(error){console.error(error);alert('No se pudo guardar el DWG: '+(error.message||error))}finally{button.disabled=false;button.textContent=original}
-};
-$('#saveAsDxf').onclick=async()=>{
- const data=buildDxf();if(data===null)return;
- if(typeof window.showSaveFilePicker==='function'&&!window.OtroCadAndroid){
-  try{const handle=await window.showSaveFilePicker({suggestedName:'otrocad.dxf',types:[{description:'Dibujo DXF',accept:{'application/dxf':['.dxf']}}]});const stream=await handle.createWritable();await stream.write(data);await stream.close();status.textContent='Archivo DXF guardado';return}catch(error){if(error.name==='AbortError')return;alert('No se pudo guardar el DXF: '+error.message);return}
+// Consolidated DWG / DXF / native project saving. The existing DWG engine
+// must round-trip its own output before a potentially invalid file is offered.
+let cadLastFile=null;
+function safeDrawingFilename(name,format){
+ const root=String(name||'OtroCAD-Proyecto').trim().replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')
+  .replace(/\.(dwg|dxf|json)$/i,'').replace(/[. ]+$/,'');
+ if(!root||root.length>150)throw Error('Escribe un nombre válido (máximo 150 caracteres).');
+ return root+'.'+format;
+}
+async function drawingContent(format){
+ if(format==='json')return new Blob([JSON.stringify({
+   version:3,shapes:objects,units,layouts,viewports:layoutViewportRecords,
+   geolocation:window.OtroCadGeolocation?.getState()||null},null,2)],{type:'application/json'});
+ const dxf=buildDxf();if(dxf===null)throw Error('No fue posible crear un archivo DXF válido.');
+ if(format==='dxf')return new Blob([dxf],{type:'application/dxf'});
+ if(format!=='dwg')throw Error('Formato de archivo no compatible.');
+ const engine=await getDwgRuntime(),bytes=engine.dxf_to_dwg(new TextEncoder().encode(dxf));
+ if(!(bytes instanceof Uint8Array)||bytes.length<6||
+  new TextDecoder().decode(bytes.subarray(0,6))!=='AC1032')
+  throw Error('El motor no produjo un DWG AC1032 válido. Guardar como DXF es la alternativa.');
+ const reconstructed=engine.dwg_to_dxf(bytes),check=parseDxfEntities(new TextDecoder('utf-8').decode(reconstructed));
+ const expected=parseDxfEntities(dxf);
+ if(!check.length||check.length!==expected.length)
+  throw Error('El DWG no pasó la comprobación de entidades: '+check.length+' / '+expected.length+'. No se guardó un archivo potencialmente corrupto.');
+ return new Blob([bytes],{type:'application/acad'});
+}
+async function saveDrawingAs(format='dwg',name='OtroCAD-Proyecto',reuse=false){
+ if(!['dwg','dxf','json'].includes(format))throw Error('Formato desconocido: '+format);
+ const filename=safeDrawingFilename(name,format),mime={dwg:'application/acad',dxf:'application/dxf',json:'application/json'}[format];
+ let handle=reuse&&cadLastFile?.format===format?cadLastFile.handle:null;
+ if(!handle&&typeof window.showSaveFilePicker==='function'&&!window.OtroCadAndroid){
+  try{handle=await window.showSaveFilePicker({
+   suggestedName:filename,types:[{description:'Archivo '+format.toUpperCase(),accept:{[mime]:['.'+format]}}],
+   excludeAcceptAllOption:false
+  })}catch(error){if(error.name==='AbortError')return{cancelled:true};throw error}
  }
- const name=prompt('Nombre del archivo DXF','otrocad.dxf');if(name===null)return;
- const safe=name.trim().replace(/[\\/:*?"<>|]/g,'_');if(!safe){alert('Escribe un nombre para el archivo.');return}
- const filename=/\.dxf$/i.test(safe)?safe:safe+'.dxf';await download(filename,data,'application/dxf');status.textContent='Descarga DXF iniciada';
+ status.textContent='Guardando '+filename+'…';
+ const blob=await drawingContent(format);
+ if(handle){
+  const writer=await handle.createWritable();
+  try{await writer.write(blob);await writer.close()}catch(err){try{await writer.abort()}catch(_){}throw err}
+ }else await download(filename,blob,mime);
+ cadLastFile={handle:handle||null,format,name:filename};
+ await persistCadProgress(true);
+ status.textContent=handle?'Guardado: '+filename:'Archivo '+filename+' enviado a Descargas';
+ window.OtroCadSaveUI?.updateCurrent?.(filename);
+ return {filename,format,bytes:blob.size,mode:handle?'file':'download'};
+}
+window.OtroCadFileCore={
+ saveAs:saveDrawingAs,
+ async saveCurrent(){
+  if(cadLastFile?.handle)return saveDrawingAs(cadLastFile.format,cadLastFile.name,true);
+  return{requiresSaveAs:true};
+ },
+ filename:()=>cadLastFile?.name||null,
+ persistProgress:()=>persistCadProgress(true),
+ async restoreProgress(slot='autosave-latest'){
+  if(!['autosave-latest','autosave-previous'].includes(slot))throw Error('Punto de recuperación inválido.');
+  const data=cadRecoveryRestoreCandidate(await cadRecoveryRead(slot));
+  if(!data?.shapes?.length)throw Error('No hay copias automáticas para recuperar.');
+  if(!await protectDrawingBeforeReplacement())throw Error('No se pudo respaldar el plano actual.');
+  pushReplacementUndo();objects=clone(data.shapes);
+  if(['m','cm','mm'].includes(data.units))units=data.units;
+  if(Array.isArray(data.layouts))layouts=clone(data.layouts);
+  if(Array.isArray(data.viewports))layoutViewportRecords=clone(data.viewports);
+  activeLayout=layouts.some(x=>x.name===data.activeLayout)?data.activeLayout:'Model';
+  clearSelection();saveLayoutState();refreshLayoutTabs();save();render();
+  return {count:objects.length,date:data.savedAt};
+ },
+ getProgressDates:async()=>{
+  const data=await Promise.all(['autosave-latest','autosave-previous'].map(id=>cadRecoveryRead(id).catch(()=>null)));
+  return data.map(x=>x?.savedAt||null);
+ },
+ saveLocal:()=>{const ok=save();void persistCadProgress(true);return ok}
 };
+$('#saveAsDwg').onclick=()=>window.OtroCadSaveUI?.open('dwg')||void saveDrawingAs('dwg').catch(e=>alert(e.message));
+$('#saveAsDxf').onclick=()=>window.OtroCadSaveUI?.open('dxf')||void saveDrawingAs('dxf').catch(e=>alert(e.message));
 $('#pdf').onclick=()=>{
  if(activeLayout==='Model'){
   ensureCadLayout();
