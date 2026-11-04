@@ -65,6 +65,8 @@ header{height:36px!important;min-height:36px!important;flex:0 0 36px;padding:3px
 .cad-geolocation-settings [hidden]{display:none!important}
 .cad-geolocation-settings .geo-note{font-size:11px;line-height:1.5;color:#526884}
 .cad-geolocation-settings .geo-center{display:flex;align-items:center;gap:7px;font-size:12px;margin-top:12px}
+.cad-geolocation-settings .cad-utility-actions{flex-wrap:wrap}
+#groups #cadEcuadorView{background:#ffdf65!important;border-color:#c7a341!important;color:#173665!important;font-weight:750}
 #cadMapAttribution{position:absolute;z-index:9;left:7px;max-width:calc(100% - 140px);padding:3px 6px;color:#173665;background:#fffffff0;border:1px solid #b9cbe7;border-radius:3px;font:9px/1.3 system-ui;pointer-events:auto}
 #cadMapAttribution[hidden]{display:none!important}
 #cadMapAttribution a{color:#174a91}
