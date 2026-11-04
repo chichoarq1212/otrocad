@@ -26,6 +26,7 @@ const requiredFiles = [
   'editor/civil-road.js',
   'editor/mep.js',
   'editor/kelvin-assistant.js',
+  'editor/assets/ing-kelvin.webp',
   'editor/jaimito-assistant.js',
   'editor/jaimito-assistant.css',
   'editor/compact-chrome.css','editor/geolocation.js','editor/mep.js','editor/vendor/proj4/proj4.js','editor/vendor/proj4/LICENSE.md',
