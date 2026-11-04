@@ -13,9 +13,12 @@ const choices=[
  ['vent','Ventilación sanitaria'],['rain','Aguas lluvias'],
  ['fire','Red contra incendios'],['electrical','Circuito eléctrico'],
  ['diffuser','Colocar difusor'],['grille','Colocar rejilla'],
- ['quantities','Cantidades de obra']
+ ['quantities','Cantidades de obra'],
+ ['load','Cargas térmicas'],['coldroom','Cuartos fríos']
 ];
 const help=[
+ [/cuarto(s)? fr[ií]o(s)?|c[aá]mara(s)? frigor[ií]fica(s)?|refrigeraci[oó]n industrial|congelaci[oó]n/i,'coldroom','Abre Cuartos fríos para estimar transmisión, infiltración, producto, personal, desescarche y capacidad frigorífica. Podrás insertar una planta 2D editable. Los valores son orientativos.'],
+ [/carga(s)? t[eé]rmica(s)?|ganancia(s)? de calor|btu\/h|tonelada(s)? de refrigeraci[oó]n/i,'load','Abre Cargas térmicas para calcular ganancias sensibles y latentes HVAC por envolvente, vidrio, ventilación y fuentes internas. Requiere datos de diseño y comprobación del proyectista.'],
  [/ducto|impulsi[oó]n|suministro|aire acondicionado/i,'supply','Para trazar impulsión, abre AIRE ACOND. y configura ancho, alto, caudal y etiqueta. El ducto conserva su geometría editable y sus cantidades.'],
  [/retorno|retornar/i,'return','Selecciona red de retorno de aire en el módulo HVAC, configura dimensiones y dibuja su polilínea eje.'],
  [/extracci[oó]n|extractor/i,'extract','Selecciona extracción y dibuja la ruta en planta. Los cálculos de pérdidas y selección del equipo aún requieren revisión profesional.'],
@@ -63,7 +66,7 @@ function add(role,content){
 function open(){
  if(!isActive())return;
  opened=true;panel.hidden=false;mascot.setAttribute('aria-expanded','true');
- if(!messages.children.length)add('bot','¡Hola! Soy el Ing. Keeelvin. Te apoyo en MEP, HVAC, agua potable, sanitaria, desagües, difusores y cuantificaciones. ¿Qué trazamos?');
+ if(!messages.children.length)add('bot','¡Hola! Soy el Ing. Keeelvin. Te apoyo en MEP, HVAC, cargas térmicas, cuartos fríos, agua potable, sanitaria y desagües. ¿Qué trazamos?');
 }
 mascot.onclick=()=>opened?close():open();
 $('kelvinMinimize').onclick=close;$('kelvinClose').onclick=close;
@@ -73,6 +76,11 @@ trigger.onclick=()=>{open();$('kelvinQuestion').focus({preventScroll:true})};tab
 function run(kind){
  try{
   if(kind==='quantities')mep.showQuantities();
+  else if(kind==='load'||kind==='coldroom'){
+   const dialog=window.OtroCadThermalUI;
+   if(!dialog)throw Error('Calculadora térmica no disponible.');
+   dialog.open(kind==='coldroom'?'cold':'hvac');
+  }
   else if(kind==='diffuser'||kind==='grille')mep.beginSymbol(kind,kind==='diffuser'?'supply':'return');
   else mep.chooseSystem(kind);
   add('bot',kind==='quantities'?'He abierto las cantidades del proyecto.':'Herramienta «'+(choices.find(x=>x[0]===kind)?.[1]||kind)+'» lista. Traza en el Modelo y configura propiedades en la barra MEP.');
