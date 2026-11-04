@@ -13,7 +13,7 @@ const tools=[
  ['C3DVOLUME','Corte / relleno'],['C3DEXPORTTIN','Exportar LandXML'],['C3DGEO','Geolocalización']
 ];
 const rules=[
- [/geolocal|cartograf|utm|satelit|satélit|mapa vial|geomap/i,'C3DGEO','Abre Geolocalización y selecciona la zona WGS84 / UTM y el hemisferio del levantamiento. Puedes usar coordenadas UTM existentes o vincular un origen local a un punto UTM conocido, sin mover las entidades. El mapa necesita conexión y es una referencia visual.'],
+ [/geolocal|cartograf|utm|satelit|satélit|mapa vial|geomap|ecuador|gal[aá]pagos/i,'C3DGEO','Usa Ver Ecuador para la vista general del país; en Geolocalización también tienes Galápagos. Para ubicar un plano, selecciona la zona WGS84 / UTM y el hemisferio e ingresa sus coordenadas reales. Puedes vincular un origen local sin mover las entidades. El mapa necesita conexión.'],
  [/landxml|exportar|xml/i,'C3DEXPORTTIN','Exporta la superficie TIN a LandXML 1.2. Primero crea el terreno; el archivo contiene vértices y caras, no objetos de diseño dinámicos.'],
  [/csv|xyz|puntos|importar|levantamiento/i,'C3DPOINTS','Importa puntos X, Y, Z desde CSV, TXT, XYZ o LandXML. Necesitas al menos tres puntos no colineales. Comprueba cotas y unidades.'],
  [/triangul|superficie|tin|delaunay/i,'C3DTIN','Crea una TIN después de importar puntos XYZ. La triangulación disponible admite hasta 1.800 puntos; divide levantamientos mayores en sectores.'],
