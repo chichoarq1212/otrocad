@@ -80,3 +80,21 @@ assert.ok(Math.abs(bevel.t1.x-1)<1e-9 && Math.abs(bevel.t1.y)<1e-9);
 assert.ok(Math.abs(bevel.t2.x)<1e-9 && Math.abs(bevel.t2.y-2)<1e-9);
 assert.equal(vm.runInContext('chamferGeometry({type:"line",a:{x:0,y:0},b:{x:1,y:0}},{type:"line",a:{x:0,y:0},b:{x:0,y:1}},{x:1,y:0},{x:0,y:1},2,2)',chamferScope),null);
 console.log('Chaflán: dos distancias independientes y rechazo de distancias excesivas verificados');
+
+const trim = {
+  objects: [], status:{textContent:''}, trimState:{phase:'cut',boundaries:new Set()},
+  isVisibleModelEntity:s=>s.visible!==false, entitySegments:s=>[[s.a,s.b]],
+  clone:x=>JSON.parse(JSON.stringify(x)), checkpoint:()=>{}, clearSelection:()=>{},save:()=>{},render:()=>{}
+};
+vm.createContext(trim);
+vm.runInContext(src.slice(src.indexOf('function lineIntersection('),src.indexOf('function trimOrExtend(')), trim);
+const target={type:'line',a:{x:0,y:0},b:{x:10,y:0}};
+const edge1={type:'line',a:{x:3,y:-1},b:{x:3,y:1}};
+const edge2={type:'line',a:{x:7,y:-1},b:{x:7,y:1}};
+trim.objects=[target,edge1,edge2];trim.trimState.boundaries.add(edge1);
+vm.runInContext('quickTrim(0,{x:1,y:0})',trim);
+assert.equal(trim.objects[0].a.x,3); assert.equal(trim.objects[0].b.x,10);
+trim.objects=[target,edge1,edge2];trim.trimState={phase:'quick',boundaries:new Set()};
+vm.runInContext('quickTrim(0,{x:5,y:0})',trim);
+assert.equal(trim.objects[0].b.x,3);assert.equal(trim.objects[1].a.x,7);
+console.log('TRIM: recorte rápido y bordes elegidos verificados');
