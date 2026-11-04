@@ -50,7 +50,7 @@ assert.ok(frozen.pullDownKW>frozen.averageKW);
 assert.ok(frozen.designKWhDay>stocked.designKWhDay);
 assert.throws(()=>thermal.coldRoom({...base,inside:35}),/ambiente|consigna/i);
 assert.throws(()=>thermal.coldRoom({...base,operationHours:0}),/Horas/);
-assert.throws(()=>thermal.coldRoom({...base,productKgDay:-1}),/Producto/);
+assert.throws(()=>thermal.coldRoom({...base,productKgDay:-1}),/producto/i);
 const start={x:742345.12,y:9976534.23};
 const original=JSON.stringify(start);
 const plan=thermal.plan(start,{length:5,width:4,height:3,door:1.2,panelMm:100,inside:2});
