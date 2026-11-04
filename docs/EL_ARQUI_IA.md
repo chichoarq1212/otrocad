@@ -10,7 +10,7 @@
 - La biblioteca incorpora fichas públicas de Neufert (nota editorial GG de la 16.ª edición, 2013) y Plazola (catálogo universitario UPAEP). Son referencias bibliográficas y tipológicas: **no se incorporaron los libros completos ni se extrajeron de ellos tablas dimensionales**.
 - Se verificaron reglas seleccionadas de la actualización NEC-HS-AU 2019 (Acuerdo 007-19; Registro Oficial 924): campo de aplicación pp. RO 12–13, circulación tabla 1 p. RO 19 y puertas tabla 7 p. RO 27. La revisión comprueba el ancho libre del pasillo entre caras de muro y mantiene pendientes marcos, altura, giros, mobiliario, ruta y normativa del predio. Las viviendas privadas reciben estos criterios como orientación salvo exigencia aplicable.
 - Las áreas útiles aproximadas descuentan espesores; los objetivos propios de habitaciones permanecen identificados como reglas de OtroCAD. Los retiros propuestos no se presentan como retiros legales de Quito u otra ciudad.
-- La conexión generativa externa sigue **sin configurar**. El Worker opcional ahora acepta el mismo programa ampliado que el motor local, pero publicar archivos estáticos no habilita por sí mismo una IA generativa.
+- **Nueva integración en línea:** el editor de Cloudflare consulta automáticamente `/api/arqui` y `/api/arqui/status`; Cloudflare Workers AI u OpenAI pueden interpretar pedidos conversacionales con todo el programa y proponer revisiones. El motor CAD 2D sigue generando geometría editable local, no BIM libre. El backend está implementado y probado con respuestas simuladas, pero permanece desactivado hasta que el propietario configure Cloudflare Access, su audiencia y `ARQUI_ACCESS_ENABLED=yes`; véase `docs/ARQUI_IA_OPENAI_SETUP.md`.
 
 Fuentes públicas consultadas:
 
@@ -57,6 +57,6 @@ Aspectos que aún requieren desarrollo y revisión de un arquitecto:
 - Estructura portante, escaleras reglamentarias, instalaciones MEP, puertas de evacuación, detalles y coordinación entre especialidades.
 - Distribuciones alternativas y optimización de adyacencias con inteligencia generativa completa.
 - Construcción y modificación libre de objetos BIM 3D, muros paramétricos, familias y detección de interferencias.
-- Conectividad real a un servicio OpenAI: falta configurar un endpoint seguro, autenticación y credenciales de API del propietario; no se almacenan claves en JavaScript público.
+- Activación productiva del modelo en línea: la ruta y el binding Cloudflare ya están incluidos, pero requieren credenciales de Cloudflare Access y control del propietario; OpenAI es opcional mediante secreto servidor, nunca incrustado en JS público.
 
 Esta primera etapa es una **demostración funcional de dibujo arquitectónico progresivo y editable**, no un proyecto final listo para construir.
