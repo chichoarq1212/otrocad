@@ -24,8 +24,8 @@ function generate(points,kind,options={}){
  const groupId=String(options.groupId||'road-'+Date.now()),out=[];
  const meta={civilRoadMarking:kind,groupId,layer,color,lineweight:.24};
  const toCad=v=>({x:v.x*scale,y:v.y*scale});
- const line=(a,b,extra={})=>out.push({type:'line',a:toCad(a),b:toCad(b),...meta,...extra});
- const polygon=vertices=>out.push({type:'polygon',pts:vertices.map(toCad),...meta,solidFill:true,hatchPattern:'SOLID',hatchOpacity:1,importedHatch:false});
+ const line=(a,b,extra={})=>{if(out.length>5000)throw Error('Señalización demasiado extensa: divide el eje en sectores.');out.push({type:'line',a:toCad(a),b:toCad(b),...meta,...extra})};
+ const polygon=vertices=>{if(out.length>5000)throw Error('Demasiadas marcas viales: divide el eje en sectores.');out.push({type:'polygon',pts:vertices.map(toCad),...meta,solidFill:true,hatchPattern:'SOLID',hatchOpacity:1,importedHatch:false})};
  let total=0;
  const parts=[];
  for(let i=1;i<p.length;i++){
@@ -35,6 +35,7 @@ function generate(points,kind,options={}){
   parts.push({a,b,dx,dy,len:length,start:total});total+=length;
  }
  if(!parts.length)throw Error('El eje no tiene longitud útil.');
+ if(total/Math.max(.01,dash+gap)>5000)throw Error('La línea discontinua genera demasiados segmentos: divide el eje.');
  const position=distance=>{
   const part=parts.find(x=>distance<=x.start+x.len)||parts.at(-1);
   const t=Math.min(part.len,Math.max(0,distance-part.start));
@@ -55,7 +56,7 @@ function generate(points,kind,options={}){
   }
  }
  switch(kind){
-  case 'solid':case 'yellow':
+  case 'solid':case 'yellow':case 'edge':
    for(const part of parts)line(part.a,part.b);break;
   case 'dashed':createDashed();break;
   case 'double':
@@ -91,6 +92,27 @@ function generate(points,kind,options={}){
    line({x:base.x+n.x*.7,y:base.y+n.y*.7},tip);
    line({x:base.x-n.x*.7,y:base.y-n.y*.7},tip);break;
   }
+  case 'island':{
+   const length=Math.min(total,Math.max(2,Number(options.length||6)));
+   const spacing=Math.max(.3,Math.min(3,Number(options.space||1)));
+   const half=width/2;
+   for(let d=Math.max(0,total/2-length/2);d<=Math.min(total,total/2+length/2)+1e-9;d+=spacing){
+    const at=position(d);
+    const n={x:-at.dy,y:at.dx};
+    const skew=.45;
+    line({x:at.x-n.x*half-at.dx*skew,y:at.y-n.y*half-at.dy*skew},
+     {x:at.x+n.x*half+at.dx*skew,y:at.y+n.y*half+at.dy*skew});
+   }
+   break;
+  }
+  case 'roadtext':{
+   const station=position(total/2);
+   const label=String(options.label||'PARE').trim().slice(0,12)||'PARE';
+   const height=Math.max(.25,Math.min(3,width*.3));
+   out.push({type:'text',a:toCad({x:station.x,y:station.y}),text:label,
+    rotation:Math.atan2(station.dy,station.dx)*180/Math.PI,
+    textHeightWorld:height*scale,...meta});break;
+  }
   case 'sign':{
    const station=position(total/2),n={x:-station.dy,y:station.dx},radius=.38;
    const center={x:station.x+n.x*(width/2+.6),y:station.y+n.y*(width/2+.6)};
@@ -104,52 +126,4 @@ function generate(points,kind,options={}){
 }
 return {path,generate,unit};
 });
-(()=>{
-'use strict';
-if(typeof window==='undefined')return;
-const math=window.OtroCadCivilRoadMath,api=window.OtroCadCivilAPI,groups=document.getElementById('groups');
-if(!math||!api||!groups)return;
-const group=document.createElement('div');group.className='toolgroup';group.dataset.panel='civil';group.hidden=true;
-const heading=document.createElement('span');heading.className='group-title';heading.textContent='SEÑALIZACIÓN VIAL';
-group.append(heading);groups.append(group);
-const actions=[
- ['Línea continua','solid','Borde de calzada continuo'],
- ['Línea discontinua','dashed','Trazos y espacios editables'],
- ['Doble amarilla','double','Doble línea longitudinal'],
- ['Paso peatonal','crosswalk','Paso de cebra a partir del eje vial'],
- ['Flecha de dirección','arrow','Flecha alineada al eje seleccionado'],
- ['Señal vertical','sign','Símbolo de señal junto al eje']
-];
-const open=(kind)=>{
- if(!document.querySelector('[data-tab="civil"].active'))throw Error('Abre CIVIL 3D para la señalización vial.');
- const selected=api.getSelectedObjects();
- const source=selected.find(x=>(x.type==='line'&&x.a&&x.b)||(x.type==='poly'&&x.pts?.length>=2));
- if(!source)throw Error('Selecciona antes una línea o polilínea que represente el eje vial.');
- const vertices=source.type==='line'?[source.a,source.b]:source.pts;
- const width=Number(prompt('Ancho referencial de vía/paso (metros)','3.5'));
- if(!Number.isFinite(width)||width<=0||width>100)return;
- const opts={units:api.getUnits(),width};
- if(kind==='dashed'){
-  opts.dash=Number(prompt('Longitud del trazo (metros)','3'));
-  opts.gap=Number(prompt('Separación entre trazos (metros)','4'));
- }
- if(kind==='sign')opts.label=prompt('Texto de señal (máximo 12 caracteres)','PARE')||'PARE';
- const entities=math.generate(vertices,kind,opts);
- const layer=kind==='sign'?'CIVIL-SENALES':'CIVIL-MARCAS-VIALES';
- api.ensureLayer(layer,kind==='yellow'||kind==='double'?'#f9ce38':'#f1f4f8');
- api.addObjects(entities,'Señalización vial · '+entities.length+' entidades nativas · verifica normativa');
-};
-actions.forEach(([label,kind,help])=>{
- const btn=document.createElement('button');btn.type='button';btn.className='civil-tool';btn.title=help;
- const ico=document.createElement('span');ico.className='ico';
- ico.innerHTML='<svg class="cad-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 20L11 3M13 20L21 3M8 13l7-3" stroke-dasharray="'+(kind==='dashed'?'4 3':'0')+'"/><circle cx="11" cy="3" r="2" fill="#ffcf23"/></svg>';
- const text=document.createElement('span');text.className='civil-label';text.textContent=label;
- btn.append(ico,text);btn.addEventListener('click',()=>{try{open(kind)}catch(error){alert(error.message)}});group.append(btn);
-});
-Object.assign(window.OtroCadCivilCommands,{
- C3DROAD:()=>{try{open('solid')}catch(error){alert(error.message)}},
- C3DDASH:()=>{try{open('dashed')}catch(error){alert(error.message)}},
- C3DZEBRA:()=>{try{open('crosswalk')}catch(error){alert(error.message)}},
- C3DARROW:()=>{try{open('arrow')}catch(error){alert(error.message)}}
-});
-})();
+/* SEÑALIZACIÓN VIAL: redesigned ribbon and preview panel are implemented in civil-road-ui.js. */
