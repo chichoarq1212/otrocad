@@ -39,6 +39,7 @@ function savePoints(points,makeAxis=false){
  return api.addObjects(entities,'Coordenadas UTM · '+points.length+' puntos'+(makeAxis?' + eje':''));
 }
 function showPolylineDialog(){
+ if(!active()){api.setStatus('Abre CIVIL 3D para ingresar una polilínea UTM');return}
  const d=makeDialog('Polilínea por coordenadas UTM · Civil 3D',
   'Ingresa Norte, Este y Cota (metros). Tab recorre campos, ; cambia de campo y Enter añade el vértice. No afecta el módulo Dibujo.');
  const holder=document.createElement('div');holder.className='civil-topo-grid';
@@ -70,6 +71,7 @@ function showPolylineDialog(){
  d.showModal();n.focus({preventScroll:true});
 }
 function showImportDialog(source=''){
+ if(!active()){api.setStatus('Abre CIVIL 3D para importar puntos topográficos');return}
  const d=makeDialog('Puntos XYZ · Importar TXT / CSV / BLOCK',
   'Número, Norte, Este, Cota, Descripción. Admite texto pegado, tabulaciones y encabezados. Verifica la vista previa antes de importar.');
  const area=document.createElement('textarea');area.setAttribute('aria-label','Bloque de texto topográfico');
