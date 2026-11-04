@@ -25,7 +25,7 @@ defaultCtx.layouts=[{name:'P1'},{name:'P2'},{name:'P3'}];
 assert.equal(vm.runInContext('ensureCadLayout().name',defaultCtx),'P1');
 assert.equal(defaultCtx.layouts.length,3,'never destroy imported drawing sheets P1/P2/P3');
 
-const viewportSource=between('function effectivePaperViewports(layout){','function describePaperLayoutState(');
+const viewportSource=between('function cadStandardSheetArea(layout){','function describePaperLayoutState(');
 const ctx={
  layouts:[],objects:[],layoutViewportRecords:[],units:'m',
  modelExtentsForPaper:()=>({center:{x:500000,y:9970000},width:100,height:50}),
