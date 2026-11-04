@@ -35,7 +35,7 @@ function generate(points,kind,options={}){
   parts.push({a,b,dx,dy,len:length,start:total});total+=length;
  }
  if(!parts.length)throw Error('El eje no tiene longitud útil.');
- if(total/Math.max(.01,dash+gap)>5000)throw Error('La línea discontinua genera demasiados segmentos: divide el eje.');
+ if(kind==='dashed'&&total/Math.max(.01,dash+gap)>5000)throw Error('La línea discontinua genera demasiados segmentos: divide el eje.');
  const position=distance=>{
   const part=parts.find(x=>distance<=x.start+x.len)||parts.at(-1);
   const t=Math.min(part.len,Math.max(0,distance-part.start));
