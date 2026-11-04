@@ -9,8 +9,8 @@ android {
         applicationId 'com.otrocad.app'
         minSdk 26
         targetSdk 34
-        versionCode 20
-        versionName '0.5.6-test-alpha'
+        versionCode 21
+        versionName '0.5.7-test-alpha'
     }
     if (nativeOnly) {
         defaultConfig {

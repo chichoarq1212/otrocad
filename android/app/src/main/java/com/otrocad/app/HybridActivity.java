@@ -90,6 +90,15 @@ public class HybridActivity extends Activity {
         });
         root.addView(web,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
+        // Refresh cached HTML/JS/CSS when the installed APK version changes;
+        // keep DOM storage and project drawings intact.
+        android.content.SharedPreferences p=getSharedPreferences("otrocad-updates",MODE_PRIVATE);
+        String installed=p.getString("editor-version","");
+        String current="0.5.7-test-alpha";
+        if(!current.equals(installed)){
+            web.clearCache(true);
+            p.edit().putString("editor-version",current).apply();
+        }
         loadOffline();
     }
 
