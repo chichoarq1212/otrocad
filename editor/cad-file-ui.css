@@ -1,0 +1,34 @@
+/* Save As and incremental local recovery · responsive on desktop/Android/iOS. */
+.cad-save-dialog{width:min(470px,calc(100vw - 22px));max-height:90dvh;overflow:auto;
+ box-sizing:border-box;background:#f7fbff;color:#193864;border:1px solid #aec6e5;
+ border-radius:12px;padding:0;box-shadow:0 18px 60px #07182c88;
+ font:12px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.cad-save-dialog::backdrop{background:#061629aa}
+.cad-save-dialog *{box-sizing:border-box}
+.cad-save-dialog .cs-head{display:flex;align-items:center;justify-content:space-between;gap:8px;
+ padding:11px 14px;color:white;background:#174da8;font-size:14px;letter-spacing:.2px}
+.cad-save-dialog .cs-head button{background:#ffffff22;border:1px solid #ffffff88;color:white;
+ border-radius:6px;width:28px;height:28px;font-size:20px;line-height:20px;cursor:pointer}
+.cad-save-dialog .cs-body{display:flex;flex-direction:column;gap:10px;padding:16px}
+.cad-save-dialog label{display:flex;flex-direction:column;gap:5px;font-weight:700;font-size:11px}
+.cad-save-dialog input,.cad-save-dialog select{width:100%;min-height:35px;border:1px solid #b1c9e5;
+ border-radius:7px;padding:7px 10px;background:white;color:#173967;font:12px system-ui,sans-serif}
+.cad-save-dialog .cs-hint,.cad-save-dialog .cs-body>p{font-size:11px;color:#607d9e;margin:0}
+.cad-save-dialog .cs-result{color:#145b9c!important;font-weight:700;white-space:pre-wrap;
+ overflow-wrap:anywhere;min-height:12px}
+.cad-save-dialog .cs-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;
+ padding:12px 14px;background:#eef5ff;border-top:1px solid #d5e3f2}
+.cad-save-dialog .cs-actions button{border:1px solid #9db7db;padding:8px 13px;
+ border-radius:7px;background:#fff;color:#1e4273;font:700 12px system-ui,sans-serif;cursor:pointer}
+.cad-save-dialog #csSave,.cad-save-dialog #csRestoreLast{background:#185be8;color:white;border-color:#185be8}
+.cad-save-dialog button:disabled{opacity:.5;cursor:not-allowed}
+.cad-save-dialog button:focus-visible,.cad-save-dialog input:focus-visible,
+.cad-save-dialog select:focus-visible{outline:2px solid #efbd34;outline-offset:2px}
+.cad-save-progress{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:175px;
+ font-size:10px;color:#88c3f2;padding:0 6px;flex:0 1 auto}
+@media(max-width:720px){.cad-save-dialog{width:calc(100vw - 18px)}
+ .cad-save-dialog .cs-body{padding:10px}.cad-save-progress{max-width:110px;font-size:9px}}
+@media(max-width:950px) and (orientation:landscape) and (max-height:500px){
+ .cad-save-dialog{max-height:94dvh}.cad-save-dialog .cs-body{padding:8px;gap:6px}
+ .cad-save-dialog .cs-actions{padding:7px}.cad-save-dialog .cs-head{padding:7px}}
+@media print{.cad-save-dialog,.cad-save-progress{display:none!important}}
