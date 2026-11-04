@@ -199,6 +199,9 @@ $('arquiDraw').onclick=async()=>{
  const id=projectId||'arqui-'+Date.now().toString(36);
  const origin={x:Number($('arquiOriginX').value),y:Number($('arquiOriginY').value)};
  const shapes=planner.toEntities(plan,{units:api.getUnits(),origin,projectId:id});
+ // Architectural CAD layers remain individually editable through CAPAS.
+ for(const [layer,color] of new Map(shapes.filter(x=>x.layer).map(x=>[x.layer,x.color])))
+  api.ensureLayer?.(layer,color);
  try{
   if(previous.length){
    api.replaceObjects(x=>x.aiArchitect&&x.aiProjectId===id,shapes,'El Arqui IA · diseño actualizado · '+shapes.length+' entidades');
