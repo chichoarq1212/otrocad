@@ -1,5 +1,5 @@
 /* Ing. Jaimito: only active in Civil 3D. Never interfere with CAD touch gestures. */
-#jaimitoAssistant[hidden],#jaimitoPanel[hidden]{display:none!important}
+#jaimitoAssistant[hidden],#jaimitoPanel[hidden],#kelvinAssistant[hidden],#kelvinPanel[hidden]{display:none!important}
 .jaimito-root{position:fixed;right:12px;bottom:var(--jaimito-bottom,calc(110px + env(safe-area-inset-bottom,0px)));
  z-index:85;pointer-events:none;isolation:isolate;font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 .jaimito-root button,.jaimito-root input{font:inherit}
