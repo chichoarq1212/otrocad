@@ -4,11 +4,13 @@ on:
     branches: ["main", "otrocad-android-alpha-*"]
     paths:
       - "android/**"
+      - "editor/**"
       - ".github/workflows/android-alpha.yml"
   pull_request:
     branches: ["main"]
     paths:
       - "android/**"
+      - "editor/**"
       - ".github/workflows/android-alpha.yml"
   workflow_dispatch:
 permissions:
@@ -32,16 +34,15 @@ jobs:
       - name: Incluir editor web local para uso sin conexión
         run: |
           mkdir -p android/app/src/main/assets/editor
-          cp editor/index.html editor/editor.js android/app/src/main/assets/editor/
-          cp -R editor/demo editor/library android/app/src/main/assets/editor/
-          if [ -d editor/vendor ]; then cp -R editor/vendor android/app/src/main/assets/editor/; fi
+          cp -a editor/. android/app/src/main/assets/editor/
+          node scripts/verify-android-offline.cjs android/app/src/main/assets/editor
       - name: Compilar APK híbrido con editor offline
         run: gradle -p android assembleDebug --no-daemon
       - name: Preparar APK con nombre de versión
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-hibrido-debug.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-hibrido-0.5.7-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: OtroCAD-Android-hibrido-debug
-          path: OtroCAD-Android-hibrido-debug.apk
+          name: OtroCAD-Android-hibrido-0.5.7-debug
+          path: OtroCAD-Android-hibrido-0.5.7-debug.apk
           if-no-files-found: error
       # Esta tarea solo genera un artefacto de pruebas; no modifica releases anteriores.
