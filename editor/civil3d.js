@@ -314,6 +314,11 @@ addButton(analysisGroup,'Volumen vs. cota','volume',volumeAnalysis,'Calcular cor
 addButton(analysisGroup,'Borrar análisis','clear',clearAnalysis,'Eliminar TIN, curvas y análisis generados sin borrar puntos');
 function numberValue(v){const n=Number(String(v??'').trim().replace(',','.'));return Number.isFinite(n)?n:NaN}
 function parsePointText(text){
+ if(window.OtroCadCivilPoints){
+  const parsed=window.OtroCadCivilPoints.parse(text);
+  return window.OtroCadCivilPoints.entities(parsed.points,(east,north)=>
+   window.OtroCadCivilTopo?.toModel(east,north)||{x:east,y:north});
+ }
  const lines=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!s.startsWith('#')&&!s.startsWith('//'));
  if(!lines.length)throw Error('El archivo no contiene filas de puntos.');
  const first=lines[0],delimiter=first.includes('\t')?'\t':first.includes(';')?';':first.includes(',')?',':' ';
@@ -344,7 +349,7 @@ function parseLandXml(text){
  const add=(node,index)=>{
   const values=String(node.textContent||'').trim().split(/[\s,;]+/).map(numberValue).filter(Number.isFinite);
   if(values.length<3)return;
-  points.push({type:'point',a:{x:values[1],y:values[0]},z:values[2],civilPoint:true,civilPointId:node.getAttribute('name')||node.getAttribute('id')||('P'+(index+1)),layer:'Topografía',color:'#70d6a3',lineweight:.25});
+  points.push({type:'point',a:window.OtroCadCivilTopo?.toModel(values[1],values[0])||{x:values[1],y:values[0]},z:values[2],civilPoint:true,civilPointId:node.getAttribute('name')||node.getAttribute('id')||('P'+(index+1)),layer:'Topografía',color:'#70d6a3',lineweight:.25});
  };
  if(nodes.length)nodes.forEach(add);
  else Array.from(xml.getElementsByTagNameNS('*','P')).filter(node=>node.parentElement?.localName==='Pnts').forEach(add);
