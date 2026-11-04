@@ -45,7 +45,7 @@ jobs:
           # HVAC loads, cold-room design, official mascots, DWG tools and CSS.
           cp -a editor/. android/app/src/main/assets/editor/
           node scripts/verify-android-offline.cjs android/app/src/main/assets/editor
-          printf '{"version":"0.5.7-test-alpha","source":"%s","mode":"offline-hybrid"}\n' "$GITHUB_SHA" > android/app/src/main/assets/editor/android-bundle-info.json
+          printf '{"version":"0.5.8-test-alpha","source":"%s","mode":"offline-hybrid"}\n' "$GITHUB_SHA" > android/app/src/main/assets/editor/android-bundle-info.json
           test -s android/app/src/main/assets/editor/android-bundle-info.json
       - name: Build Android debug APK
         run: gradle -p android clean assembleDebug --no-daemon --stacktrace
@@ -56,7 +56,7 @@ jobs:
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk | head -n 8
           unzip -Z1 android/app/build/outputs/apk/debug/app-debug.apk > /tmp/otrocad-apk-entry-list.txt
-          for required in             editor/index.html editor/editor.js editor/civil3d.js             editor/civil-points.js editor/civil-topography.js             editor/civil-road.js editor/civil-road-ui.js             editor/civil-ribbon.css editor/civil-road-ui.css             editor/mep.js editor/mep-ribbon.css             editor/mep-thermal.js editor/mep-thermal-ui.js             editor/mep-thermal-ui.css editor/kelvin-assistant.js             editor/jaimito-assistant.js editor/assets/ing-kelvin.webp             editor/assets/ing-jaimito-hd.webp; do
+          for required in             editor/index.html editor/editor.js editor/civil3d.js             editor/civil-points.js editor/civil-topography.js             editor/civil-road.js editor/civil-road-ui.js             editor/civil-ribbon.css editor/civil-road-ui.css             editor/mep.js editor/mep-ribbon.css             editor/mep-thermal.js editor/mep-thermal-ui.js             editor/mep-thermal-ui.css editor/kelvin-assistant.js             editor/jaimito-assistant.js editor/assets/ing-kelvin.webp editor/arqui-planner.js editor/arqui-references.js editor/arqui-assistant.js editor/arqui-assistant.css editor/assets/el-arqui.webp             editor/assets/ing-jaimito-hd.webp; do
             grep -Fx "assets/$required" /tmp/otrocad-apk-entry-list.txt >/dev/null || {
               echo "::error::APK missing $required"; exit 1;
             }
@@ -79,27 +79,27 @@ jobs:
             adb shell am start -W -n com.otrocad.app/.HybridActivity
             for attempt in $(seq 1 12); do if adb shell pidof com.otrocad.app >/dev/null 2>&1; then echo "OtroCAD inició en Android (intento $attempt)"; exit 0; fi; echo "Esperando inicio de OtroCAD ($attempt/12)"; sleep 2; done; adb logcat -d -s AndroidRuntime:E ActivityManager:W WebViewFactory:E; exit 1
       - name: Prepare named test APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.5.7-alpha.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.5.8-alpha.apk
       # Always preserve the tested APK even if release permissions are restricted.
       - uses: actions/upload-artifact@v4
         with:
-          name: OtroCAD-Android-0.5.7-verified
-          path: OtroCAD-Android-0.5.7-alpha.apk
+          name: OtroCAD-Android-0.5.8-verified
+          path: OtroCAD-Android-0.5.8-alpha.apk
           if-no-files-found: error
           retention-days: 90
-      - name: Publish Android 0.5.7 in GitHub Releases
+      - name: Publish Android 0.5.8 in GitHub Releases
         if: github.event_name != 'pull_request'
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-0.5.7-test
+          tag_name: android-0.5.8-test
           overwrite_files: true
           make_latest: false
           target_commitish: ${{ github.sha }}
-          name: OtroCAD Android 0.5.7 alfa · Civil + MEP + refrigeración
+          name: OtroCAD Android 0.5.8 alfa · El Arqui IA + Civil + MEP
           prerelease: true
           body: |
-            OtroCAD Android 0.5.7-test-alpha (versionCode 21).
+            OtroCAD Android 0.5.8-test-alpha (versionCode 22).
             APK híbrido de prueba con editor completo empaquetado para uso SIN conexión.
             Civil 3D: ingreso UTM Norte/Este/Cota, importación de puntos TXT/CSV/LandXML,
             curvas, TIN, alineamientos, señalización vial con editor de marcas, pasos
@@ -108,9 +108,14 @@ jobs:
             corregidos para evitar solapamientos; Ing. Keeelvin con imagen oficial,
             cálculo preliminar de cargas térmicas HVAC y diseño de cuartos fríos,
             balance de energía, exportación CSV y planta CAD 2D.
-            También incluye el Ing. Jaimito, disposición móvil/iOS y utilidades CAD existentes.
+            Añade El Arqui IA con imagen oficial, generación de plantas 2D por
+            instrucciones, habitaciones, pasillos, puertas, ventanas, áreas y cotas;
+            auditoría dimensional, vista previa y dibujo CAD progresivo.
+            Plazola y Neufert completos NO están incorporados: extractos optativos
+            autorizados y API generativa preparada, pendiente de conexión segura.
+            Conserva Ing. Jaimito, Keeelvin, Civil 3D y MEP.
             Cálculos orientativos: requieren verificación profesional.
             La modalidad "Android nativo experimental" es otro APK con menos herramientas.
             APK DEBUG de pruebas, no firmado para Play Store. La firma podría diferir
             de una instalación anterior; realiza respaldo antes de instalar.
-          files: OtroCAD-Android-0.5.7-alpha.apk
+          files: OtroCAD-Android-0.5.8-alpha.apk
