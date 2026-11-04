@@ -1111,14 +1111,17 @@ function matchPropertiesAt(q){
  }
  if(hit===matchState.sourceIndex){status.textContent='MA: selecciona objetos de destino distintos al origen';return}
  if(lockedLayers.has(item.layer)){status.textContent='MA: destino en una capa bloqueada';return}
- const source=matchState.source,patch={};
- for(const key of matchStyleKeys)if(Object.prototype.hasOwnProperty.call(source,key))patch[key]=clone(source[key]);
- if(item.type===source.type){
-  for(const key of matchTypeKeys[item.type]||[])if(Object.prototype.hasOwnProperty.call(source,key))patch[key]=clone(source[key]);
- }
- // Never copy geometry, positions, layout, groups or project identity.
- if(!Object.keys(patch).length){status.textContent='MA: el origen no tiene propiedades transferibles';return}
+ const source=matchState.source,patch={},clear=[];
+ const transfer=key=>{
+  if(Object.prototype.hasOwnProperty.call(source,key))patch[key]=clone(source[key]);
+  else if(Object.prototype.hasOwnProperty.call(item,key))clear.push(key);
+ };
+ for(const key of matchStyleKeys)transfer(key);
+ if(item.type===source.type)for(const key of matchTypeKeys[item.type]||[])transfer(key);
+ // Never copy geometry, positions, layouts, groups or project identity.
+ if(!Object.keys(patch).length&&!clear.length){status.textContent='MA: el origen no tiene propiedades transferibles';return}
  checkpoint();
+ for(const key of clear)delete item[key];
  for(const [key,value] of Object.entries(patch))item[key]=value;
  if(patch.layer)window.OtroCadCivilAPI?.ensureLayer(patch.layer,patch.color||source.color);
  save();render();matchState.applied++;
