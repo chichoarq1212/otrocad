@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const planner=require('../editor/arqui-planner.js');
+const professional=require('../editor/arqui-professional.js');
 const refs=require('../editor/arqui-references.js');
 const script=fs.readFileSync('editor/arqui-assistant.js','utf8');
 const nodes={};
@@ -59,7 +60,7 @@ const api={
  fit:()=>{fitCalled=true},
 };
 const store={entries:new Map(),getItem(k){return this.entries.get(k)||null},setItem(k,v){this.entries.set(k,v)}};
-const window={OtroCadArquiPlanner:planner,OtroCadArquiReferences:refs,OtroCadCivilAPI:api,addEventListener(){}};
+const window={OtroCadArquiPlanner:planner,OtroCadArquiProfessional:professional,OtroCadArquiReferences:refs,OtroCadCivilAPI:api,addEventListener(){}};
 const context={window,document,location:{href:'https://example.org/editor/'},localStorage:store,
  MutationObserver:class{observe(){}},queueMicrotask:cb=>cb(),URL,AbortController,
  confirm:()=>true,console,setTimeout,clearTimeout,Date,Number,Math};
