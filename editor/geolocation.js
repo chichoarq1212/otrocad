@@ -229,6 +229,8 @@ function draw(ctx,view){
  }catch(error){attribution.textContent=crs(state)+' · '+error.message}
 }
 window.OtroCadGeolocation={draw,isVisible,getState:()=>({...state}),restore,clear:()=>restore(null),showSettings,setEnabled,showEcuador,
+ modelToUtm:(point,units)=>modelToUtm(point,state,units),
+ utmToModel:(pair,units)=>utmToModel(pair,state,units),
  formatCoordinate:(point,units)=>{if(!isVisible())return '';if(!state.configured)return ' · Vista Ecuador · georreferencia del plano pendiente';const p=modelToUtm(point,state,units);return ' · E '+p[0].toFixed(2)+' · N '+p[1].toFixed(2)+' · '+crs(state)}};
 Object.assign(window.OtroCadCivilCommands,{C3DGEO:showSettings,GEOGRAPHICLOCATION:showSettings,GEOMAP:showSettings,GEOMAPOFF:()=>setEnabled(false),ECUADOR:()=>showEcuador(),GALAPAGOS:()=>showEcuador('galapagos')});
 window.addEventListener('online',()=>{for(const [id,item] of cache)if(item.status==='error')cache.delete(id);for(const [id,item] of coverage)if(item.available===null&&item.status!=='loading')coverage.delete(id);redraw()});
