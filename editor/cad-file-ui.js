@@ -100,7 +100,7 @@ $r('csRestoreLast').onclick=()=>restore('autosave-latest');
 $r('csRestorePrev').onclick=()=>restore('autosave-previous');
 if(btnRecovery)btnRecovery.onclick=openRecovery;
 document.addEventListener('keydown',event=>{
- if((event.ctrlKey||event.metaKey)&&event.shiftKey&&event.key.toLowerCase()==='s'){
+ if(!event.defaultPrevented&&(event.ctrlKey||event.metaKey)&&event.shiftKey&&event.key.toLowerCase()==='s'){
   event.preventDefault();event.stopImmediatePropagation();open('dwg');
  }
 },true);
