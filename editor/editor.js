@@ -2717,6 +2717,36 @@ window.OtroCadCivilAPI={
   status.textContent=String(message||('Añadidas '+valid.length+' entidades Civil'))+(saved?'':' · respaldo local pendiente');
   return saved;
  },
+ // One Undo checkpoint for a whole generated CAD design, despite progressive visual commits.
+ addObjectsAnimated:async(items,{batchSize=12,delayMs=45,signal,onProgress,message}={})=>{
+  const valid=(Array.isArray(items)?items:[]).filter(item=>item&&typeof item==='object');
+  if(!valid.length)throw Error('No hay entidades para dibujar.');
+  if(valid.length>4000)throw Error('El diseño IA supera el límite seguro de entidades.');
+  if(window.OtroCadAIStreamBusy)throw Error('Ya hay un dibujo IA en ejecución.');
+  window.OtroCadAIStreamBusy=true;
+  const chunk=Math.max(1,Math.min(100,Math.round(Number(batchSize)||12)));
+  const delay=Math.max(0,Math.min(500,Math.round(Number(delayMs)||45)));
+  const inserted=new Set();
+  checkpoint();
+  try{
+   for(let i=0;i<valid.length;i+=chunk){
+    if(signal?.aborted)throw Error('Dibujo cancelado por el usuario.');
+    const group=valid.slice(i,i+chunk);
+    objects.push(...group);group.forEach(o=>inserted.add(o));
+    render();onProgress?.(Math.min(valid.length,i+group.length),valid.length);
+    if(i+chunk<valid.length&&delay)await new Promise(resolve=>setTimeout(resolve,delay));
+   }
+   const saved=save();render();
+   status.textContent=String(message||('El Arqui IA · '+valid.length+' entidades CAD editables'))+(saved?'':' · respaldo local pendiente');
+   return {count:valid.length,saved};
+  }catch(error){
+   // Cancel only this batch without affecting the user's existing drawing.
+   objects=objects.filter(o=>!inserted.has(o));
+   save();render();status.textContent=String(error.message||error);
+   throw error;
+  }finally{window.OtroCadAIStreamBusy=false}
+ },
+
  replaceObjects:(predicate,items,message)=>{
   if(typeof predicate!=='function')return false;
   const valid=(Array.isArray(items)?items:[]).filter(item=>item&&typeof item==='object');
