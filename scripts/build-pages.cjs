@@ -35,6 +35,7 @@ const requiredFiles = [
   'editor/kelvin-assistant.js',
   'editor/arqui-planner.js',
   'editor/arqui-house-layout.js',
+  'editor/arqui-user-ai.js',
   'editor/arqui-references.js',
   'editor/arqui-assistant.js',
   'editor/arqui-professional.js',
