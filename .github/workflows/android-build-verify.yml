@@ -41,7 +41,7 @@ jobs:
       - name: Bundle latest web editor for offline Android mode
         run: |
           mkdir -p android/app/src/main/assets/editor
-          cp editor/index.html editor/editor.js editor/civil3d.js editor/jaimito-assistant.js editor/jaimito-assistant.css editor/compact-chrome.css android/app/src/main/assets/editor/
+          cp editor/index.html editor/editor.js editor/civil3d.js editor/jaimito-assistant.js editor/jaimito-assistant.css editor/compact-chrome.css editor/geolocation.js android/app/src/main/assets/editor/
           cp -R editor/demo editor/library editor/assets android/app/src/main/assets/editor/
           if [ -d editor/vendor ]; then cp -R editor/vendor android/app/src/main/assets/editor/; fi
           test -s android/app/src/main/assets/editor/index.html

@@ -784,8 +784,9 @@ console.log('Viewport import preservation passed: zero-width and disabled paper 
  approve=true;
  assert.equal(await vm.runInContext('protectDrawingBeforeReplacement()',noDb),true);
 
- let approvedSafety=false;const buttons={};
+ let approvedSafety=false,mapCleared=0;const buttons={};
  const newScope={
+  window:{OtroCadGeolocation:{clear:()=>{mapCleared++}}},
   objects:[{type:'line',a:{x:0,y:0},b:{x:8,y:0}}],layouts:[{name:'P-03'}],layoutViewportRecords:[{id:2}],activeLayout:'P-03',hideModelAnnotations:true,
   undo:[],redo:[],clone:x=>JSON.parse(JSON.stringify(x)),clearSelection(){},saveLayoutState(){},
   refreshLayoutTabs(){},render(){},save:()=>true,status:{textContent:''},offset:{x:10,y:-10},zoom:3,
@@ -798,9 +799,11 @@ console.log('Viewport import preservation passed: zero-width and disabled paper 
  vm.runInContext(source.slice(source.indexOf("$('#newDrawing').onclick="),source.indexOf("\n$('#save').onclick=")),newScope);
  await buttons['#newDrawing'].onclick();
  assert.equal(newScope.objects.length,1,'No reemplazar dibujo si no hay respaldo');
+ assert.equal(mapCleared,0,'Cancelled new drawing retains its geographic reference');
  approvedSafety=true;
  await buttons['#newDrawing'].onclick();
  assert.equal(newScope.objects.length,0,'Nuevo dibujo abre lienzo vacío');
+ assert.equal(mapCleared,1,'New drawings must not inherit a previous project location');
  assert.equal(newScope.layouts.length,1,'Nuevo dibujo crea una única presentación, sin conservar las hojas anteriores');
  assert.equal(newScope.layouts[0].name,'Presentación 1');
  assert.equal(newScope.undo.length,1,'El cambio sigue siendo reversible en memoria');
