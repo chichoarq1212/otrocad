@@ -80,3 +80,18 @@ header{height:36px!important;min-height:36px!important;flex:0 0 36px;padding:3px
 #stage>#dynamic.cad-offset-input #dynLen{width:85px}
 #stage>#dynamic #acceptPoint{min-height:27px;height:27px;padding:2px 6px}
 @media print{body{display:block}#workspace{height:auto!important;flex:none}.jaimito-root{display:none!important}}
+
+/* The same compact blue/yellow CAD chrome is shared by MEP and point entry. */
+#stage>#dynamic.cad-coordinate-input{position:absolute;z-index:45;right:auto!important;bottom:auto!important;width:450px;max-width:calc(100% - 16px);padding:5px 7px;gap:5px;flex-wrap:wrap;border-radius:4px;touch-action:manipulation}
+#stage>#dynamic.cad-coordinate-input label{font:9px system-ui}
+#stage>#dynamic.cad-coordinate-input input{width:104px;height:27px;padding:3px 5px;font:12px Consolas,monospace}
+#stage>#dynamic #dynCoordMode{height:25px;padding:2px 4px;border:1px solid #4f83ba;border-radius:3px;background:#123251;color:#d9ecff;font:10px system-ui}
+#groups .mep-field{display:flex;align-items:center;gap:4px;font:9px system-ui;color:#285583;white-space:nowrap}
+#groups .mep-field input{width:59px;min-width:0}
+#groups .mep-field select{max-width:170px}
+#groups .mep-field input.mep-tag{width:86px}
+#groups .mep-tool.active{border-color:#c8a61c!important;background:#fff0a8!important}
+#tabs button[data-tab="mep"],#tabs button[data-tab="hvac"]{font-weight:750;color:#185be8}
+#tabs button[data-tab="mep"].active,#tabs button[data-tab="hvac"].active{background:#185be8;color:white}
+.mep-summary-table{width:100%;border-collapse:collapse;font:12px system-ui}.mep-summary-table th,.mep-summary-table td{padding:7px;border-bottom:1px solid #d8e4f3;text-align:left}
+@media(max-width:480px){#stage>#dynamic.cad-coordinate-input{max-width:calc(100% - 16px);width:310px}#stage>#dynamic.cad-coordinate-input input{width:92px}#stage>#dynamic #dynHint{white-space:normal}}
