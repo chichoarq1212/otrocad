@@ -86,7 +86,7 @@ assert.match(assistant,/allowed=new Set\(\['draw'/,'El Arqui appears only on arc
 assert.match(assistant,/api\.addObjectsAnimated/);
 assert.match(assistant,/api\.replaceObjects/);
 assert.match(assistant,/api\.removeObjects/);
-assert.match(assistant,/El Arqui IA.*Plano|He dibujado el anteproyecto/);
+assert.match(assistant,/Tu anteproyecto ya está dibujado|Dibujar plano completo en CAD/);
 assert.match(assistant,/confirm\(/,'Explicit approval before touching existing CAD');
 assert.match(assistant,/referenceExcerpts/);
 assert.match(css,/orientation:landscape/);
