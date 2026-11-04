@@ -300,14 +300,17 @@ function generate(plan,options={}){
   rect(x,y,w,d,'parking','AI-ARQ-GARAJE',art.site,.08);
   for(const [ax,ay,bx,by] of [[x,y,x+w,y],[x+w,y,x+w,y+d],[x+w,y+d,x,y+d],[x,y+d,x,y]])
    ln(ax,ay,bx,by,'AI-ARQ-GARAJE',art.site,'parking');
-  const cx=x+w/2,cy=y+d/2;
-  rect(cx-.83,cy-1.68,1.66,3.32,'car','AI-ARQ-MOBILIARIO',art.furniture,.12);
-  rect(cx-.65,cy-.9,1.30,1.16,'windscreen','AI-ARQ-MOBILIARIO',art.furniture,.10);
-  for(const yy of [cy-1.13,cy+.9]){
-   ln(cx-.93,yy,cx-.79,yy,'AI-ARQ-MOBILIARIO',art.furniture,'wheel');
-   ln(cx+.79,yy,cx+.93,yy,'AI-ARQ-MOBILIARIO',art.furniture,'wheel');
+  const cx=x+w/2,spaces=g.spaces===2&&d>10?2:1;
+  for(let i=0;i<spaces;i++){
+   const cy=y+(i+.5)*(d/spaces);
+   rect(cx-.83,cy-1.68,1.66,3.32,'car','AI-ARQ-MOBILIARIO',art.furniture,.12);
+   rect(cx-.65,cy-.9,1.30,1.16,'windscreen','AI-ARQ-MOBILIARIO',art.furniture,.10);
+   for(const yy of [cy-1.13,cy+.9]){
+    ln(cx-.93,yy,cx-.79,yy,'AI-ARQ-MOBILIARIO',art.furniture,'wheel');
+    ln(cx+.79,yy,cx+.93,yy,'AI-ARQ-MOBILIARIO',art.furniture,'wheel');
+   }
+   text(x+.24,y+i*d/spaces+.2,'PARQUEO '+(i+1),.14,'AI-ARQ-GARAJE',art.title);
   }
-  text(x+.3,y+.28,'ESTACIONAMIENTO 1',.15,'AI-ARQ-GARAJE',art.title);
  }
  if(s.style!=='esquematico')northAndTitle();
  if(out.length>3300)throw Error('El anteproyecto excede el límite gráfico: reduce la complejidad.');
