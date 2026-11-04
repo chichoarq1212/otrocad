@@ -213,14 +213,14 @@ function makePreview(next,announce=false){
   if(announce){
    const info=spec;
    const areas=plan.floors.map(f=>f.rooms.filter(r=>r.kind!=='circulation').reduce((n,r)=>n+(r.netArea??r.area),0).toFixed(1));
-   const brief='Te propongo '+info.floors+' planta(s) en un terreno de '+info.lotWidth+' × '+info.lotDepth+' m, con retiros de '+info.frontSetback+' m al frente, '+info.backSetback+' m atrás y '+info.sideSetback+' m laterales. ';
+   const brief=info.dimensionMeaning==='house'?'Interpreto '+info.houseWidth+' × '+info.houseDepth+' m como el tamaño de la CASA. Te propongo '+info.floors+' plantas; para mostrar los '+(plan.garage?.spaces||0)+' parqueos y el patio de '+info.patioDepth+' m he dibujado una PARCELA HIPOTÉTICA de '+info.lotWidth+' × '+info.lotDepth+' m, pendiente de confirmar. ':'Te propongo '+info.floors+' planta(s) en un terreno de '+info.lotWidth+' × '+info.lotDepth+' m, con retiros de '+info.frontSetback+' m al frente, '+info.backSetback+' m atrás y '+info.sideSetback+' m laterales. ';
    const baths=plan.floors.reduce((n,f)=>n+f.rooms.filter(r=>r.kind==='bath').length,0);
    const detail='Organicé '+rooms+' espacios, '+info.bedrooms+' dormitorios, '+baths+' baños y '+(plan.garage?plan.garage.spaces+' parqueo(s)':'sin plaza de estacionamiento dibujada')+
     '. Muros exteriores de '+Math.round(info.wallOuter*100)+' cm e interiores de '+Math.round(info.wallInner*100)+' cm; '+(info.furniture?'mobiliario, ':'')+(info.wallHatch?'hachurado, ':'')+(info.dimensions?'cotas, ':'')+
     'puertas y ventanas reales. Áreas por planta: '+areas.join(' / ')+' m² útiles aproximados. ';
    const notes=plan.warnings.slice(0,2).join(' ');
    message('bot',brief+detail+'He preparado '+shapes.length+' entidades CAD en modo '+info.style+'. '+(notes?'Observaciones: '+notes+' ':'')+
-    'Si no indicaste retiros o espesores, usé supuestos visibles en «Ajustar medidas». Revisa la propuesta y pulsa «Dibujar plano completo en CAD». Después podrás modificarla aquí o con comandos de OtroCAD.');
+    (info.siteAssumed?'La franja frontal de parqueo no es un retiro municipal verificado; confirma el terreno real. ':'Si no indicaste retiros o espesores, usé supuestos visibles en «Ajustar medidas». ')+'Revisa la propuesta y pulsa «Dibujar plano completo en CAD». Después podrás modificarla aquí o con comandos de OtroCAD.');
   }
   return true;
  }catch(error){
