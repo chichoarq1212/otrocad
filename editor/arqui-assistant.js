@@ -91,11 +91,21 @@ tabs.addEventListener('click',()=>queueMicrotask(sync));
 const observer=new MutationObserver(sync);observer.observe(tabs,{subtree:true,attributes:true,attributeFilter:['class','aria-selected']});
 window.addEventListener('pageshow',sync);
 const endpoint=(()=>{
- const raw=window.OTROCAD_ARQUI_AI_ENDPOINT;
+ const here=new URL(location.href);
+ const auto=here.hostname.endsWith('.workers.dev')||here.hostname.startsWith('otrocad.');
+ const raw=window.OTROCAD_ARQUI_AI_ENDPOINT||(auto?here.origin+'/api/arqui':'');
  if(typeof raw!=='string'||!raw)return null;
  try{const url=new URL(raw,location.href);return url.protocol==='https:'?url:null}catch(_){return null}
 })();
-$('arquiMode').textContent=endpoint?'IA remota opcional · planos sujetos a validación':'Diseño CAD local · IA generativa no conectada';
+$('arquiMode').textContent='IA generativa no conectada · modo local';
+if(endpoint&&typeof fetch==='function'){
+ fetch(endpoint.href.replace(/\/api\/arqui$/, '/api/arqui/status'),{cache:'no-store'})
+  .then(r=>r.ok?r.json():null)
+  .then(info=>$('arquiMode').textContent=info?.online?
+   'IA en línea disponible · '+(info.provider==='openai'?'OpenAI':'Cloudflare AI'):
+   'IA generativa no conectada · modo local')
+  .catch(()=>$('arquiMode').textContent='IA generativa no conectada · modo local');
+}
 function message(role,text){
  conversation.push({role:role==='user'?'user':'assistant',content:String(text).slice(0,2200)});
  while(conversation.length>12)conversation.shift();
@@ -248,23 +258,35 @@ async function propose(text){
   let next,remoteAnswered=false;
   const current=fromInputs();
   if(endpoint){
-   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),22000);
+   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
    try{
     const linked=$('arquiSendExcerpts').checked?refs.search(prompt,refs.get(),3):[];
     const response=await fetch(endpoint.href,{method:'POST',headers:{'Content-Type':'application/json'},
      body:JSON.stringify({message:prompt,mode:'architecture',currentSpec:current,
       conversation:conversation.slice(0,-1).slice(-8),
       referenceExcerpts:linked.map(x=>({source:x.source,title:x.title,text:x.excerpt}))}),signal:controller.signal});
-    if(!response.ok)throw Error('Servicio no disponible');
+    if(!response.ok){
+      const err=await response.json().catch(()=>null);
+      if(response.status===503)throw Error('LOCAL_FALLBACK');
+      throw Error('REMOTE: '+(err?.error||'El servicio IA está temporalmente inaccesible.'));
+     }
     const data=await response.json();
-    if(!data||typeof data.reason!=='string'||typeof data.requiresReview!=='boolean'||!data.spec||typeof data.spec!=='object')throw Error('Respuesta inválida');
+    if(!data||typeof data.reason!=='string'||typeof data.requiresReview!=='boolean'||!data.spec||typeof data.spec!=='object')throw Error('REMOTE: La respuesta IA no tiene un programa válido.');
     const candidate=planner.validateSpec({...current,...data.spec});
+    $('arquiMode').textContent='IA en línea conectada · propuesta editable';
     remoteAnswered=true;
     if(data.requiresReview){message('bot',data.reason||'Necesito aclarar un detalle antes de dibujar.');return}
     next=candidate;
     if(data.reason)message('bot',data.reason);
-   }catch(_){
-    message('bot','La conexión generativa no está disponible. Intentaré interpretar localmente lo que pueda reconocer.');
+   }catch(error){
+    if(String(error.message||'').startsWith('REMOTE:')){
+     message('bot',String(error.message).slice(7)+' La propuesta anterior se conserva.');
+     return;
+    }
+    $('arquiMode').textContent='IA generativa no conectada · modo local';
+    message('bot',String(error.message)==='LOCAL_FALLBACK'?
+     'IA en línea pendiente de activación. Usaré provisionalmente el motor local.':
+     'No se pudo comunicar con el modelo en línea. Usaré provisionalmente el motor local.');
    }finally{clearTimeout(timeout)}
   }
   if(!remoteAnswered){
