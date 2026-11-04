@@ -34,6 +34,7 @@ const requiredFiles = [
   'editor/mep-thermal-ui.css',
   'editor/kelvin-assistant.js',
   'editor/arqui-planner.js',
+  'editor/arqui-house-layout.js',
   'editor/arqui-references.js',
   'editor/arqui-assistant.js',
   'editor/arqui-professional.js',
