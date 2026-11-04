@@ -28,6 +28,30 @@
   else if(/\b(?:una?|1)\s*(?:planta|piso|nivel)/.test(s))spec.floors=1;
   if(/sin\s*(?:garaje|garage|estacionamiento|parqueadero)/.test(s))spec.garage=false;
   else if(/\b(?:garaje|garage|estacionamiento|parqueadero)\b/.test(s))spec.garage=true;
+  const pickRetiro=(words)=>{const q=s.match(new RegExp('(?:retiro|retiros|separacion)\\s*(?:de\\s*)?(?:'+words+')\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:m|metros)?'));return q?Number(q[1].replace(',','.')):null};
+  // Also accept "frontal 3m", "posterior 2 m" and "laterales de 1 m".
+  const pickLoose=(word)=>{const q=s.match(new RegExp('\\b(?:'+word+')\\b\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:m|metros)?'));return q?Number(q[1].replace(',','.')):null};
+  for(const [k,words] of [['frontSetback','frontal|frente'],['backSetback','posterior|fondo'],['sideSetback','lateral|laterales']]){
+    const value=pickRetiro(words)??pickLoose(words);if(value!==null)spec[k]=value;
+  }
+  const wallExt=s.match(/(?:muros?|pared(?:es)?)\s*(?:exteriores?|perimetrales?)\s*(?:de|:)?\s*(\d+(?:[.,]\d+)?)\s*(cm|centimetros|m|metros)?/);
+  const wallInt=s.match(/(?:muros?|pared(?:es)?)\s*(?:interiores?|internas?)\s*(?:de|:)?\s*(\d+(?:[.,]\d+)?)\s*(cm|centimetros|m|metros)?/);
+  const thickness=m=>Number(m[1].replace(',','.'))*(m[2]?.startsWith('c')?.01:(!m[2]&&Number(m[1])>1?.01:1));
+  if(wallExt)spec.wallOuter=thickness(wallExt);
+  if(wallInt)spec.wallInner=thickness(wallInt);
+  if(/(?:garage|garaje|estacionamiento|parqueadero).{0,24}?(?:dos|2)\s*(?:autos|vehiculos|carros|puestos|plazas)/.test(s)||/(?:dos|2)\s*(?:autos|vehiculos|puestos|plazas)\s*(?:de\s*)?(?:garaje|estacionamiento)/.test(s))spec.garageSpaces=2;
+  else if(/(?:garage|garaje|estacionamiento).{0,18}?(?:un|uno|1)\s*(?:auto|carro|vehiculo|puesto)/.test(s))spec.garageSpaces=1;
+  if(/sin\s*mobiliario/.test(s))spec.furniture=false;else if(/mobiliario|amobla|amuebl|equipamiento/.test(s))spec.furniture=true;
+  if(/sin\s*(?:hatch|hachurado|tramado)/.test(s))spec.wallHatch=false;else if(/hatch|hachur|trama.*muro/.test(s))spec.wallHatch=true;
+  if(/sin\s*cotas|no\s*acotes/.test(s))spec.dimensions=false;else if(/acotad|cotas|acotar/.test(s))spec.dimensions=true;
+  if(/(?:concurso|lamina|presentacion|bonito|profesional)/.test(s))spec.style=/concurso|lamina/.test(s)?'concurso':'profesional';
+  if(/(?:esquematico|simple)/.test(s))spec.style='esquematico';
+  if(/isla\s*(?:de\s*)?cocina|cocina\s*(?:con\s*)?isla/.test(s))spec.kitchenIsland=true;
+  if(/cocina\s*(?:abierta|integrada)|abre\s*(?:la\s*)?cocina/.test(s))spec.openKitchen=true;
+  if(/(?:habitacion|dormitorio|cuarto)\s*(?:master|principal)|suite\s*principal/.test(s))spec.mainSuite=true;
+  if(/(?:walking\s*closet|walk\s*in|vestidor)/.test(s))spec.walkInCloset=true;
+  if(/ban[o]?\s*social|medio\s*ban[o]?/.test(s))spec.socialBath=true;
+  if(/lavanderia|cuarto\s*de\s*lavado/.test(s))spec.laundry=true;
   if(/agrand(?:a|ar)\s*(?:la\s*)?cocina/.test(s)){
    const change=s.match(/cocina.{0,28}?(\d+(?:[.,]\d+)?)\s*(cm|centimetros|m|metros)/);
    spec.kitchenExtra=change?(Number(change[1].replace(',','.'))*(change[2].startsWith('c')?.01:1)):.45;
@@ -44,7 +68,15 @@
    frontSetback:number(s.frontSetback,3,0,12,'Retiro frontal orientativo'),
    backSetback:number(s.backSetback,2,0,12,'Retiro posterior orientativo'),
    sideSetback:number(s.sideSetback,.45,0,5,'Retiro lateral orientativo'),
-   kitchenExtra:number(s.kitchenExtra,0,0,1.8,'Ampliación de cocina')
+   kitchenExtra:number(s.kitchenExtra,0,0,1.8,'Ampliación de cocina'),
+   garageSpaces:number(s.garageSpaces,1,1,2,'Número de estacionamientos'),
+   wallOuter:number(s.wallOuter,.20,.10,.45,'Espesor de muro exterior'),
+   wallInner:number(s.wallInner,.15,.07,.35,'Espesor de muro interior'),
+   furniture:s.furniture!==false,wallHatch:s.wallHatch!==false,dimensions:s.dimensions!==false,
+   style:['esquematico','profesional','concurso'].includes(s.style)?s.style:'concurso',
+   kitchenIsland:s.kitchenIsland!==false,openKitchen:Boolean(s.openKitchen),
+   mainSuite:s.mainSuite!==false,walkInCloset:s.walkInCloset!==false,
+   socialBath:s.socialBath!==false,laundry:s.laundry!==false
   };
  }
  function segments(depth,items){
@@ -119,9 +151,12 @@
    floors.push({level:floor+1,x:originX+floor*(lotW+3),y:originY,width:houseWidth,depth:buildDepth,
     hallStart:leftWidth,hallWidth:corridor,rooms,leftParts,rightParts});
   }
+  if(spec.garageSpaces===2&&spec.garage){
+   warnings.push('Se solicitaron dos estacionamientos: este esquema solo reserva una plaza lateral. La segunda plaza queda PENDIENTE; no se dibujará un segundo vehículo invadiendo áreas habitables.');
+  }
   if(sideGarage)warnings.push('Estacionamiento lateral conceptual: comprobar maniobra de acceso, estructura, servidumbres y medidas locales.');
   warnings.push('Retiros configurables, no equivalen a normativa municipal; verificar implantación, iluminación, ventilación, accesibilidad, estructura e instalaciones.');
-  warnings.push('Esquema de anteproyecto: los recintos se conectan a un pasillo; escaleras, puertas y mobiliario requieren desarrollo constructivo.');
+  warnings.push('Esquema de anteproyecto con accesos y zonificación; la distribución, el mobiliario y las escaleras requieren comprobación profesional para obra.');
   const audit=[];
   for(const floor of floors){
    for(const room of floor.rooms){
