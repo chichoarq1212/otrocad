@@ -77,6 +77,8 @@ jobs:
           node tests/arqui-planner.test.cjs
           node --check tests/arqui-assistant.test.cjs
           node tests/arqui-assistant.test.cjs
+          node --check tests/arqui-worker.test.cjs
+          node tests/arqui-worker.test.cjs
           node --check tests/kelvin-portrait.test.cjs
           node tests/kelvin-portrait.test.cjs
           node --check tests/civil-topography-road.test.cjs
