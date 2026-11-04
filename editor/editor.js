@@ -2763,8 +2763,8 @@ window.OtroCadFileCore={
  },
  saveLocal:()=>{const ok=save();void persistCadProgress(true);return ok}
 };
-$('#saveAsDwg').onclick=()=>window.OtroCadSaveUI?.open('dwg')||void saveDrawingAs('dwg').catch(e=>alert(e.message));
-$('#saveAsDxf').onclick=()=>window.OtroCadSaveUI?.open('dxf')||void saveDrawingAs('dxf').catch(e=>alert(e.message));
+$('#saveAsDwg').onclick=()=>{if(window.OtroCadSaveUI)window.OtroCadSaveUI.open('dwg');else void saveDrawingAs('dwg').catch(e=>alert(e.message))};
+$('#saveAsDxf').onclick=()=>{if(window.OtroCadSaveUI)window.OtroCadSaveUI.open('dxf');else void saveDrawingAs('dxf').catch(e=>alert(e.message))};
 $('#pdf').onclick=()=>{
  if(activeLayout==='Model'){
   ensureCadLayout();
