@@ -1,0 +1,73 @@
+/* Ing. Jaimito: only active in Civil 3D. Never interfere with CAD touch gestures. */
+#jaimitoAssistant[hidden],#jaimitoPanel[hidden]{display:none!important}
+.jaimito-root{position:fixed;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));
+ z-index:85;pointer-events:none;isolation:isolate;font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+.jaimito-root button,.jaimito-root input{font:inherit}
+.jaimito-mascot{pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:end;
+ width:112px;min-height:136px;border:0!important;background:transparent!important;box-shadow:none!important;
+ padding:0!important;cursor:pointer;overflow:visible;touch-action:manipulation;transform-origin:bottom right;
+ animation:jaimito-enter .3s ease both}
+.jaimito-mascot:hover{transform:translateY(-3px)}
+.jaimito-mascot:focus-visible{outline:2px solid #ffd64d;outline-offset:3px;border-radius:10px}
+.jaimito-mascot img{display:block;width:108px;max-height:138px;object-fit:contain;object-position:center bottom;
+ pointer-events:none;filter:drop-shadow(0 4px 5px #001c3840)}
+.jaimito-mascot-tag{white-space:nowrap;margin-top:-9px;border:1px solid #9fc0ef;
+ background:#185be8;color:#fff;font:700 11px/1.2 system-ui,sans-serif;
+ padding:5px 8px;border-radius:999px;box-shadow:0 3px 9px #0d214b45}
+.jaimito-mascot-tag b{color:#ffdc53}
+.jaimito-chat{position:absolute;right:4px;bottom:153px;width:min(352px,calc(100vw - 24px));
+ max-height:min(530px,calc(100dvh - 205px));min-height:170px;display:flex;flex-direction:column;
+ overflow:hidden;border-radius:13px;border:1px solid #9bb9e6;background:#f9fbff;
+ box-shadow:0 12px 40px #0c254e65;pointer-events:auto;color:#173665}
+.jaimito-head{display:flex;align-items:center;gap:5px;background:#185be8;color:#fff;padding:9px 10px;flex:0 0 auto}
+.jaimito-head>div{flex:1;display:flex;flex-direction:column;min-width:0}
+.jaimito-head strong{font-size:14px}
+.jaimito-head small{font-size:10px;font-weight:500;color:#e6efff}
+.jaimito-head button{color:#fff;background:#ffffff20;border:1px solid #ffffff65;border-radius:7px;
+ width:29px;height:29px;padding:0;font-size:19px;flex:0 0 29px}
+.jaimito-head button:hover{background:#ffffff3f}
+.jaimito-messages{display:flex;flex-direction:column;gap:9px;flex:1;min-height:65px;overflow-y:auto;
+ overscroll-behavior:contain;padding:12px 11px 8px;background:#edf4ff}
+.jaimito-message{max-width:95%;border:1px solid #cbdaf3;background:white;color:#173665;
+ border-radius:10px;padding:7px 9px;overflow-wrap:anywhere}
+.jaimito-message strong{display:block;font-size:11px;color:#185be8;margin-bottom:3px}
+.jaimito-message p{margin:0;font-size:12px;white-space:pre-wrap;line-height:1.4}
+.jaimito-message.user{align-self:end;background:#1e5acb;color:white;border-color:#1e5acb}
+.jaimito-message.user strong{color:#fff}
+.jaimito-tools{flex:0 0 auto;max-height:96px;overflow-y:auto;display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:8px;background:#f9fbff}
+.jaimito-tools button,.jaimito-open-command{white-space:normal;text-align:center;
+ min-height:27px;padding:5px 4px;background:#e9f1ff;color:#174b93;
+ border:1px solid #bed2f2;border-radius:7px;font-size:11px!important;font-weight:650}
+.jaimito-tools button:hover,.jaimito-open-command:hover{background:#d9e9ff}
+.jaimito-open-command{align-self:start;margin:0 10px 6px}
+.jaimito-form{display:flex;gap:6px;padding:8px;background:white;border-top:1px solid #d6e3f6;flex:0 0 auto}
+.jaimito-form input{min-width:0;flex:1;background:#fff!important;border:1px solid #abc3e7!important;
+ color:#173665!important;border-radius:7px;padding:7px;font-size:13px!important}
+.jaimito-form button{flex:0 0 auto;background:#185be8!important;color:white!important;
+ border-color:#185be8!important;border-radius:7px;padding:7px 11px}
+.jaimito-note{margin:0;padding:4px 9px 7px;color:#5b7293;background:#fff;font-size:10px;line-height:1.2}
+#jaimitoRibbon{font-size:11px;font-weight:800;color:#185be8;background:#ffdf65;
+ padding:6px 9px;white-space:nowrap;border:1px solid #d4ab32;border-radius:7px}
+#jaimitoRibbon[hidden]{display:none!important}
+@keyframes jaimito-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:760px){
+ .jaimito-root{right:8px;bottom:calc(68px + env(safe-area-inset-bottom,0px))}
+ .jaimito-mascot{width:87px;min-height:111px}
+ .jaimito-mascot img{width:82px;max-height:104px}
+ .jaimito-mascot-tag{font-size:9px;padding:4px 6px}
+ .jaimito-chat{right:1px;bottom:125px;width:min(330px,calc(100vw - 18px));
+  max-height:calc(100dvh - 173px)}
+}
+@media(max-width:950px) and (orientation:landscape) and (max-height:500px){
+ .jaimito-root{right:8px;bottom:calc(47px + env(safe-area-inset-bottom,0px))}
+ .jaimito-mascot{width:70px;min-height:79px}
+ .jaimito-mascot img{width:63px;max-height:75px}
+ .jaimito-mascot-tag{margin-top:-6px;font-size:8px}
+ .jaimito-chat{right:74px;bottom:0;width:min(315px,calc(100vw - 105px));min-height:150px;
+  max-height:calc(100dvh - 62px)}
+ .jaimito-tools{max-height:65px}
+ .jaimito-messages{padding:6px;gap:5px}
+ .jaimito-note{display:none}
+}
+@media(prefers-reduced-motion:reduce){.jaimito-mascot{animation:none}}
