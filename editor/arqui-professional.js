@@ -138,6 +138,11 @@ function generate(plan,options={}){
    circ(rx+.25,ry+.22,.15,'wc-seat');
    rect(x+w-.97,y+d-1.10,.65,.75,'shower');
    ln(x+w-.97,y+d-.48,x+w-.32,y+d-1.10);
+   if(/VESTIDOR/.test(r.name)&&d>=2.5){
+    const h=Math.min(.55,d*.18);
+    rect(x+.3,y+d-h-.23,Math.min(1.2,w-1.1),h,'wardrobe');
+    for(let i=0;i<3;i++)ln(x+.32+(i+1)*Math.min(1.2,w-1.1)/4,y+d-h-.2,x+.32+(i+1)*Math.min(1.2,w-1.1)/4,y+d-.2);
+   }
   };
   const drawKitchen=()=>{
    rect(x+.25,y+.34,Math.min(2.45,w-.55),.52,'counter');
