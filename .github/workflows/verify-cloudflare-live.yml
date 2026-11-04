@@ -40,7 +40,7 @@ jobs:
           for i in $(seq 1 18); do
             echo "Checking public build and assets (attempt $i)"
             matched=1
-            for file in build-info.json index.html editor/index.html editor/editor.js editor/civil3d.js editor/jaimito-assistant.js editor/jaimito-assistant.css editor/arqui-planner.js editor/arqui-house-layout.js editor/arqui-user-ai.js editor/arqui-references.js editor/arqui-assistant.js editor/arqui-assistant.css editor/assets/el-arqui.webp editor/compact-chrome.css editor/geolocation.js editor/mep.js editor/vendor/proj4/proj4.js editor/assets/ing-jaimito-hd.webp editor/demo/vivienda.js editor/library/furnishings.js sw.js descargas/index.html ios/index.html apple-touch-icon.png icon-192.png icon-512.png; do
+            for file in build-info.json index.html editor/index.html editor/editor.js editor/civil3d.js editor/jaimito-assistant.js editor/jaimito-assistant.css editor/arqui-planner.js editor/arqui-house-layout.js editor/arqui-user-ai.js editor/arqui-oauth.js editor/arqui-references.js editor/arqui-assistant.js editor/arqui-assistant.css editor/assets/el-arqui.webp editor/compact-chrome.css editor/geolocation.js editor/mep.js editor/vendor/proj4/proj4.js editor/assets/ing-jaimito-hd.webp editor/demo/vivienda.js editor/library/furnishings.js sw.js descargas/index.html ios/index.html apple-touch-icon.png icon-192.png icon-512.png; do
               if ! curl --fail --location --silent --show-error --max-time 20 \
                 -H 'Cache-Control: no-cache, no-store' \
                 "$BASE/$file?verify=${GITHUB_SHA}-$i" -o /tmp/otrocad-live-file || ! cmp -s "dist/$file" /tmp/otrocad-live-file; then
