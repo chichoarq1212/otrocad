@@ -25,10 +25,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Preparar editor y dependencias
         shell: pwsh
         run: |
           node scripts/build-pages.cjs
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python desktop/create_windows_icon.py icon-512.png desktop/build/otrocad.ico
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item -Recurse dist desktop/dist
           Push-Location desktop
           npm install --no-audit --no-fund
@@ -47,6 +54,15 @@ jobs:
           if ($setup.ExitCode -ne 0) { throw "Instalador terminó con $($setup.ExitCode)" }
           $exe = Join-Path $target 'OtroCAD.exe'
           if (-not (Test-Path $exe)) { throw 'No se encontró la aplicación instalada' }
+          Add-Type -AssemblyName System.Drawing
+          $appIcon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe)
+          if (-not $appIcon) { throw 'La aplicación no tiene icono Windows.' }
+          $bitmap = $appIcon.ToBitmap()
+          $pixel = $bitmap.GetPixel([int]($bitmap.Width / 2), [int]($bitmap.Height / 2))
+          Write-Host "Centro del icono OtroCAD: R=$($pixel.R) G=$($pixel.G) B=$($pixel.B)"
+          if ($pixel.R -lt 150 -or $pixel.G -lt 95 -or $pixel.B -gt 170) { throw 'El icono del EXE no parece el logo azul, blanco y amarillo oficial.' }
+          $bitmap.Dispose()
+          $appIcon.Dispose()
           $smoke = Start-Process $exe -ArgumentList '--smoke-test' -PassThru -Wait
           if ($smoke.ExitCode -ne 0) { throw "Prueba de apertura terminó con $($smoke.ExitCode)" }
           Get-FileHash $installer.FullName -Algorithm SHA256
@@ -56,11 +72,11 @@ jobs:
         with:
           tag_name: windows-experimental-${{ github.run_id }}-${{ github.run_attempt }}
           target_commitish: ${{ github.sha }}
-          name: OtroCAD Windows experimental · ${{ github.run_id }}
+          name: OtroCAD Windows 0.5.6 experimental · ${{ github.run_id }}
           prerelease: true
           make_latest: false
           body: |
-            Instalador experimental sin firma. La compilación instala, abre y prueba dibujo y recuperación con red bloqueada. No incluye DWG auténtico ni validación en un PC físico.
+            Instalador experimental sin firma. Icono oficial OtroCAD en EXE, accesos directos y NSIS. Incluye runtime DWG WebAssembly local. La compilación instala, abre y prueba dibujo y recuperación con red bloqueada. Sigue pendiente la validación en un PC físico.
           files: desktop/release/*-Setup.exe
       - uses: actions/upload-artifact@v4
         with:
