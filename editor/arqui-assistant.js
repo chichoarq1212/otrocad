@@ -35,7 +35,7 @@ root.innerHTML=[
  '<option value="openai">OpenAI API · puede generar cargos</option></select></label>',
  '<label>Clave personal (solo en esta página)<input id="arquiAiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega tu clave API personal"></label></div>',
  '<p class="arqui-disclaimer">Tu clave no se guarda ni se envía a OtroCAD o Cloudflare: el navegador contacta directamente al proveedor elegido. No equivale a iniciar sesión en ChatGPT o Gemini. Usa una clave gratuita y limitada.</p>',
- '<p class="arqui-context"><a id="arquiAiHelp" href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer">Obtener clave personal</a> · <button type="button" id="arquiAiClear">Desconectar</button></p>',
+ '<p class="arqui-context"><button type="button" id="arquiAiLogin" hidden>Iniciar sesión con OpenRouter</button> <a id="arquiAiHelp" href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer">Obtener clave personal</a> · <button type="button" id="arquiAiClear">Desconectar</button></p>',
  '<p id="arquiAiState" class="arqui-context" role="status">Sin IA en línea conectada.</p></details>',
  '<div class="arqui-chat" id="arquiMessages" role="log" aria-live="polite"></div>',
  '<form id="arquiForm" class="arqui-form"><label for="arquiPrompt">¿Qué deseas diseñar o modificar?</label>',
@@ -101,7 +101,7 @@ avatar.onclick=()=>panel.hidden?open():close();$('arquiClose').onclick=close;
 tabs.addEventListener('click',()=>queueMicrotask(sync));
 const observer=new MutationObserver(sync);observer.observe(tabs,{subtree:true,attributes:true,attributeFilter:['class','aria-selected']});
 window.addEventListener('pageshow',sync);
-const userBridge=window.OtroCadUserAI;
+const userBridge=window.OtroCadUserAI,oauthBridge=window.OtroCadArquiOAuth;
 const aiSelect=$('arquiAiProvider'),aiKey=$('arquiAiKey');
 const endpoint=(()=>{
  // Optional community self-hosted proxy; nunca requerir Cloudflare AI de OtroCAD.
@@ -111,6 +111,7 @@ const endpoint=(()=>{
 })();
 function updateAiConnection(){
  const provider=aiSelect.value,help=$('arquiAiHelp');
+ $('arquiAiLogin').hidden=provider!=='openrouter'||!oauthBridge;
  const known=userBridge?.providers?.[provider];
  if(provider==='none'){
   help.href='https://openrouter.ai/settings/keys';help.textContent='¿Cómo obtener una clave gratuita?';
@@ -130,6 +131,26 @@ aiSelect.addEventListener('change',updateAiConnection);
 aiKey.addEventListener('input',updateAiConnection);
 $('arquiAiClear').onclick=()=>{aiKey.value='';aiSelect.value='none';updateAiConnection()};
 updateAiConnection();
+$('arquiAiLogin').onclick=async()=>{
+ if(!oauthBridge){message('bot','El inicio de sesión de OpenRouter no está disponible.');return}
+ try{
+  const cryptoApi=window.crypto||crypto;
+  const target=await oauthBridge.begin(location.href,window.sessionStorage||sessionStorage,cryptoApi);
+  window.location.assign(target);
+ }catch(error){message('bot','No se pudo iniciar OpenRouter: '+String(error.message||error))}
+};
+if(oauthBridge&&oauthBridge.hasCallback(location.href)){
+ (async()=>{
+  try{
+   const token=await oauthBridge.complete(location.href,window.sessionStorage||sessionStorage,fetch);
+   aiSelect.value='openrouter';aiKey.value=token;updateAiConnection();
+   message('bot','Tu cuenta de OpenRouter está conectada. El Arqui utilizará solo modelos gratuitos mientras esta página permanezca abierta.');
+  }catch(error){message('bot','No se completó la conexión OpenRouter: '+String(error.message||error))}
+  finally{
+   try{window.history.replaceState(null,'',oauthBridge.cleanedUrl(location.href))}catch(_){}
+  }
+ })();
+}
 function message(role,text){
  conversation.push({role:role==='user'?'user':'assistant',content:String(text).slice(0,2200)});
  while(conversation.length>12)conversation.shift();
