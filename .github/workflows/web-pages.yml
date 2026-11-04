@@ -58,6 +58,10 @@ jobs:
           node --check editor/editor.js
           node --check editor/civil3d.js
           node --check editor/mep.js
+          node --check editor/mep-thermal.js
+          node --check editor/mep-thermal-ui.js
+          node --check tests/mep-thermal.test.cjs
+          node tests/mep-thermal.test.cjs
           node tests/mep.test.cjs
           node --check editor/civil-points.js
           node --check editor/civil-topography.js
