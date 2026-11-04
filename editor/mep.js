@@ -149,27 +149,43 @@ const icons={
  finish:'<path d="M4 4v16h16M7 11l5 5L22 5"/><circle class="cad-node" cx="4" cy="20" r="1.5"/>',
  report:'<path d="M5 2h11l4 4v16H5zM16 2v5h4M8 11h9m-9 4h9m-9 4h5"/><circle class="cad-node" cx="8" cy="11" r="1.2"/>'
 };
-let pendingRoute=null,pendingSymbol=null;
+let pendingRoute=null,pendingSymbol=null,pendingColdRoom=null;
 const $=id=>document.getElementById(id);
 function activate(tab){tabs.querySelectorAll('[data-tab]').forEach(b=>{const active=b===tab;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active))});groups.querySelectorAll('[data-panel]').forEach(g=>g.hidden=g.dataset.panel!==tab.dataset.tab);api.repaint()}
+function syncMepRibbon(){
+ const selected=tabs.querySelector('[data-tab="mep"].active,[data-tab="hvac"].active');
+ document.body.classList.toggle('cad-mep-active',!!selected);
+}
+new MutationObserver(syncMepRibbon).observe(tabs,{subtree:true,attributes:true,attributeFilter:['class','aria-selected']});
+syncMepRibbon();
 for(const [id,label] of [['mep','MEP'],['hvac','AIRE ACOND.']]){const tab=document.createElement('button');tab.type='button';tab.dataset.tab=id;tab.textContent=label;tab.setAttribute('role','tab');tab.setAttribute('aria-selected','false');tab.onclick=()=>activate(tab);tabs.append(tab)}
 function group(panel,title){const el=document.createElement('div');el.className='toolgroup';el.dataset.panel=panel;el.hidden=true;const label=document.createElement('span');label.className='group-title';label.textContent=title;el.append(label);groups.append(el);return el}
-function button(group,label,icon,handler){const b=document.createElement('button');b.type='button';b.className='civil-tool mep-tool';b.title=label;const mark=document.createElement('span');mark.className='ico';mark.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[icon]||icons.pipe)+'</svg>';const name=document.createElement('span');name.className='civil-label';name.textContent=label;b.append(mark,name);b.onclick=handler;group.append(b);return b}
+function button(group,label,icon,handler){
+ const b=document.createElement('button');b.type='button';b.className='civil-tool mep-tool';b.title=label;b.setAttribute('aria-label',label);
+ const mark=document.createElement('span');mark.className='ico';
+ mark.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[icon]||icons.pipe)+'</svg>';
+ const labels={'Bandeja portacables':'Bandeja','Gabinete de incendios':'Gabinete','Unidad interior split':'Split','Manejadora de aire':'Manejadora',
+  'Luminaria':'Luminaria','Agua caliente':'Agua caliente','Terminar conducto':'Terminar','Trazar conducto / línea':'Trazar aire',
+  'Cantidades del plano':'Cantidades','Trampa de grasa':'Trampa grasa','Pozo de revisión':'Pozo','Puesta a tierra':'Tierra',
+  'Caja de paso':'Caja paso','Medidor de agua':'Medidor','Ventilación sanitaria':'Vent. sanitaria','Condensadora':'Condensadora'};
+ const name=document.createElement('span');name.className='civil-label';name.textContent=labels[label]||label;
+ b.append(mark,name);b.onclick=handler;group.append(b);return b;
+}
 function field(group,label,id,value,type='number'){const wrap=document.createElement('label');wrap.className='mep-field';wrap.textContent=label;const input=document.createElement('input');input.id=id;input.type=type;input.value=value;input.setAttribute('aria-label',label);if(type==='number'){input.step='any';input.min='0'}else{input.maxLength=60;input.className='mep-tag'}wrap.append(input);group.append(wrap);return input}
 function select(group,label,id,choices){const wrap=document.createElement('label');wrap.className='mep-field';wrap.textContent=label;const input=document.createElement('select');input.id=id;input.setAttribute('aria-label',label);for(const [value,name] of choices){const op=document.createElement('option');op.value=value;op.textContent=name;input.append(op)}wrap.append(input);group.append(wrap);return input}
-const config=group('mep','SISTEMA Y TRAZADO');
+const config=group('mep','REDES');
 select(config,'Red','mepSystem',Object.entries(systems).filter(([,v])=>v.family!=='hvac').map(([k,v])=>[k,v.name]));
 field(config,'DN (mm)','mepDiameter',25);field(config,'ID red','mepTag','EL-01','text');field(config,'Pendiente (%)','mepSlope',0);
 button(config,'Trazar red','pipe',()=>beginRoute(false));button(config,'Terminar red','finish',()=>api.finishDrawing());
 const electrical=group('mep','ELÉCTRICO');
-const water=group('mep','AGUA Y ACCESORIOS');
-const sanitary=group('mep','SANITARIO Y LLUVIAS');
-const safety=group('mep','GAS E INCENDIOS');
-const hvac=group('hvac','CONDUCTOS Y TUBERÍAS DE CLIMA');
+const water=group('mep','AGUA');
+const sanitary=group('mep','SANITARIO');
+const safety=group('mep','SEGURIDAD');
+const hvac=group('hvac','DUCTOS Y LÍNEAS');
 select(hvac,'Sistema de aire','hvacSystem',Object.entries(systems).filter(([,v])=>v.family==='hvac').map(([k,v])=>[k,v.name]));
 field(hvac,'Ancho (mm)','hvacWidth',400);field(hvac,'Alto (mm)','hvacHeight',250);field(hvac,'DN clima (mm)','hvacDiameter',20);field(hvac,'Caudal (m³/h)','hvacFlow',0);field(hvac,'ID clima','hvacTag','IMP-01','text');
 button(hvac,'Trazar conducto / línea','duct',()=>beginRoute(true));button(hvac,'Terminar conducto','finish',()=>api.finishDrawing());
-const equipment=group('hvac','EQUIPOS DE CLIMATIZACIÓN'),terminals=group('hvac','DIFUSIÓN Y CONTROL');
+const equipment=group('hvac','EQUIPOS'),terminals=group('hvac','DIFUSIÓN');
 for(const [g,k,icon,sys] of [
  [electrical,'outlet','outlet','electrical'],[electrical,'switch','switch','electrical'],[electrical,'light','light','electrical'],[electrical,'panel','panel','electrical'],[electrical,'junction','panel','electrical'],[electrical,'earth','outlet','electrical'],
  [water,'valve','valve',null],[water,'elbow','elbow',null],[water,'tee','tee',null],[water,'reducer','reducer',null],[water,'meter','meter','cold'],[water,'pump','pump','cold'],[water,'tank','tank','cold'],[water,'heater','heater','hot'],
@@ -177,7 +193,7 @@ for(const [g,k,icon,sys] of [
  [safety,'gasMeter','gas','gas'],[safety,'regulator','valve','gas'],[safety,'sprinkler','sprinkler','fire'],[safety,'hydrant','fire','fire'],[safety,'extinguisher','fire','fire'],
  [equipment,'split','ac','supply'],[equipment,'condenser','fan','refrigerant'],[equipment,'cassette','diffuser','supply'],[equipment,'ahu','ac','supply'],[equipment,'fan','fan','extract'],[terminals,'diffuser','diffuser','supply'],[terminals,'grille','grille','return'],[terminals,'thermostat','thermostat','supply'],[terminals,'damper','valve',null]
 ])button(g,symbolNames[k],icon,()=>beginSymbol(k,sys,g.dataset.panel==='hvac'));
-for(const panel of ['mep','hvac']){const g=group(panel,'INSERCIÓN Y CANTIDADES');select(g,'Giro (°)',panel+'Rotation',[[0,'0°'],[90,'90°'],[180,'180°'],[270,'270°']]);field(g,'Etiqueta equipo',panel+'SymbolTag','EQ-01','text');field(g,'Dato / capacidad',panel+'Rating','','text');button(g,'Cantidades del plano','report',showQuantities)}
+for(const panel of ['mep','hvac']){const g=group(panel,'PROPIEDADES');select(g,'Giro (°)',panel+'Rotation',[[0,'0°'],[90,'90°'],[180,'180°'],[270,'270°']]);field(g,'Etiqueta equipo',panel+'SymbolTag','EQ-01','text');field(g,'Dato / capacidad',panel+'Rating','','text');button(g,'Cantidades del plano','report',showQuantities)}
 $('mepSystem').onchange=()=>{$('mepTag').value=systems[$('mepSystem').value].tag+'-01';$('mepDiameter').value=['drain','rain'].includes($('mepSystem').value)?110:25};
 $('hvacSystem').onchange=()=>{$('hvacTag').value=systems[$('hvacSystem').value].tag+'-01'};
 function options(air=false){return {system:$(air?'hvacSystem':'mepSystem').value,tag:$(air?'hvacTag':'mepTag').value,diameter:$(air?'hvacDiameter':'mepDiameter').value,width:$('hvacWidth').value,height:$('hvacHeight').value,flow:air?$('hvacFlow').value:0,slope:air?0:$('mepSlope').value,units:api.getUnits()}}
@@ -187,12 +203,38 @@ function beginSymbol(kind,system,air){const prefix=air?'hvac':'mep',value={syste
 function currentSymbol(){if(!pendingSymbol)return null;const prefix=systems[pendingSymbol.system].family==='hvac'?'hvac':'mep';return {...pendingSymbol,rotation:$(prefix+'Rotation').value,tag:$(prefix+'SymbolTag').value,rating:$(prefix+'Rating').value,units:api.getUnits()}}
 function showQuantities(){const rows=quantities(api.getObjects(),api.getUnits()),dlg=document.createElement('dialog');dlg.className='cad-utility-dialog';const title=document.createElement('h3');title.textContent='MEP · cantidades dibujadas';const note=document.createElement('p');note.textContent='Longitud de ejes en metros y símbolos colocados. Los valores y capacidades son datos ingresados por el proyectista.';const table=document.createElement('table');table.className='mep-summary-table';const head=table.createTHead().insertRow();for(const v of ['Sistema','Elemento','Longitud (m)','Unidades']){const th=document.createElement('th');th.textContent=v;head.append(th)}const body=table.createTBody();for(const row of rows){const tr=body.insertRow();for(const v of [row.system,row.label,row.length?row.length.toFixed(2):'—',row.count||'—'])tr.insertCell().textContent=v}if(!rows.length)note.textContent='Aún no hay redes o equipos MEP dibujados. Traza una red o coloca símbolos para listar cantidades.';const close=document.createElement('button');close.textContent='Cerrar';close.onclick=()=>dlg.close();dlg.append(title,note,table,close);document.body.append(dlg);dlg.addEventListener('close',()=>dlg.remove());dlg.showModal()}
 window.OtroCadMep={
- onToolChanged(){pendingRoute=null;pendingSymbol=null},
+ onToolChanged(){pendingRoute=null;pendingSymbol=null;pendingColdRoom=null},
  hasRoute:()=>!!pendingRoute,
  commitRoute(points){try{const items=route(points,{...pendingRoute,units:api.getUnits()});if(!layerFor(pendingRoute.system))return false;pendingRoute=null;api.addObjects(items,'Red MEP creada · capas y geometría editables');return true}catch(error){api.setStatus(error.message);return false}},
- placeAt(point){if(!pendingSymbol||api.getActiveTool()!=='mep-symbol')return false;try{const value=currentSymbol();if(!layerFor(value.system))return true;const items=symbol(value.kind,point,value);api.addObjects(items,symbolNames[value.kind]+' colocado · clic para repetir · Esc: terminar')}catch(error){api.setStatus(error.message)}return true},
- getPreview(){try{if(pendingSymbol&&api.getActiveTool()==='mep-symbol'){const value=currentSymbol();return symbol(value.kind,api.getDraftPoint(),{...value,groupId:'mep-preview'})}if(pendingRoute){const path=api.getDraftPath();if(path.length>=2)return route(path,{...pendingRoute,groupId:'mep-preview',units:api.getUnits()})}}catch(_){}return []},
+ placeAt(point){
+  if(pendingColdRoom&&api.getActiveTool()==='mep-symbol'){
+   try{
+    const value={...pendingColdRoom,units:api.getUnits()};
+    const items=window.OtroCadThermal.plan(point,value);
+    api.addObjects(items,'Cuarto frío '+value.length+'×'+value.width+' m · esquema MEP editable');
+   }catch(error){api.setStatus(error.message)}
+   return true;
+  }
+  if(!pendingSymbol||api.getActiveTool()!=='mep-symbol')return false;
+  try{const value=currentSymbol();if(!layerFor(value.system))return true;
+   const items=symbol(value.kind,point,value);
+   api.addObjects(items,symbolNames[value.kind]+' colocado · clic para repetir · Esc: terminar');
+  }catch(error){api.setStatus(error.message)}return true;
+ },
+ getPreview(){try{if(pendingColdRoom&&api.getActiveTool()==='mep-symbol')
+   return window.OtroCadThermal.plan(api.getDraftPoint(),{...pendingColdRoom,units:api.getUnits(),groupId:'mep-preview'});
+  if(pendingSymbol&&api.getActiveTool()==='mep-symbol'){const value=currentSymbol();return symbol(value.kind,api.getDraftPoint(),{...value,groupId:'mep-preview'})}if(pendingRoute){const path=api.getDraftPath();if(path.length>=2)return route(path,{...pendingRoute,groupId:'mep-preview',units:api.getUnits()})}}catch(_){}return []},
  beginRoute,showQuantities,
+ startColdRoomLayout(input){
+  if(!window.OtroCadThermal)throw Error('Motor térmico no disponible');
+  const defaults={...input,units:api.getUnits()};
+  window.OtroCadThermal.plan({x:0,y:0},defaults); // validate geometry first
+  api.setCurrentLayer('MEP-CUARTOS-FRIOS','#68c5ed');
+  if(!api.startDrawingTool('mep-symbol'))throw Error('No se puede iniciar la inserción del cuarto frío.');
+  pendingSymbol=null;pendingRoute=null;pendingColdRoom=defaults;
+  api.setStatus('CUARTO FRÍO · clic en Modelo para insertar planta con panel, puerta y evaporador · Esc: finalizar');
+  api.repaint();return true;
+ },
  beginSymbol:(kind,system)=>beginSymbol(kind,system,systems[system]?.family==='hvac'),
  chooseSystem:(system)=>{
   if(!systems[system])throw Error('Sistema MEP no disponible.');
