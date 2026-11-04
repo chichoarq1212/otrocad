@@ -30,6 +30,27 @@ async function run(){
   method:'POST',headers:{Origin:'https://editor.example','Cf-Access-Jwt-Assertion':'mock-only-for-test','Content-Type':'application/json'},
   body:JSON.stringify(body)}),{ALLOWED_ORIGIN:'https://editor.example',ARQUI_ACCESS_ENABLED:'yes'});
  assert.equal(missingSecret.status,503);
+ const oldFetch=global.fetch;let received;
+ global.fetch=async(_url,options)=>{
+  received=JSON.parse(options.body);
+  const allSpec={lotWidth:15,lotDepth:10,floors:1,bedrooms:3,bathrooms:2,garage:false,garageSpaces:1,
+   frontSetback:3,backSetback:2,sideSetback:.45,kitchenExtra:0,livingExtra:0,bedroomExtra:0,
+   wallOuter:.2,wallInner:.15,accessible:false,furniture:true,wallHatch:true,dimensions:true,
+   kitchenIsland:true,openKitchen:false,mainSuite:true,walkInCloset:true,socialBath:true,laundry:true,
+   style:'concurso',location:''};
+  return new Response(JSON.stringify({output:[{content:[{type:'output_text',text:JSON.stringify({spec:allSpec,reason:'Entendí el terreno y necesito aclarar el esquema.',requiresReview:true})}]}]}),{status:200});
+ };
+ try{
+  const request=new Request('https://arqui.example/api/arqui',{method:'POST',headers:{Origin:'https://editor.example','Cf-Access-Jwt-Assertion':'mock-only-for-test','Content-Type':'application/json'},
+   body:JSON.stringify({...body,message:'Terreno 15x10, vivienda 12x8 y sin eje central',conversation:[{role:'user',content:'Quiero una vivienda'},{role:'assistant',content:'Dime cómo la imaginas'}]})});
+  const response=await worker.fetch(request,{ALLOWED_ORIGIN:'https://editor.example',ARQUI_ACCESS_ENABLED:'yes',OPENAI_API_KEY:'fake',OPENAI_MODEL:'configured-model'});
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).requiresReview,true);
+  const details=JSON.parse(received.input[1].content);
+  assert.match(details.userMessage,/sin eje central/);
+  assert.equal(details.conversation[0].content,'Quiero una vivienda');
+  assert.match(received.input[0].content,/no puede fijar libremente posiciones/);
+ }finally{global.fetch=oldFetch}
  console.log('El Arqui optional Worker defaults to disabled, rejects unapproved origins and bad programs, no secrets embedded.');
 }
 run().catch(error=>{console.error(error);process.exitCode=1});

@@ -29,6 +29,12 @@ No está autorizado ni implementado copiar o publicar automáticamente libros co
 - **Fase PDF grandes pendiente:** indexar el documento con número de edición, capítulo y página; recuperar páginas relevantes; diseñar reglas verificables por tipología, jurisdicción y edición; citar siempre páginas; generar un informe de comprobaciones, no afirmar cumplimiento automático.
 - No implementar verificación de áreas, alturas, ancho de puertas, escaleras o evacuación sobre una supuesta tabla de Plazola o Neufert sin tener el texto y su contexto.
 
+## Conversación libre y estado real
+
+Cuando se configura el servicio, el editor envía el mensaje tal como lo escribió el usuario, el programa anterior validado y hasta ocho intervenciones recientes de la conversación. La interpretación local deja de filtrar primero el texto: expresiones informales y peticiones acumuladas llegan al modelo. Si el servicio necesita una aclaración o identifica una condición que el dibujo no puede garantizar, responde sin sustituir la propuesta anterior.
+
+Esto no conecta el servicio por sí solo: requiere la configuración y protección indicadas arriba. Sin servicio, funciona únicamente el intérprete local de reglas. Aunque el modelo mejore la conversación, el motor geométrico actual sigue usando una distribución predefinida con pasillo central: no puede garantizar una implantación de 12 × 8 m, una distribución sin eje central ni la posición libre de todos los ambientes. Se necesita un motor espacial adicional para resolverlas. El historial conversacional de esta integración se mantiene durante la sesión, no queda recuperado automáticamente al reabrir el dibujo.
+
 ## Alcance técnico
 
 La API generativa puede sugerir un **programa numérico** —terreno, plantas, dormitorios, baños, garaje, muros, presentación, equipamiento y condiciones orientativas—. No acepta JS arbitrario, comandos de shell ni escrituras directas al editor. El CAD local genera y controla la geometría, muestra la vista previa y requiere confirmación del operador.

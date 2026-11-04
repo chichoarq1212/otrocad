@@ -13,6 +13,7 @@ const allowed=new Set(['draw','modify','annotate','blocks','layers','view']);
 let plan=null,previewEntities=[],spec=planner.parsePrompt('Vivienda de 1 planta en un terreno 12x20 con 3 dormitorios y garaje');
 let projectId=api.getObjects().filter(x=>x.aiArchitect&&x.aiProjectId).at(-1)?.aiProjectId||null;
 let activeStream=null,busy=false,pending=false,lastModelKey=null,baseline=null;
+const conversation=[];
 const root=document.createElement('div');root.id='arquiAssistant';root.className='jaimito-root arqui-root';root.hidden=true;
 root.innerHTML=[
  '<button id="arquiMascot" class="jaimito-mascot arqui-mascot" type="button" aria-label="Abrir El Arqui IA" aria-controls="arquiPanel" aria-expanded="false">',
@@ -33,7 +34,7 @@ root.innerHTML=[
  '<details id="arquiDetails" class="arqui-details" hidden><summary>Ajustar medidas de esta propuesta</summary>',
  '<div class="arqui-grid">',
  '<label>Terreno ancho (m)<input id="arquiLotW" type="number" min="8" max="60" step=".1" value="12"></label>',
- '<label>Terreno fondo (m)<input id="arquiLotD" type="number" min="12" max="80" step=".1" value="20"></label>',
+ '<label>Terreno fondo (m)<input id="arquiLotD" type="number" min="5" max="80" step=".1" value="20"></label>',
  '<label>Plantas<select id="arquiFloors"><option value="1">1 planta</option><option value="2">2 plantas</option></select></label>',
  '<label>Dormitorios<select id="arquiBeds"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>',
  '<label>Baños<select id="arquiBaths"><option value="0">Propuesta del motor</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>',
@@ -95,6 +96,8 @@ const endpoint=(()=>{
 })();
 $('arquiMode').textContent=endpoint?'IA remota opcional · planos sujetos a validación':'Diseño CAD local · IA generativa no conectada';
 function message(role,text){
+ conversation.push({role:role==='user'?'user':'assistant',content:String(text).slice(0,2200)});
+ while(conversation.length>12)conversation.shift();
  const item=document.createElement('div');item.className='arqui-msg '+role;
  const head=document.createElement('strong');head.textContent=role==='user'?'Tú':'El Arqui IA';
  const body=document.createElement('p');body.textContent=String(text);item.append(head,body);
@@ -204,27 +207,38 @@ async function propose(text){
  if(answer){message('bot',answer);return}
  pending=true;$('arquiPropose').disabled=true;$('arquiDraw').disabled=true;
  try{
-  const interpreted=planner.interpret(prompt,fromInputs());
-  if(interpreted.unsupported.length){message('bot',interpreted.unsupported.join(' '));return}
-  let next=interpreted.spec;
-  if(!endpoint&&!interpreted.canGenerate){
-   message('bot','No identifiqué un cambio que pueda dibujar. Puedes decir «amplía la cocina 50 cm», «quita la lavandería», «dos plantas», «sin mobiliario» o editar las medidas de la propuesta.');return;
-  }
-  // Remote AI returns only validated program fields; never executable CAD/code.
+  // Give the configured language model the user's actual words and the prior
+  // validated proposal. Local keyword parsing must not reject or pre-edit a
+  // free-form request before the model gets a chance to interpret it.
+  let next,remoteAnswered=false;
+  const current=fromInputs();
   if(endpoint){
    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),22000);
    try{
     const linked=$('arquiSendExcerpts').checked?refs.search(prompt,refs.get(),3):[];
     const response=await fetch(endpoint.href,{method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({message:prompt,mode:'architecture',currentSpec:next,
+     body:JSON.stringify({message:prompt,mode:'architecture',currentSpec:current,
+      conversation:conversation.slice(0,-1).slice(-8),
       referenceExcerpts:linked.map(x=>({source:x.source,title:x.title,text:x.excerpt}))}),signal:controller.signal});
     if(!response.ok)throw Error('Servicio no disponible');
     const data=await response.json();
-    if(data?.spec&&typeof data.spec==='object')next=planner.validateSpec({...next,...data.spec});
+    if(!data||typeof data.reason!=='string'||typeof data.requiresReview!=='boolean'||!data.spec||typeof data.spec!=='object')throw Error('Respuesta inválida');
+    const candidate=planner.validateSpec({...current,...data.spec});
+    remoteAnswered=true;
+    if(data.requiresReview){message('bot',data.reason||'Necesito aclarar un detalle antes de dibujar.');return}
+    next=candidate;
+    if(data.reason)message('bot',data.reason);
    }catch(_){
-    message('bot','La conexión generativa no está disponible. Uso el intérprete local para los cambios reconocidos.');
-    if(!interpreted.canGenerate)return;
+    message('bot','La conexión generativa no está disponible. Intentaré interpretar localmente lo que pueda reconocer.');
    }finally{clearTimeout(timeout)}
+  }
+  if(!remoteAnswered){
+   const interpreted=planner.interpret(prompt,current);
+   if(interpreted.unsupported.length){message('bot',interpreted.unsupported.join(' '));return}
+   if(!interpreted.canGenerate){
+    message('bot','No pude interpretar este pedido con el modo local. El Arqui necesita la conexión generativa para conversar con mayor libertad; no he modificado tu propuesta.');return;
+   }
+   next=interpreted.spec;
   }
   makePreview(next,true);
  }catch(error){message('bot','No se pudo interpretar el encargo: '+String(error.message||error))}
