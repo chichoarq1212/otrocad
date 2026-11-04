@@ -10,6 +10,8 @@ const must=[
  'civil-road-ui.css','geolocation.js','mep.js','mep-ribbon.css',
  'mep-thermal.js','mep-thermal-ui.js','mep-thermal-ui.css',
  'kelvin-assistant.js','jaimito-assistant.js','jaimito-assistant.css',
+ 'arqui-planner.js','arqui-references.js','arqui-assistant.js','arqui-assistant.css',
+ 'assets/el-arqui.webp',
  'assets/ing-kelvin.webp','assets/ing-jaimito-hd.webp',
  'compact-chrome.css','vendor/proj4/proj4.js'
 ];
