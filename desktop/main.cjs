@@ -43,6 +43,7 @@ app.whenReady().then(async () => {
   const window = new BrowserWindow({
     width: 1440, height: 900, minWidth: 800, minHeight: 600,
     title: 'OtroCAD', show: !smoke,
+    icon: path.join(__dirname, 'build', 'otrocad.ico'),
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
