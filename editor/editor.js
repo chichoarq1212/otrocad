@@ -1927,7 +1927,7 @@ function runCommand(raw){
  }
  // In line/polyline mode a distance alone follows the current pointer angle.
  // This matches the common CAD sequence L ↵ first point ↵ 5 ↵.
- if(/^[+]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(textValue)&&temp&&activeAnchor()&&['line','poly','measure'].includes(tool)){
+ if(/^[+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(textValue)&&temp&&activeAnchor()&&['line','poly','measure'].includes(tool)){
   const len=Number(textValue.replace(',','.'));
   if(!(len>0)){status.textContent='La distancia debe ser mayor que cero';return}
   const a=activeAnchor(),heading=angle(a,temp.b)*Math.PI/180;
