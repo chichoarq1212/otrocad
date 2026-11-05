@@ -10,14 +10,15 @@ CAD 2D gratuito en desarrollo para arquitectura, dibujo técnico, ingeniería, t
 - Compilaciones: https://github.com/chichoarq1212/otrocad/actions
 - Versiones: https://github.com/chichoarq1212/otrocad/releases
 
-## El Arqui IA automático · sin configuraciones para visitantes
+## El Arqui Local · biblioteca arquitectónica estática, sin IA ni créditos
 
-- El visitante abre **Dibujo → El Arqui IA**, escribe lo que quiere y recibe una propuesta arquitectónica 2D editable, sin elegir proveedor de IA ni pegar claves.
-- Backend opcional Cloudflare Workers AI, **desactivado hasta que el propietario lo active** en su cuenta Workers Free con `ARQUI_AUTO_ENABLED=yes`.
-- Cuotas atómicas en Cloudflare: **2 consultas por IP/conexión al día UTC y 20 consultas para todo OtroCAD al día**, para limitar consumo. Los dispositivos con la misma IP comparten cupo.
-- **No habilitar Workers Paid si se requiere cero facturación.** El plan Workers Free agota la franquicia y después bloquea inferencias; en Paid pueden cobrarse usos excedentes.
-- Si falta activar el servicio o se agotan los cupos, el editor CAD local sigue funcionando y los diseños no se pierden.
-- [Guía del administrador para activar la IA automáticamente y sin sobrecostos](docs/ARQUI_IA_AUTOMATICA.md).
+- El asistente de vivienda es ahora **100 % determinista**: interpreta medidas, dormitorios, baños, patio, estacionamientos y cambios de dimensionado sin enviar ningún mensaje ni plano a modelos de inteligencia artificial.
+- Biblioteca local `editor/arqui-knowledge.js` con **reglas espaciales, mínimos orientativos, relaciones de ambientes, muebles a escala, puertas, escaleras y 6 fichas tipológicas**. Las tipologías distinguen las soluciones geométricas implementadas de las todavía documentales.
+- Caso compacto validado de casa **10 × 8 m, 3 dormitorios, 2 baños, 2 plantas, patio posterior y 2 estacionamientos**: escalera en U con 16 contrahuellas, 2 tramos y descanso en posición coincidente arriba y abajo; baño máster con acceso desde la suite; puertas y ventanas distribuidas y CAD editable.
+- Referencias públicas comprobadas: [Quito RTAU 2024](https://www.ecp.ec/wp-content/uploads/2024/10/RTAU-Tomo2-EDIFICABILIDAD-v2.0-23-10-2024.pdf), [MIDUVI 2024](https://www.habitatyvivienda.gob.ec/wp-content/uploads/2024/08/Lineamientos-urbanos-habitacionales-02-08-2024.pdf) e IRC como referencia comparativa. **Plazola y Neufert son bibliografía reconocida, no libros copiados ni datos normativos no verificados**.
+- La geometría rechaza propuestas que sobrepasan capacidades o reducen los ambientes útiles por debajo de las referencias. La aprobación del usuario es obligatoria antes de insertar las entidades CAD.
+- **Cero API, cero llamadas a IA, cero tokens, cero cuotas**. Cloudflare queda como alojamiento estático de los archivos; Windows y Android llevan el mismo motor local.
+- [Ver biblioteca, alcances y programa de pruebas](docs/ARQUI_LOCAL_ESTATICO.md).
 
 ## Capacidades del editor web
 
@@ -47,7 +48,7 @@ CAD 2D gratuito en desarrollo para arquitectura, dibujo técnico, ingeniería, t
 - **Web/PWA:** editor en navegador; el service worker cachea recursos publicados para uso offline después de cargarlos.
 - **Android híbrido:** incluye el editor web local, runtime DWG WebAssembly y selector Android SAF para abrir y guardar archivos sin conexión. Se sirve desde `WebViewAssetLoader` bajo un origen HTTPS local.
 - **Android nativo Canvas:** variante independiente sin permiso de Internet. Tiene herramientas táctiles propias, pero no toda la paridad del editor web ni DWG.
-- **Windows:** aplicación Electron con editor y runtime DWG empaquetados; usa un protocolo local seguro para cargar WebAssembly sin red. La compilación CI instala, abre sin conexión y ejecuta una prueba de ida/vuelta DWG cuando el runtime está presente; aún falta validación en un PC físico.
+- **Windows:** aplicación Electron con editor, biblioteca arquitectónica y runtime DWG empaquetados; usa un protocolo local seguro para cargar WebAssembly sin red. La compilación CI instala, abre sin conexión y ejecuta una prueba de ida/vuelta DWG cuando el runtime está presente; aún falta validación en un PC físico.
 - **iOS:** PWA instalable desde Safari; no hay aplicación nativa publicada.
 
 ## Estado y limitaciones
