@@ -145,8 +145,22 @@ async function refreshAutoStatus(known=null){
  }
 }
 if(typeof fetch==='function')refreshAutoStatus();
-function validateAiProgram(current,change){
+function validateAiProgram(current,change,requestText=''){
  const patch={...change};
+ // An LLM may insert extra rooms or arbitrary offsets despite an explicit brief.
+ // Preserve the user's stated quantities over incidental model guesses.
+ const ask=String(requestText||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ const suite=/(?:master.{0,24}bano|bano.{0,24}master|principal.{0,24}bano)/.test(ask);
+ const shared=/(?:bano\s+compartid|compart.{0,24}bano)/.test(ask);
+ if(suite&&shared){
+  patch.bathrooms=2;patch.mainSuite=true;patch.socialBath=false;
+ }
+ if(/\bpatio\b/.test(ask)&&/\b(?:lavanderia|area\s+de\s+lavado)\b/.test(ask)){
+  patch.patioLaundry=true;patch.laundry=true;
+ }
+ if(!/(?:amplia|agranda|aumenta|reduce|achica|ensancha|estrecha|extiende|disminuye).{0,35}cocina|cocina.{0,35}(?:centimetros?|cm|metro(?:s)?\b|mas\s+grande|mas\s+pequena)/.test(ask)){
+  patch.kitchenExtra=current.kitchenExtra||0;
+ }
  if(patch.dimensionMeaning==='house'||(current.dimensionMeaning==='house'&&patch.dimensionMeaning!=='site')){
   patch.dimensionMeaning='house';
   const width=Number(patch.houseWidth??current.houseWidth??current.lotWidth);
@@ -416,13 +430,18 @@ async function propose(text){
      }
     const data=await response.json();
     if(!data||typeof data.reason!=='string'||typeof data.requiresReview!=='boolean'||!data.spec||typeof data.spec!=='object')throw Error('REMOTE: La respuesta IA no tiene un programa válido.');
-    const candidate=validateAiProgram(current,data.spec);
+    const candidate=validateAiProgram(current,data.spec,prompt);
     refreshAutoStatus({online:true,remaining:data.remaining,globalRemaining:data.globalRemaining,limit:data.limit||2});
     $('arquiMode').textContent='IA automática · plano editable';
     remoteAnswered=true;
     if(data.requiresReview){message('bot',data.reason||'Necesito aclarar un detalle antes de dibujar.');return}
     next=candidate;
-    if(data.reason)message('bot',data.reason);
+    const explanation=candidate.dimensionMeaning==='house'&&candidate.siteAssumed?
+     'Se propuso una casa de '+candidate.houseWidth+' × '+candidate.houseDepth+
+     ' m, con parcela HIPOTÉTICA de '+candidate.lotWidth+' × '+candidate.lotDepth+
+     ' m para mostrar patio y estacionamientos. Es un supuesto, no un dato del terreno.':
+     data.reason;
+    if(explanation)message('bot',explanation);
    }catch(error){
     const msg=String(error.message||'');
     if(msg.startsWith('QUOTA:')){
