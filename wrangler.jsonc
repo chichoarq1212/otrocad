@@ -29,5 +29,6 @@
         "ArquiBudget"
       ]
     }
-  ]
+  ],
+  "keep_vars": true
 }
