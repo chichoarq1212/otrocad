@@ -100,6 +100,10 @@ let activeBrowser=null,activePage=null,requestLog=[];
  assert(errors.length===0,'Browser JS errors: '+errors.join(' | '));
  fs.mkdirSync('/tmp/otrocad-browser-smoke',{recursive:true});
  await page.screenshot({path:'/tmp/otrocad-browser-smoke/preview-and-cad.png',fullPage:true});
+ // Clean evidence for design feedback: real plan in OtroCAD, without the assistant panel covering upper floor.
+ await page.evaluate(()=>{const panel=document.getElementById('arquiPanel');if(panel)panel.hidden=true});
+ await page.screenshot({path:'/tmp/otrocad-browser-smoke/plano-dos-plantas-sin-panel.png',fullPage:true});
+ await page.evaluate(()=>{const panel=document.getElementById('arquiPanel');if(panel)panel.hidden=false});
  // Repeat UI audit at iPhone-sized viewport: no provider selector or API key.
  await page.setViewportSize({width:390,height:844});
  await page.waitForTimeout(160);
