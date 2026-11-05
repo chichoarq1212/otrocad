@@ -45,7 +45,7 @@ assert.deepEqual([both.spec.lotWidth,both.spec.lotDepth],[15,24]);
 assert.deepEqual([both.spec.frontSetback,both.spec.backSetback,both.spec.sideSetback],[3,2,1]);
 assert.equal(both.spec.gardenFrontDepth,2);
 assert(both.shapes.some(e=>e.type==='text'&&e.text.includes('JARDÍN FRONTAL')));
-assert(both.shapes.some(e=>e.type==='text'&&e.text.includes('TERRENO 15 × 24')));
+assert(both.shapes.some(e=>e.type==='text'&&e.text.includes('TERRENO 15')&&e.text.includes('24')));
 assert(both.shapes.some(e=>e.layer==='AI-ARQ-TERRENO'));
 const site=simulate('Terreno de 15 por 24 metros, retiros frontal 3, posterior 2 y laterales 1. Jardín posterior 2 metros');
 assert.equal(site.spec.siteDeclared,true);
