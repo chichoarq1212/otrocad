@@ -1,6 +1,6 @@
 /* El Arqui · Motor Local · assistant for architecture and CAD Dibujo only.
  * Phase 1: offline validated concept plans, preview/approval and real progressive CAD.
- * Optional secure AI endpoint may propose dimensions but cannot execute arbitrary code.
+ * No generative AI network dependency: language is interpreted with local rules.
  */
 (()=>{
 'use strict';
@@ -10,7 +10,7 @@ const planner=window.OtroCadArquiPlanner,professional=window.OtroCadArquiProfess
 if(!planner||!professional||!api||!tabs)return;
 const $=id=>document.getElementById(id);
 const allowed=new Set(['draw','modify','annotate','blocks','layers','view']);
-let plan=null,previewEntities=[],spec=planner.parsePrompt('Vivienda de 1 planta en un terreno 12x20 con 3 dormitorios y garaje');
+let plan=null,previewEntities=[],spec=planner.parsePrompt('Casa de 10 x 8 con 3 dormitorios en dos plantas');
 let projectId=api.getObjects().filter(x=>x.aiArchitect&&x.aiProjectId).at(-1)?.aiProjectId||null;
 let activeStream=null,busy=false,pending=false,lastModelKey=null,baseline=null;
 const conversation=[];
@@ -37,8 +37,8 @@ root.innerHTML=[
  '<p id="arquiContext" class="arqui-context">Describe tu idea. Las medidas que falten se mostrarán como supuestos editables.</p>',
  '<details id="arquiDetails" class="arqui-details" hidden><summary>Ajustar medidas de esta propuesta</summary>',
  '<div class="arqui-grid">',
- '<label>Terreno ancho (m)<input id="arquiLotW" type="number" min="8" max="60" step=".1" value="12"></label>',
- '<label>Terreno fondo (m)<input id="arquiLotD" type="number" min="5" max="80" step=".1" value="20"></label>',
+ '<label id="arquiLabelSizeW">Casa ancho (m)<input id="arquiLotW" type="number" min="8" max="60" step=".1" value="12"></label>',
+ '<label id="arquiLabelSizeD">Casa fondo (m)<input id="arquiLotD" type="number" min="5" max="80" step=".1" value="20"></label>',
  '<label>Plantas<select id="arquiFloors"><option value="1">1 planta</option><option value="2">2 plantas</option></select></label>',
  '<label>Dormitorios<select id="arquiBeds"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>',
  '<label>Baños<select id="arquiBaths"><option value="0">Propuesta del motor</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>',
@@ -85,7 +85,7 @@ function visible(){const tab=tabs.querySelector('[data-tab].active');return !!ta
 function sync(){const state=visible();root.hidden=!state;toolbar.hidden=!state;if(!state)close()}
 function open(){if(!visible())return;root.hidden=false;panel.hidden=false;avatar.setAttribute('aria-expanded','true');
  restoreModel();
- if(!chat.childElementCount)message('bot','¡Cuéntame tu proyecto como lo hablarías con otro arquitecto! Basta con contarme tu idea y el terreno. Propondré lo que falte y lo verás como supuesto; luego puedes pedirme cambios sobre esta propuesta. Te prepararé un anteproyecto amueblado con muros de espesor real, puertas, ventanas, hatch y cotas, listo para editar en CAD. Si algo no cabe, te explicaré por qué en vez de inventarlo.');}
+ if(!chat.childElementCount)message('bot','¡Cuéntame tu proyecto como lo hablarías con otro arquitecto! Dime las medidas de la CASA. Menciona TERRENO, retiros, jardines o parqueos solo si los necesitas. Propondré lo que falte como supuesto editable; luego puedes pedirme cambios sobre esta propuesta. Te prepararé un anteproyecto amueblado con muros de espesor real, puertas, ventanas, hatch y cotas, listo para editar en CAD. Si algo no cabe, te explicaré por qué en vez de inventarlo.');}
 function close(){panel.hidden=true;avatar.setAttribute('aria-expanded','false')}
 avatar.onclick=()=>panel.hidden?open():close();$('arquiClose').onclick=close;
 tabs.addEventListener('click',()=>queueMicrotask(sync));
@@ -100,7 +100,14 @@ function message(role,text){
  chat.append(item);chat.scrollTop=chat.scrollHeight;while(chat.childElementCount>14)chat.firstChild.remove();
 }
 function toInputs(s){
- $('arquiLotW').value=s.lotWidth;$('arquiLotD').value=s.lotDepth;
+ const houseOnly=s.dimensionMeaning==='house'&&!s.siteDeclared;
+ $('arquiLotW').value=houseOnly?s.houseWidth:s.lotWidth;
+ $('arquiLotD').value=houseOnly?s.houseDepth:s.lotDepth;
+ $('arquiLabelSizeW').firstChild.textContent=houseOnly?'CASA ancho (m)':'TERRENO ancho (m)';
+ $('arquiLabelSizeD').firstChild.textContent=houseOnly?'CASA fondo (m)':'TERRENO fondo (m)';
+ for(const id of ['arquiSetFront','arquiSetBack','arquiSetSide']){
+  $(id).closest('label').hidden=houseOnly;
+ }
  $('arquiFloors').value=String(s.floors);$('arquiBeds').value=String(s.bedrooms);
  $('arquiGarage').checked=s.garage;$('arquiBaths').value=String(s.bathrooms);$('arquiAccessible').checked=s.accessible;
  $('arquiGarageCount').value=String(s.garageSpaces);
@@ -115,7 +122,10 @@ function toInputs(s){
  $('arquiDimensions').checked=s.dimensions;
 }
 function fromInputs(){
- return planner.validateSpec({...spec,lotWidth:$('arquiLotW').value,lotDepth:$('arquiLotD').value,
+ const houseOnly=spec.dimensionMeaning==='house'&&!spec.siteDeclared;
+ const width=$('arquiLotW').value,depth=$('arquiLotD').value;
+ return planner.validateSpec({...spec,lotWidth:width,lotDepth:depth,
+  ...(houseOnly?{houseWidth:width,houseDepth:depth}:{}),
   bathrooms:$('arquiBaths').value,accessible:$('arquiAccessible').checked,
   floors:$('arquiFloors').value,bedrooms:$('arquiBeds').value,garage:$('arquiGarage').checked,
   garageSpaces:$('arquiGarageCount').value,
@@ -185,7 +195,8 @@ $('arquiPrompt').addEventListener('input',()=>{
 });
 function displayIssues(){
  const output=$('arquiWarnings');output.replaceChildren();
- const warnings=plan?[...refs.review(plan).map(x=>x.message),...plan.audit.map(x=>x.message),...plan.warnings]:[];
+ const spatial=plan&&window.OtroCadArchitecturalKnowledge?.spatialReview?.(plan);
+ const warnings=plan?[...refs.review(plan).map(x=>x.message),...(spatial?.issues||[]).map(x=>x.message),...plan.audit.map(x=>x.message),...plan.warnings]:[];
  if(!warnings.length){output.textContent='Sin observaciones preliminares.';return}
  for(const warn of warnings){
   const item=document.createElement('p');item.textContent='• '+warn;output.append(item);
@@ -201,21 +212,23 @@ function makePreview(next,announce=false){
   if(shapes.length>3300)throw Error('El programa genera demasiados objetos para el editor.');
   plan=proposed;previewEntities=shapes;spec=proposed.spec;
   toInputs(spec);renderPreview();displayIssues();
-  if(announce){$('arquiDetails').hidden=false;$('arquiContext').textContent='Propuesta activa · los próximos pedidos parten de estas medidas. Retiros y programa pendientes de validar para el predio.';}
+  if(announce){$('arquiDetails').hidden=false;$('arquiContext').textContent=spec.siteDeclared?'Terreno reconocido de forma explícita; revisa retiros y programa.':'Propuesta de CASA, sin terreno inventado. Puedes añadir terreno, jardín o parqueo cuando lo necesites.';}
   $('arquiDraw').disabled=false;
   const rooms=plan.floors.reduce((n,f)=>n+f.rooms.filter(r=>r.kind!=='circulation').length,0);
   $('arquiSummary').textContent=plan.floors.length+' planta(s) · '+rooms+' espacios · '+shapes.length+' entidades';
   if(announce){
    const info=spec;
    const areas=plan.floors.map(f=>f.rooms.filter(r=>r.kind!=='circulation').reduce((n,r)=>n+(r.netArea??r.area),0).toFixed(1));
-   const brief=info.dimensionMeaning==='house'?'Interpreto '+info.houseWidth+' × '+info.houseDepth+' m como el tamaño de la CASA. Te propongo '+info.floors+' plantas; para mostrar los '+(plan.garage?.spaces||0)+' parqueos y el patio de '+info.patioDepth+' m he dibujado una PARCELA HIPOTÉTICA de '+info.lotWidth+' × '+info.lotDepth+' m, pendiente de confirmar. ':'Te propongo '+info.floors+' planta(s) en un terreno de '+info.lotWidth+' × '+info.lotDepth+' m, con retiros de '+info.frontSetback+' m al frente, '+info.backSetback+' m atrás y '+info.sideSetback+' m laterales. ';
+   const brief=(info.dimensionMeaning==='house'?'Interpreto '+info.houseWidth+' × '+info.houseDepth+' m como medidas de la CASA, no del terreno. ':'')+
+    (info.siteDeclared?'El terreno de '+info.lotWidth+' × '+info.lotDepth+' m fue indicado en el encargo. Retiros registrados: frontal '+info.frontSetback+', posterior '+info.backSetback+', lateral '+info.sideSetback+' m. ':
+    'NO se inventa ninguna parcela ni retiro. Solo dibujo exteriores que realmente hayas solicitado: '+(info.garage?'parqueo; ':'')+(info.patioDepth?'patio; ':'')+(info.garden?'jardín; ':'')+'los demás quedan sin definir. ');
    const baths=plan.floors.reduce((n,f)=>n+f.rooms.filter(r=>r.kind==='bath').length,0);
    const detail='Organicé '+rooms+' espacios, '+info.bedrooms+' dormitorios, '+baths+' baños y '+(plan.garage?plan.garage.spaces+' parqueo(s)':'sin plaza de estacionamiento dibujada')+
     '. Muros exteriores de '+Math.round(info.wallOuter*100)+' cm e interiores de '+Math.round(info.wallInner*100)+' cm; '+(info.furniture?'mobiliario, ':'')+(info.wallHatch?'hachurado, ':'')+(info.dimensions?'cotas, ':'')+
     'puertas y ventanas reales. Áreas por planta: '+areas.join(' / ')+' m² útiles aproximados. ';
    const notes=plan.warnings.slice(0,2).join(' ');
    message('bot',brief+detail+'He preparado '+shapes.length+' entidades CAD en modo '+info.style+'. '+(notes?'Observaciones: '+notes+' ':'')+
-    (info.siteAssumed?'La franja frontal de parqueo no es un retiro municipal verificado; confirma el terreno real. ':'Si no indicaste retiros o espesores, usé supuestos visibles en «Ajustar medidas». ')+'Revisa la propuesta y pulsa «Dibujar plano completo en CAD». Después podrás modificarla aquí o con comandos de OtroCAD.');
+    (info.siteDeclared?'Los retiros y dimensiones deben verificarse según la norma municipal. ':'No asigné retiro municipal ni orientación geográfica no solicitados. ')+'Revisa la propuesta y pulsa «Dibujar plano completo en CAD». Después podrás modificarla aquí o con comandos de OtroCAD.');
   }
   return true;
  }catch(error){
@@ -260,7 +273,7 @@ async function propose(text){
  }
 }
 $('arquiForm').addEventListener('submit',event=>{event.preventDefault();propose($('arquiPrompt').value)});
-$('arquiExampleHome').onclick=()=>{$('arquiPrompt').value='Quiero una vivienda de 12 por 20 con tres dormitorios y garaje';propose($('arquiPrompt').value)};
+$('arquiExampleHome').onclick=()=>{$('arquiPrompt').value='Quiero una casa de 10 por 8 con tres dormitorios, un baño máster y otro compartido, sala comedor y cocina';propose($('arquiPrompt').value)};
 $('arquiExampleEdit').onclick=()=>{$('arquiPrompt').value='Amplía la cocina 50 cm';propose($('arquiPrompt').value)};
 $('arquiExampleRules').onclick=()=>propose('Revisa los criterios y las referencias de este plano');
 $('arquiRecheck').onclick=()=>{if(busy||pending)return;try{makePreview(fromInputs(),true)}catch(error){message('bot',String(error.message||error))}};
