@@ -145,6 +145,25 @@ async function refreshAutoStatus(known=null){
  }
 }
 if(typeof fetch==='function')refreshAutoStatus();
+function validateAiProgram(current,change){
+ const patch={...change};
+ if(patch.dimensionMeaning==='house'||(current.dimensionMeaning==='house'&&patch.dimensionMeaning!=='site')){
+  patch.dimensionMeaning='house';
+  const width=Number(patch.houseWidth??current.houseWidth??current.lotWidth);
+  const depth=Number(patch.houseDepth??current.houseDepth??current.lotDepth);
+  const patio=Number(patch.patioDepth??current.patioDepth??0);
+  const garage=patch.garage??current.garage;
+  const front=Number(patch.frontSetback??(current.dimensionMeaning==='house'?current.frontSetback:(garage?5.5:0)));
+  patch.houseWidth=width;patch.houseDepth=depth;
+  patch.siteAssumed=patch.siteAssumed??current.siteAssumed??true;
+  if(patch.siteAssumed){
+   patch.lotWidth=width;patch.frontSetback=front;
+   patch.backSetback=patio;patch.lotDepth=Math.round((depth+front+patio)*1000)/1000;
+   patch.sideSetback=0;
+  }
+ }
+ return planner.validateSpec({...current,...patch});
+}
 function updateAiConnection(){
  const provider=aiSelect.value,help=$('arquiAiHelp');
  $('arquiAiLogin').hidden=provider!=='openrouter'||!oauthBridge;
@@ -396,7 +415,7 @@ async function propose(text){
      }
     const data=await response.json();
     if(!data||typeof data.reason!=='string'||typeof data.requiresReview!=='boolean'||!data.spec||typeof data.spec!=='object')throw Error('REMOTE: La respuesta IA no tiene un programa válido.');
-    const candidate=planner.validateSpec({...current,...data.spec});
+    const candidate=validateAiProgram(current,data.spec);
     refreshAutoStatus({online:true,remaining:data.remaining,globalRemaining:data.globalRemaining,limit:data.limit||2});
     $('arquiMode').textContent='IA automática · plano editable';
     remoteAnswered=true;
