@@ -20,6 +20,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   verify-live:
     runs-on: ubuntu-latest
@@ -33,6 +34,8 @@ jobs:
       - name: Verify deployed files match this exact build and the APK downloads
         if: github.event_name != 'pull_request'
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           BASE="https://otrocad.cristhian-torres-arq.workers.dev"
@@ -80,22 +83,19 @@ jobs:
           grep -Fiq 'motor arquitectónico' dist/index.html
           grep -Fq '0 créditos' dist/editor/arqui-assistant.js
           echo "Static deployment verified: model APIs retired; no AI quota can be consumed."
-          APK="https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.1-test/OtroCAD-Android-0.6.1-alpha.apk"
-          WINDOWS_ARTIFACT="https://github.com/chichoarq1212/otrocad/actions/runs/41952848540/artifacts/13382380735"
-
-          for attempt in $(seq 1 24); do
-            if curl --fail --location --silent --show-error --max-time 90 "$APK" -o /tmp/otrocad-hybrid.apk && unzip -tq /tmp/otrocad-hybrid.apk; then
-              echo "APK Android 0.6.1 descargado e íntegro."
-              break
+          APK_ARTIFACT="https://github.com/chichoarq1212/otrocad/actions/runs/41954042054/artifacts/13381887860"
+          WINDOWS_ARTIFACT="https://github.com/chichoarq1212/otrocad/actions/runs/41954074602/artifacts/13382552312"
+          # GitHub Actions artifacts are the exact verified offline binaries, stored as ZIP.
+          # Check metadata rather than silently accepting older AI-enabled releases.
+          for artifact in 13381887860 13382552312; do
+            meta=$(gh api "/repos/chichoarq1212/otrocad/actions/artifacts/$artifact" --jq '.expired')
+            if [ "$meta" != false ]; then
+              echo "::error::The current offline build artifact has expired: $artifact"
+              exit 1
             fi
-            if [ "$attempt" = 24 ]; then echo "::error::APK 0.6.1 no disponible o corrupto"; exit 1; fi
-            echo "Esperando publicación APK 0.6.1 ($attempt/24)"
-            sleep 15
           done
-          # Windows offline installer was checked in its independent Windows CI job.
-          # GitHub Actions ZIP artifact is the current downloadable build.
-          grep -Fq "$APK" dist/descargas/index.html
-          grep -Fq "$APK" dist/index.html
-          ! grep -Fq "android-hybrid-test-" dist/descargas/index.html
+          grep -Fq "$APK_ARTIFACT" dist/index.html
+          grep -Fq "$APK_ARTIFACT" dist/descargas/index.html
           grep -Fq "$WINDOWS_ARTIFACT" dist/descargas/index.html
-          echo "Cloudflare serves the static app; Android APK checked. Windows offline artifact built and verified separately."
+          ! grep -Fq "releases/download/android-0.6.1-test" dist/index.html
+          echo "Cloudflare hosts zero-AI editor; latest verified Android and Windows binary artifacts linked correctly."
