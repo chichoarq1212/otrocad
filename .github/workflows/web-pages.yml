@@ -74,6 +74,8 @@ jobs:
           node --check editor/arqui-house-layout.js
           node --check editor/arqui-user-ai.js
           node --check editor/arqui-oauth.js
+          node --check tests/arqui-user-ai.test.cjs
+          node tests/arqui-user-ai.test.cjs
           node --check editor/arqui-references.js
           node --check editor/arqui-assistant.js
           node --check tests/arqui-planner.test.cjs
