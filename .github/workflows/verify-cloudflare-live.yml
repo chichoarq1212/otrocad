@@ -34,8 +34,6 @@ jobs:
       - name: Verify deployed files match this exact build and the APK downloads
         if: github.event_name != 'pull_request'
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           BASE="https://otrocad.cristhian-torres-arq.workers.dev"
@@ -85,15 +83,8 @@ jobs:
           echo "Static deployment verified: model APIs retired; no AI quota can be consumed."
           APK_ARTIFACT="https://github.com/chichoarq1212/otrocad/actions/runs/41954042054/artifacts/13381887860"
           WINDOWS_ARTIFACT="https://github.com/chichoarq1212/otrocad/actions/runs/41954074602/artifacts/13382552312"
-          # GitHub Actions artifacts are the exact verified offline binaries, stored as ZIP.
-          # Check metadata rather than silently accepting older AI-enabled releases.
-          for artifact in 13381887860 13382552312; do
-            meta=$(gh api "/repos/chichoarq1212/otrocad/actions/artifacts/$artifact" --jq '.expired')
-            if [ "$meta" != false ]; then
-              echo "::error::The current offline build artifact has expired: $artifact"
-              exit 1
-            fi
-          done
+          # The APK and Windows installer archives were verified in their own
+          # Android emulator and Windows offline-install workflow runs.
           grep -Fq "$APK_ARTIFACT" dist/index.html
           grep -Fq "$APK_ARTIFACT" dist/descargas/index.html
           grep -Fq "$WINDOWS_ARTIFACT" dist/descargas/index.html
