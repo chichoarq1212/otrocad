@@ -36,11 +36,14 @@ jobs:
         run: |
           set -euo pipefail
           BASE="https://otrocad.cristhian-torres-arq.workers.dev"
+          # build-info.json contains the deployment commit hash. A site ahead of
+          # this run is still valid; compare actual app assets instead.
+          curl --fail --location --silent --show-error --max-time 20 "$BASE/build-info.json" -o /tmp/otrocad-live-build-info.json
           matched=0
           for i in $(seq 1 18); do
             echo "Checking public build and assets (attempt $i)"
             matched=1
-            for file in build-info.json index.html editor/index.html editor/editor.js editor/civil3d.js editor/jaimito-assistant.js editor/jaimito-assistant.css editor/arqui-planner.js editor/arqui-house-layout.js editor/arqui-user-ai.js editor/arqui-oauth.js editor/arqui-references.js editor/arqui-assistant.js editor/arqui-assistant.css editor/assets/el-arqui.webp editor/compact-chrome.css editor/geolocation.js editor/mep.js editor/vendor/proj4/proj4.js editor/assets/ing-jaimito-hd.webp editor/demo/vivienda.js editor/library/furnishings.js sw.js descargas/index.html ios/index.html apple-touch-icon.png icon-192.png icon-512.png; do
+            for file in index.html editor/index.html editor/editor.js editor/civil3d.js editor/jaimito-assistant.js editor/jaimito-assistant.css editor/arqui-planner.js editor/arqui-house-layout.js editor/arqui-user-ai.js editor/arqui-oauth.js editor/arqui-references.js editor/arqui-assistant.js editor/arqui-assistant.css editor/assets/el-arqui.webp editor/compact-chrome.css editor/geolocation.js editor/mep.js editor/vendor/proj4/proj4.js editor/assets/ing-jaimito-hd.webp editor/demo/vivienda.js editor/library/furnishings.js sw.js descargas/index.html ios/index.html apple-touch-icon.png icon-192.png icon-512.png; do
               if ! curl --fail --location --silent --show-error --max-time 20 \
                 -H 'Cache-Control: no-cache, no-store' \
                 "$BASE/$file?verify=${GITHUB_SHA}-$i" -o /tmp/otrocad-live-file || ! cmp -s "dist/$file" /tmp/otrocad-live-file; then
@@ -67,7 +70,7 @@ jobs:
             fi
           done
           APK="https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.1-test/OtroCAD-Android-0.6.1-alpha.apk"
-          WINDOWS_EXE="https://github.com/chichoarq1212/otrocad/releases/download/windows-experimental-41838907662-1/OtroCAD-Windows-0.5.6-experimental-Setup.exe"
+          WINDOWS_EXE="https://github.com/chichoarq1212/otrocad/releases/download/windows-experimental-41947943166-1/OtroCAD-Windows-0.6.1-experimental-Setup.exe"
 
           for attempt in $(seq 1 24); do
             if curl --fail --location --silent --show-error --max-time 90 "$APK" -o /tmp/otrocad-hybrid.apk && unzip -tq /tmp/otrocad-hybrid.apk; then
