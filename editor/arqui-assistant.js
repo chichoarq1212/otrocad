@@ -62,7 +62,7 @@ root.innerHTML=[
  '<div class="arqui-actions"><button id="arquiRecheck" type="button">Revisar diseño</button>',
  '<button id="arquiDraw" type="button">Dibujar plano completo en CAD</button>',
  '<button id="arquiStop" type="button" hidden>Cancelar dibujo</button>',
- '<button id="arquiErase" type="button">Retirar diseño IA</button></div>',
+ '<button id="arquiErase" type="button">Retirar anteproyecto local</button></div>',
  '<p class="arqui-disclaimer">Anteproyecto editable, no plano aprobado. Revisar normativa municipal, accesibilidad, estructura, ventilación y seguridad. Referencias y alcance de cada comprobación en Biblioteca técnica.</p>',
  '</div>',
  '<div class="arqui-pane" id="arquiLibraryPane" hidden>',
