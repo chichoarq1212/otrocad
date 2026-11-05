@@ -1,4 +1,4 @@
-/* El Arqui IA: local, opt-in technical excerpts.
+/* El Arqui LOCAL: licensed-safe architectural knowledge and local TXT/MD excerpts.
  * Never bundles or pretends to have licensed Plazola/Neufert PDFs.
  */
 (function(root,factory){
@@ -8,6 +8,7 @@
  'use strict';
  const name='otrocad-arqui-references-v1';
  // Public bibliographic/official summaries, reviewed 2026-11-04. No book pages bundled.
+ const knowledge=typeof window!=='undefined'?window.OtroCadArchitecturalKnowledge:null;
  const catalog=[
   {id:'neufert',source:'Neufert',title:'Arte de proyectar en arquitectura · 16.ª ed., GG, 2013',
    kind:'Referencia de diseño',status:'Ficha editorial pública; libro completo no incorporado',
@@ -24,6 +25,25 @@
    documentUrl:'https://derechoecuador.com/uploads/content/pdf/2019/05/pdf190527055044_1558997918.pdf',
    locator:'Acuerdo 007-19 · RO 924, 20-05-2019 · tablas 1 y 7, pp. RO 19 y 27; campo de aplicación pp. 12–13',
    summary:'Ámbito: espacios públicos, comunales y privados que prestan servicio público. Circulación libre: 1,20 m; giro: 1,50 m. Puertas: paso libre exterior principal 1,00 m, interior 0,90 m; altura 2,05 m. Vivienda privada: criterios de diseño salvo exigencia aplicable. Verificar herrajes, acabados, ruta y reglas locales.'},
+  {id:'quito-rtau-2024',source:'Quito RTAU',title:'Reglas Técnicas de Arquitectura y Urbanismo · Tomo 2 (2024)',
+   kind:'Fuente pública municipal · confirmar vigencia',status:'Cuadros 23–25 para vivienda, puertas, circulaciones y escaleras',
+   url:'https://www.ecp.ec/wp-content/uploads/2024/10/RTAU-Tomo2-EDIFICABILIDAD-v2.0-23-10-2024.pdf',
+   locator:'2.1.4–2.1.6; páginas impresas 130–132',
+   summary:'Vivienda de tres dormitorios: sala-comedor ≥16 m², cocina ≥6,5 m² y dormitorio principal ≥9 m²; secundarios ≥8 m². Vanos: entrada ≥0,96 m, habitaciones ≥0,86 m y baños ≥0,76 m. Pasillos y escaleras unifamiliares ≥0,90 m; el motor propone 1,20 m útil de pasillo y 1,05 m de escalera como objetivos de diseño.'},
+  {id:'miduvi-vis-2024',source:'MIDUVI',title:'Lineamientos Urbanísticos y Habitacionales (2024)',
+   kind:'Referencia pública nacional · ámbito VIS en suelo estatal',
+   status:'Ficha de recomendaciones y requisitos de tipologías VIS; aplicación condicionada',
+   url:'https://www.habitatyvivienda.gob.ec/wp-content/uploads/2024/08/Lineamientos-urbanos-habitacionales-02-08-2024.pdf',
+   locator:'3.2.2–3.2.3, página impresa 12–13',
+   summary:'Para un anteproyecto, cocina relacionada al comedor y sala prioritaria junto al ingreso; ningún dormitorio ni baño debe ser paso obligatorio a otra estancia. Lados útiles de referencia: cocina 1,50 m, sala-comedor 2,70 m, principal 2,50 m y secundarios 2,20 m.'},
+  {id:'stair-local',source:'OtroCAD',title:'Escalera U calculada, dos tramos y descanso',
+   kind:'Biblioteca estática geométrica propia',status:'Motor local auditable',
+   url:'',locator:'arqui-knowledge.js · stairGeometry',
+   summary:'2,80 m de desnivel entre pisos, 16 contrahuellas de 17,5 cm, siete huellas de 28 cm por tramo, dos tramos paralelos útiles de 1,05 m y descanso de 1,05 m; caja mínima orientativa 2,48 × 3,33 m. Coincidencia de caja en ambas plantas. Altura libre y estructura pendientes de estudio.'},
+  {id:'furniture-local',source:'OtroCAD',title:'Módulos de mobiliario y circulación interior',
+   kind:'Biblioteca propia de ergonomía',status:'Módulos editables orientativos; no copiados de manuales comerciales',
+   url:'',locator:'arqui-knowledge.js · dimensions.furniture',
+   summary:'Cama doble 1,60 × 2,00 m, armario 0,60 m de fondo, mesa 1,60 × 0,90 m, mesones de cocina 0,60 m, isla 1,40 × 0,80 m y pasos de trabajo orientativos de 0,90 m. Se validan dimensiones antes de dibujar.'},
   {id:'criterios',source:'OtroCAD',title:'Criterios propios del anteproyecto',kind:'Objetivos orientativos',
    status:'Reglas explícitas del motor; no atribuidas a libros ni ordenanzas',url:'',locator:'Motor local · versión 2026-11-04',
    summary:'Zonificación social, privada y de servicio; habitaciones con área útil objetivo de 9 m² y ancho útil de 2,80 m; revisar luz, ventilación y mobiliario. Los retiros son supuestos hasta contrastarlos con el predio.'}
@@ -43,13 +63,14 @@
     if(w<2.795||area<8.995)out.push({sourceId:'criterios',status:'revisar',message:r.name+': '+w.toFixed(2)+' m útiles y '+area.toFixed(2)+' m²; revisar objetivo propio de 2,80 m / 9 m².'});
    }
   }
+  for(const issue of plan.audit||[])out.push({sourceId:'criterios',status:issue.severity==='error'?'revisar':'observación',message:issue.message});
   out.push({sourceId:'nec-au',status:'pendiente',message:'Puertas: se representan vanos, no paso libre certificado. Verificar marco, hoja, altura y giro libre de 1,50 m a ambos lados (tabla 7, p. RO 27).'});
   out.push({sourceId:'criterios',status:'pendiente',message:'Retiros, uso de suelo, luz/ventilación, estructura, escaleras y normativa municipal'+(s.location?' de '+s.location:' del predio')+': pendientes de comprobación.'});
   return out;
  }
  function consult(query,plan){
   const q=norm(query);
-  if(!/plazola|neufert|normativ|referencias|criterios|accesibilidad|cumple/.test(q))return null;
+  if(!/plazola|neufert|normativ|referencias|criterios|accesibilidad|cumple|escalera|pasillo|puerta|ventana|cocina|dormitorio|bano|minim|estacionamiento|patio|mobiliario|medidas/.test(q))return null;
   // A design request containing a source name still goes through normal design generation.
   if(/disena|dibuja|genera|quiero|amplia|agranda|agrega/.test(q))return null;
   let selected=catalog.filter(x=>q.includes(norm(x.source)));
