@@ -67,6 +67,7 @@
   if(!k)throw Error('Falta cargar la biblioteca arquitectónica local.');
   if(W<9.4||D<7.7)
    throw Error('Casa '+W+' × '+D+' m: la tipología de tres dormitorios en dos plantas necesita al menos 9,4 × 7,7 m. No forzaré habitaciones ni escaleras demasiado pequeñas.');
+  if(s.bathrooms&&s.bathrooms!==2)throw Error('Esta tipología compacta dispone de 2 baños (máster y compartido); no asignaré un número distinto sin otra distribución.');
   if(s.bedrooms!==3||s.floors!==2)
    throw Error('La tipología compacta verificada atiende 3 dormitorios y 2 plantas. Para otro programa selecciona una tipología y dimensiones compatibles.');
   if(s.accessible)throw Error('El proyecto accesible exige una distribución distinta, radios de giro y continuidad vertical; no se certifica automáticamente.');
@@ -80,7 +81,13 @@
    throw Error('Pasillo libre '+hallClear+' m insuficiente para el objetivo de '+k.dimensions.corridor.clearWidth+' m.');
   const stairDepth=round(clamp(D*.44,3.48,3.74));
   const stair=k.stairGeometry({height:2.8,width:rightW,depth:stairDepth});
-  const groundSplit=round(clamp(D*.50-Number(s.kitchenExtra||0)+Number(s.livingExtra||0),3.6,D-3.85));
+  const requestedSplit=D*.515-Number(s.kitchenExtra||0)+Number(s.livingExtra||0);
+  const minimumLiving=round(Math.max(3.60,16/(L-(s.wallOuter+s.wallInner)/2)+(s.wallOuter+s.wallInner)/2));
+  const minimumKitchen=s.kitchenIsland?3.65:2.55;
+  if(requestedSplit<minimumLiving-.002||D-requestedSplit<minimumKitchen-.002)
+   throw Error('La modificación no cabe: sala-comedor necesita al menos '+minimumLiving+
+    ' m de profundidad y la cocina '+minimumKitchen+' m. Modifica el tamaño de la casa o reduce el incremento.');
+  const groundSplit=round(requestedSplit);
   const upperSplit=round(clamp(D*.54+Number(s.bedroomExtra||0),4.15,D-3.15));
   const lastBath=round(Math.max(1.70,Math.min(1.80,D*.215)));
   const secondSplit=round(D-lastBath);
@@ -156,6 +163,8 @@
    ' Verificar ventanas y ventilación de baño máster (posible extracción mecánica), altura libre bajo escalera y normativa local.'
   ];
   const audit=k.auditPlan({spec:s,floors});
+  const invalid=audit.filter(x=>x.severity==='error');
+  if(invalid.length)throw Error('Revisión espacial: '+invalid.slice(0,3).map(x=>x.message).join(' '));
   if(audit.some(x=>x.severity==='error'))
    warnings.push('Se detectaron dimensiones por revisar: la biblioteca local las muestra, pero no equivalen a licencia municipal.');
   return {spec:s,floors,warnings,audit,garage,patio,layoutKind:'compact-coherent-v3',
