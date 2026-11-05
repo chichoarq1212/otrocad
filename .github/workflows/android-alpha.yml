@@ -1,4 +1,4 @@
-name: Compilar OtroCAD Android híbrido online/offline
+name: Compilar OtroCAD Android híbrido · motor arquitectónico offline
 on:
   push:
     branches: ["main", "otrocad-android-alpha-*"]
@@ -36,6 +36,7 @@ jobs:
           mkdir -p android/app/src/main/assets/editor
           cp -a editor/. android/app/src/main/assets/editor/
           node scripts/verify-android-offline.cjs android/app/src/main/assets/editor
+          node tests/arqui-static-architecture.test.cjs
       - name: Compilar APK híbrido con editor offline
         run: gradle -p android assembleDebug --no-daemon
       - name: Preparar APK con nombre de versión
