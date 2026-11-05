@@ -14,12 +14,13 @@ const mockSpec={
 const brief='Quiero una casa de 10 por 8 metros, tres habitaciones, una máster con baño y dos con baño compartido, sala comedor, cocina con isla, patio de 3 metros atrás con lavandería, puerta al patio y parque para dos carros.';
 const answer={spec:mockSpec,reason:'Propuesta de dos plantas en casa 10x8, terreno de referencia 10x16.5 pendiente de confirmar.',requiresReview:false};
 
+let activeBrowser=null,activePage=null;
 (async()=>{
  const binaries=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'];
  const binary=binaries.find(x=>fs.existsSync(x));
- const browser=await chromium.launch({headless:true,...(binary?{executablePath:binary}:{}),
+ const browser=activeBrowser=await chromium.launch({headless:true,...(binary?{executablePath:binary}:{}),
   args:['--no-sandbox','--disable-dev-shm-usage']});
- const page=await browser.newPage({viewport:{width:1400,height:900},deviceScaleFactor:1});
+ const page=activePage=await browser.newPage({viewport:{width:1400,height:900},deviceScaleFactor:1});
  const errors=[];
  page.on('pageerror',e=>errors.push(String(e).slice(0,320)));
  let requests=0;
@@ -33,16 +34,19 @@ const answer={spec:mockSpec,reason:'Propuesta de dos plantas en casa 10x8, terre
    body:JSON.stringify({choices:[{message:{content:JSON.stringify(answer)}}]})});
  });
  const target=process.env.OTROCAD_TEST_URL||'http://127.0.0.1:4173/editor/';
+ page.setDefaultTimeout(8500);console.log('Chrome: navegando a '+target);
  const res=await page.goto(target,{waitUntil:'domcontentloaded',timeout:25000});
  assert.equal(res.status(),200);
  await page.waitForFunction(()=>!!window.OtroCadArqui&&!!window.OtroCadCivilAPI,
   null,{timeout:15000});
+ console.log('Chrome: OtroCAD inicializado, abriendo El Arqui');
  await page.evaluate(()=>window.OtroCadArqui.open());
  assert.equal(await page.locator('#arquiPanel').isVisible(),true);
  await page.locator('#arquiAiSettings summary').click();
  await page.locator('#arquiAiProvider').selectOption('openrouter');
  await page.locator('#arquiAiKey').fill('sk-or-fake-only-browser-automated-test');
  await page.locator('#arquiPrompt').fill(brief);
+ console.log('Chrome: enviando solicitud al modelo simulado');
  await page.locator('#arquiPropose').click();
  await page.waitForFunction(()=>window.OtroCadArqui.preview()?.spec?.dimensionMeaning==='house',null,{timeout:15000});
  const initial=await page.evaluate(()=>({
@@ -58,6 +62,7 @@ const answer={spec:mockSpec,reason:'Propuesta de dos plantas en casa 10x8, terre
  assert.equal(initial.floors,2);
  assert.equal(initial.beforeDraw,0,'Preview must not mutate CAD before approval');
  assert(initial.previewMarks>200,'SVG must contain the actual drawing geometry');
+ console.log('Chrome: vista previa generada; aprobando entidades CAD');
  await page.locator('#arquiDraw').click();
  await page.waitForFunction(()=>window.OtroCadCivilAPI.getObjects().filter(x=>x.aiArchitect).length>300,null,{timeout:15000});
  const geometry=await page.evaluate(()=>{
@@ -85,4 +90,23 @@ const answer={spec:mockSpec,reason:'Propuesta de dos plantas en casa 10x8, terre
  },null,2));
  console.log('CHROME REAL BROWSER PASS: per-user AI response -> SVG preview -> approved '+geometry.entityCount+' editable CAD entities');
  await browser.close();
-})().catch(error=>{console.error(error);process.exitCode=1});
+})().catch(async error=>{
+ console.error('ERROR navegador El Arqui:',error);
+ try{
+  fs.mkdirSync('/tmp/otrocad-browser-smoke',{recursive:true});
+  if(activePage){
+   const details=await activePage.evaluate(()=>({
+    url:location.href,readyState:document.readyState,
+    mode:document.getElementById('arquiMode')?.textContent,
+    summary:document.getElementById('arquiSummary')?.textContent,
+    context:document.getElementById('arquiContext')?.textContent,
+    message:Array.from(document.querySelectorAll('#arquiMessages .arqui-msg')).slice(-3).map(e=>e.textContent?.slice(0,200)),
+    objectCount:window.OtroCadCivilAPI?.getObjects?.().length||0
+   })).catch(e=>({error:String(e)}));
+   fs.writeFileSync('/tmp/otrocad-browser-smoke/failure.json',JSON.stringify({error:String(error),details},null,2));
+   await activePage.screenshot({path:'/tmp/otrocad-browser-smoke/failure.png',timeout:4500}).catch(()=>{});
+  }
+ }catch(e){console.error('Error recolectando diagnóstico',e)}
+ try{await activeBrowser?.close()}catch(e){console.error('Error cerrando navegador',e)}
+ process.exitCode=1;
+});
