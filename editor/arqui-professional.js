@@ -131,20 +131,27 @@ function generate(plan,options={}){
    rect(bx,Math.min(y+d-.40,by+bd+.12),.46,.32,'nightstand');
   };
   const drawBath=()=>{
-   rect(x+.3,y+.35,Math.min(.85,usableW*.48),.64,'vanity');
-   circ(x+.67,y+.67,.20,'sink');
-   const rx=x+w-.85,ry=y+.4;
-   rect(rx,ry,.50,.70,'wc');
-   circ(rx+.25,ry+.22,.15,'wc-seat');
-   rect(x+w-.97,y+d-1.10,.65,.75,'shower');
-   ln(x+w-.97,y+d-.48,x+w-.32,y+d-1.10);
-   if(/VESTIDOR/.test(r.name)&&d>=2.5){
-    const h=Math.min(.55,d*.18);
-    rect(x+.3,y+d-h-.23,Math.min(1.2,w-1.1),h,'wardrobe');
-    for(let i=0;i<3;i++)ln(x+.32+(i+1)*Math.min(1.2,w-1.1)/4,y+d-h-.2,x+.32+(i+1)*Math.min(1.2,w-1.1)/4,y+d-.2);
-   }
-  };
-  const drawKitchen=()=>{
+  if(w<2.5){
+   // Compact en-suite: fixtures along the far side; an outward-swing door
+   // from the bedroom reserves the left wall and does not hit the shower.
+   const wcX=x+w-.81;
+   rect(wcX,y+.30,.53,.70,'wc');
+   circ(wcX+.26,y+.52,.16,'wc-seat');
+   rect(x+w-.82,y+1.05,.54,.43,'vanity');
+   circ(x+w-.55,y+1.27,.13,'sink');
+   rect(x+.25,y+d-.94,Math.min(.93,w-.53),.70,'shower');
+   ln(x+.25,y+d-.24,x+Math.min(1.18,w-.28),y+d-.94);
+  }else{
+   rect(x+.30,y+.35,.86,.55,'vanity');
+   circ(x+.64,y+.60,.18,'sink');
+   const rx=x+w-.90,ry=y+.40;
+   rect(rx,ry,.51,.70,'wc');
+   circ(rx+.25,ry+.23,.15,'wc-seat');
+   rect(x+w-1.12,y+d-1.08,.79,.78,'shower');
+   ln(x+w-1.10,y+d-.30,x+w-.33,y+d-1.08);
+  }
+ }; 
+ const drawKitchen=()=>{
    rect(x+.25,y+.34,Math.min(2.45,w-.55),.52,'counter');
    rect(x+.25,y+.34,.60,.52,'sink');
    circ(x+.55,y+.61,.13,'sink');
@@ -168,9 +175,24 @@ function generate(plan,options={}){
    rect(x+.28,y+d-.8,Math.min(1.8,w-.56),.41,'laundry-counter');
   };
   const drawStair=()=>{
-   const l=.25,stairs=10,hh=(d-.65)/stairs;
-   for(let i=0;i<stairs;i++)ln(x+l,y+.35+i*hh,x+w-l,y+.35+i*hh,'AI-ARQ-ESCALERAS',art.tread,'stair-tread');
-   text(x+.43,y+d-.22,'↑ SUBE',.12,'AI-ARQ-ESCALERAS',art.tread,'stair-label');
+   // Actual U-shaped stair footprint rather than parallel stripes.
+   const model=options.knowledge?.stairGeometry?.({height:2.8,width:w,depth:d})||
+     {risersPerFlight:8,tread:.28,clearFlight:1.05,wellGap:.14,run:1.96,landing:1.05};
+   const lane=model.clearFlight,gap=model.wellGap,x0=x+.25,y0=y+.22;
+   const layer='AI-ARQ-ESCALERAS',x1=x0+lane+gap;
+   rect(x0,y0,lane,model.run,'first-flight',layer,art.tread,.06);
+   rect(x1,y0,lane,model.run,'return-flight',layer,art.tread,.06);
+   rect(x0,y0+model.run,lane*2+gap,model.landing,'turn-landing',layer,art.tread,.14);
+   for(let i=1;i<model.risersPerFlight;i++){
+    const yy=y0+i*model.tread;
+    ln(x0,yy,x0+lane,yy,layer,art.tread,'stair-tread');
+    ln(x1,yy,x1+lane,yy,layer,art.tread,'stair-tread');
+   }
+   ln(x0+lane/2,y0+.25,x0+lane/2,y0+model.run-.16,layer,art.tread,'stair-up');
+   ln(x0+lane/2,y0+model.run-.16,x0+lane/2-.12,y0+model.run-.34,layer,art.tread,'stair-up');
+   ln(x0+lane/2,y0+model.run-.16,x0+lane/2+.12,y0+model.run-.34,layer,art.tread,'stair-up');
+   text(x0+.07,y0+model.run+model.landing*.56,'DESCANSO',.14,layer,art.tread,'stair-label');
+   text(x1+.1,y0+.28,'U 16C / 0.28H',.12,layer,art.tread,'stair-label');
   };
   const name=r.name.toUpperCase();
   if(r.kind==='bedroom'||/DORMITORIO/.test(name))drawBed();
@@ -180,8 +202,8 @@ function generate(plan,options={}){
   else if(/LAVANDER/.test(name))drawLaundry();
   else if(/SALA|COMEDOR|ESTAR|ESTUDIO/.test(name))drawLiving();
   else if(/VESTIDOR|CLOSET/.test(name)){
-   rect(x+.24,y+.25,.56,d-.55,'closet');
-   rect(x+w-.75,y+.25,.48,d-.55,'closet');
+   rect(x+.14,y+.17,.52,Math.max(.7,d-.34),'closet');
+   if(w>2.5)rect(x+w-.75,y+.25,.48,d-.55,'closet');
   }
  }
  function dimension(ax,ay,bx,by,offset,label,vertical=false,role='dimension'){
@@ -233,7 +255,7 @@ function generate(plan,options={}){
   ln(x,y+1.28,x+.22,y+.93,'AI-ARQ-SIMBOLOGÍA',art.title,'north');
   text(x-.10,y+1.50,'N',.22,'AI-ARQ-SIMBOLOGÍA',art.title);
   const y2=s.lotDepth+1.8;
-  text(0,y2,'EL ARQUI IA  |  ANTEPROYECTO ARQUITECTÓNICO',.32,'AI-ARQ-LÁMINA',art.title);
+  text(0,y2,'EL ARQUI LOCAL  |  ANTEPROYECTO ARQUITECTÓNICO',.32,'AI-ARQ-LÁMINA',art.title);
   text(0,y2+.4,'PLANTAS AMUEBLADAS · MUROS '+compact(wallOut)+'/'+compact(wallIn)+' m · ESCALA MODELO 1:1',.19,'AI-ARQ-LÁMINA',art.text);
   text(0,y2+.73,'LA ESCALA FINAL DE IMPRESIÓN SE AJUSTA EN LAYOUT · MEDIDAS Y NORMATIVA A VERIFICAR',.145,'AI-ARQ-LÁMINA',art.dim);
   const sy=y2+1.18;
@@ -243,9 +265,90 @@ function generate(plan,options={}){
   }
   text(3.2,sy+.15,'m | ESCALA GRÁFICA',.14,'AI-ARQ-SIMBOLOGÍA',art.title);
  }
+ function renderCoherentFloor(f){
+  const X=f.x,Y=f.y,W=f.width,D=f.depth,L=f.hallStart,C=f.hallWidth,R=L+C;
+  const leftX=X+L,rightX=X+R;
+  const openings=[],innerDoors=[];
+  const leftFrontWindow={center:X+L*.39,width:Math.min(1.4,L*.29)};
+  const rightFrontWindow={center:rightX+(W-R)*.56,width:1.06};
+  const entry={center:X+L+C/2,width:.96};
+  const front=f.level===1?[entry,leftFrontWindow,rightFrontWindow]:[leftFrontWindow,rightFrontWindow];
+  const fGaps=wallWithGaps('h',X,X+W,Y,wallOut,front,true);
+  if(f.level===1){door(entry.center,Y,entry.width,'h',1)}
+  for(const w of [leftFrontWindow,rightFrontWindow])
+   if(fGaps.some(g=>Math.abs((g.low+g.high)/2-w.center)<.012))
+    window(w.center,Y,w.width,'h',wallOut);
+  const rearLeftWindow={center:X+L*.32,width:Math.min(1.12,L*.23)};
+  const rearRightWindow={center:rightX+(W-R)*.55,width:f.level===1?1.1:.68};
+  const rearDoor=f.openings.backDoor&&f.level===1?{center:X+L*.77,width:.96}:null;
+  const rearGaps=wallWithGaps('h',X,X+W,Y+D,wallOut,[rearLeftWindow,rearRightWindow,...(rearDoor?[rearDoor]:[])],true);
+  for(const w of [rearLeftWindow,rearRightWindow])if(rearGaps.some(g=>Math.abs((g.low+g.high)/2-w.center)<.012))
+    window(w.center,Y+D,w.width,'h',wallOut);
+  if(rearDoor&&rearGaps.some(g=>Math.abs((g.low+g.high)/2-rearDoor.center)<.012))
+   door(rearDoor.center,Y+D,rearDoor.width,'h',-1);
+  for(const [side,axisX,positions] of [['left',X,f.windows.left],['right',X+W,f.windows.right]]){
+   const avail=positions.map((pos,i)=>({center:Y+pos,width:pos>D-1.5?.64:Math.min(1.20,(side==='left'?1.20:1.0))}));
+   const gaps=wallWithGaps('v',Y,Y+D,axisX,wallOut,avail,true);
+   for(const win of avail)if(gaps.some(g=>Math.abs((g.low+g.high)/2-win.center)<.012))
+    window(axisX,win.center,win.width,'v',wallOut);
+  }
+  for(const side of ['left','right']){
+   const hallX=side==='left'?leftX:rightX;
+   const gaps=f.doors[side].map(d=>({center:Y+d.y,width:d.width}));
+   const accepted=wallWithGaps('v',Y,Y+D,hallX,wallIn,gaps,false);
+   for(const d of gaps){
+    if(!accepted.some(g=>Math.abs((g.low+g.high)/2-d.center)<.012))continue;
+    const stairRoom=side==='right'&&Math.abs(d.center-(Y+f.doors.right[0].y))<.005;
+    // Stairwell joins corridor via an unobstructed opening (no swing across steps).
+    if(!stairRoom)door(hallX,d.center,d.width,'v',side==='left'?-1:1);
+   }
+  }
+  for(const yy of f.partitions.left){
+   const openings=f.openings.openSocial&&f.level===1?[{center:X+L*.56,width:1.55}]:[];
+   wallWithGaps('h',X,X+L,Y+yy,wallIn,openings,false);
+  }
+  for(const yy of f.partitions.right)wallWithGaps('h',rightX,X+W,Y+yy,wallIn,[],false);
+  if(f.level===2){
+   const p0=f.partitions,xx=X+p0.suiteX;
+   const doors=[{center:Y+1.09,width:.86},
+    {center:Y+(p0.suiteBathY+p0.suiteEndY)/2,width:.76}];
+   wallWithGaps('v',Y,Y+p0.suiteEndY,xx,wallIn,doors,false);
+   door(xx,doors[0].center,doors[0].width,'v',-1);
+   // Bathroom door opens out toward bedroom; fixtures are not in its swept area.
+   door(xx,doors[1].center,doors[1].width,'v',-1);
+   wallWithGaps('h',xx,X+L,Y+p0.suiteBathY,wallIn,[],false);
+  }
+  let habitable=0;
+  for(const room of f.rooms){
+   if(room.kind==='circulation'){
+    text(X+L+.06,Y+.62,'PASILLO LIBRE '+compact(room.clearWidth)+' m',.12,'AI-ARQ-TEXTOS',art.dim,'circulation');
+    continue;
+   }
+   const ax=X+room.x,ay=Y+room.y;
+   if(room.kind==='stairs'){
+    const st=room;
+    furniture(st,X,Y);
+   }else furniture(room,X,Y);
+   const cx=ax+room.width/2,cy=ay+room.depth/2;
+   const label=(room.name||'').replace(' / ',' / ');
+   text(cx-Math.min(1.08,room.width*.38),cy-.16,label,room.width<2.1?.115:.165,
+    'AI-ARQ-TEXTOS',art.text,'room-label');
+   text(cx-.35,cy+.10,compact(room.netArea||room.area)+' m²',.13,
+    'AI-ARQ-TEXTOS',art.dim,'room-area');
+   habitable+=room.netArea||room.area;
+  }
+  dimensionChains(f);
+  text(X,Y-1.66,'PLANTA '+f.level+' · ÁREA ÚTIL APROX. '+compact(habitable)+' m²',
+   .24,'AI-ARQ-LÁMINA',art.title,'floor-title');
+  return {floor:f.level,area:round(habitable)};
+ }
  site();
  const floorTotals=[];
  for(const f of plan.floors){
+  if(f.layoutKind==='compact-coherent-v3'){
+   floorTotals.push(renderCoherentFloor(f));
+   continue;
+  }
   const X=f.x,Y=f.y,W=f.width,D=f.depth,L=f.hallStart,C=f.hallWidth,R=L+C;
   const frontLeft=X+L/2,frontRight=X+R+(W-R)/2,entry=X+L+C/2;
   // Contours and openings are generated once, with a readable wall thickness.
@@ -307,6 +410,15 @@ function generate(plan,options={}){
   rect(x,y,w,d,'parking','AI-ARQ-GARAJE',art.site,.08);
   for(const [ax,ay,bx,by] of [[x,y,x+w,y],[x+w,y,x+w,y+d],[x+w,y+d,x,y+d],[x,y+d,x,y]])
    ln(ax,ay,bx,by,'AI-ARQ-GARAJE',art.site,'parking');
+  // The front pedestrian strip is deliberately outside the two parking bays.
+  if(g.layout==='side-by-side'&&g.spaces===2){
+   const entryX=(plan.floors[0]?.hallStart||5)+((plan.floors[0]?.hallWidth||1.36)/2);
+   const pedestrianX=Math.max(g.x+g.width+.2,entryX-.5);
+   const pathWidth=Math.min(1.05,Math.max(.6,entryX+.5-pedestrianX));
+   rect(pedestrianX,0,pathWidth,s.frontSetback,'pedestrian-entry','AI-ARQ-PATIO',art.site,.035);
+   text(pedestrianX+.10,1.1,'ACCESO',.13,'AI-ARQ-PATIO',art.title);
+   text(pedestrianX+.10,1.35,'PEATONAL',.13,'AI-ARQ-PATIO',art.title);
+  }
   const sideBySide=g.layout==='side-by-side'&&g.spaces===2;
   const spaces=sideBySide?2:(g.spaces===2&&d>10?2:1);
   for(let i=0;i<spaces;i++){
