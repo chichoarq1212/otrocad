@@ -10,7 +10,7 @@ const must=[
  'civil-road-ui.css','geolocation.js','mep.js','mep-ribbon.css',
  'mep-thermal.js','mep-thermal-ui.js','mep-thermal-ui.css',
  'kelvin-assistant.js','jaimito-assistant.js','jaimito-assistant.css',
- 'arqui-planner.js','arqui-references.js','arqui-assistant.js','arqui-assistant.css',
+ 'arqui-planner.js','arqui-knowledge.js','arqui-house-layout.js','arqui-references.js','arqui-assistant.js','arqui-assistant.css',
  'arqui-professional.js','cad-file-ui.js','cad-file-ui.css',
  'assets/el-arqui.webp',
  'assets/ing-kelvin.webp','assets/ing-jaimito-hd.webp',
@@ -38,4 +38,9 @@ const thermal=fs.readFileSync(path.join(dir,'mep-thermal.js'),'utf8');
 assert.ok(thermal.includes('function hvac(')&&thermal.includes('function coldRoom('));
 const road=fs.readFileSync(path.join(dir,'civil-road-ui.js'),'utf8');
 assert.ok(road.includes('SEÑALIZACIÓN VIAL')&&road.includes('roadPreview'));
+const assistant=fs.readFileSync(path.join(dir,'arqui-assistant.js'),'utf8');
+assert(!assistant.includes('/api/arqui')&&!assistant.includes('OpenRouter'),'Android must not contain AI inference');
+for(const removed of ['arqui-oauth.js','arqui-user-ai.js'])
+ assert(!fs.existsSync(path.join(dir,removed)),'Retired AI file included in Android: '+removed);
+console.log('Motor arquitectónico local comprobado: conocimiento, U escaleras y 0 conexiones de IA.');
 console.log('APK offline OK: '+must.length+' recursos y herramientas CAD/Civil/Señalización/MEP/Frío presentes.');
