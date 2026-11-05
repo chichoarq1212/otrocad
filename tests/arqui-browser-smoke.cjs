@@ -1,154 +1,92 @@
 'use strict';
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const cp=require('node:child_process');
 const {chromium}=require('playwright-core');
-
-const mockSpec={
- dimensionMeaning:'house',houseWidth:10,houseDepth:8,siteAssumed:true,
- lotWidth:10,lotDepth:16.5,frontSetback:5.5,backSetback:3,sideSetback:0,
- floors:2,bedrooms:3,bathrooms:2,mainSuite:true,socialBath:true,
- kitchenIsland:true,patioDepth:3,patioLaundry:false,rearDoor:true,
- kitchenExtra:0.5,style:'residencial',
- garage:true,garageSpaces:2
-};
-const brief='Quiero una casa de 10 por 8 metros, tres habitaciones, una máster con baño y dos con baño compartido, sala comedor, cocina con isla, patio de 3 metros atrás con lavandería, puerta al patio y parque para dos carros.';
-const answer={spec:mockSpec,reason:'Se asume que el terreno mide 12 x 20 metros, aunque la casa es 10 x 8.',requiresReview:false};
-
-let activeBrowser=null,activePage=null,requestLog=[];
+const OUT='/tmp/otrocad-browser-smoke';
+const prompt='Quiero una casa de 10 x 8 con 3 habitaciones, dos de ellas con baño compartido y una con baño máster, sala, comedor, cocina con isla, puerta trasera para patio de 3 metros con lavandería y parqueo para 2 carros.';
+fs.mkdirSync(OUT,{recursive:true});
 (async()=>{
- const binaries=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'];
- const binary=binaries.find(x=>fs.existsSync(x));
- const browser=activeBrowser=await chromium.launch({headless:true,...(binary?{executablePath:binary}:{}),
-  args:['--no-sandbox','--disable-dev-shm-usage']});
- const page=activePage=await browser.newPage({viewport:{width:1400,height:900},deviceScaleFactor:1,serviceWorkers:'block'});
- const errors=[];
- page.on('pageerror',e=>errors.push(String(e).slice(0,320)));
- page.on('console',msg=>{if(msg.type()==='error')console.error('Chrome console:',msg.text().slice(0,400))});
- let requests=0;
- requestLog=[];
- page.on('requestfailed',req=>requestLog.push({url:req.url(),error:req.failure()?.errorText}));
- await page.route('**/api/arqui/status',async route=>{
-  requestLog.push({url:route.request().url(),method:'GET'});
-  await route.fulfill({status:200,contentType:'application/json',
-   body:JSON.stringify({online:true,limit:2,remaining:2,globalRemaining:20,reset:'00:00 UTC'})});
+ const binary=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(fs.existsSync);
+ const browser=await chromium.launch({headless:true,...(binary?{executablePath:binary}:{}) ,args:['--no-sandbox','--disable-dev-shm-usage']});
+ const page=await browser.newPage({viewport:{width:1440,height:900},serviceWorkers:'block'});
+ const errors=[],remoteCalls=[];
+ page.setDefaultTimeout(15000);
+ page.on('pageerror',e=>errors.push(String(e)));
+ page.on('request',r=>{
+  const dest=r.url();
+  if(/\/api\/arqui|openrouter\.ai|generativelanguage\.googleapis\.com|api\.openai\.com|api\.groq\.com/.test(dest))
+   remoteCalls.push(dest);
  });
- await page.route('**/api/arqui',async route=>{
-  const req=route.request();
-  requestLog.push({url:req.url(),method:req.method()});
-  assert.equal(req.method(),'POST');
-  requests++;
-  const sent=req.postDataJSON();
-  assert.equal(sent.mode,'architecture');
-  assert(sent.message.includes('casa de 10 por 8'));
-  await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
-   ...answer,remaining:1,limit:2,globalRemaining:19
-  })});
- });
+ await page.route('**/api/arqui*',r=>r.abort('blockedbyclient'));
  const target=process.env.OTROCAD_TEST_URL||'http://127.0.0.1:4173/editor/';
- page.setDefaultTimeout(8500);console.log('Chrome: navegando a '+target);
- const res=await page.goto(target,{waitUntil:'domcontentloaded',timeout:25000});
+ console.log('Opening offline OtroCAD:',target);
+ const res=await page.goto(target,{waitUntil:'domcontentloaded',timeout:30000});
  assert.equal(res.status(),200);
- await page.waitForFunction(()=>!!window.OtroCadArqui&&!!window.OtroCadCivilAPI,
-  null,{timeout:15000});
- console.log('Chrome: OtroCAD inicializado, abriendo El Arqui');
+ await page.waitForFunction(()=>window.OtroCadArqui&&window.OtroCadArchitecturalKnowledge&&window.OtroCadCivilAPI,
+  null,{timeout:20000});
  await page.evaluate(()=>window.OtroCadArqui.open());
  assert.equal(await page.locator('#arquiPanel').isVisible(),true);
- assert.equal(await page.locator('#arquiAiSettings').isVisible(),false,'No provider dropdown should be visible');
- await page.waitForFunction(()=>document.querySelector('#arquiCloudStatus')?.textContent?.includes('consultas disponibles'),null,{timeout:12000});
- await page.locator('#arquiPrompt').fill(brief);
- console.log('Chrome: enviando solicitud al modelo simulado');
+ assert.equal(await page.locator('#arquiAiSettings').count(),0,'No provider settings');
+ assert.equal(await page.locator('#arquiCloudStatus').count(),0,'No cloud credit counter');
+ assert.match(await page.locator('#arquiLocalStatus').textContent(),/0 créditos/);
+ await page.locator('#arquiPrompt').fill(prompt);
+ await page.waitForTimeout(600);
+ assert((await page.locator('#arquiPreview polygon').count())>100,'The draft must show CAD walls while typing');
  await page.locator('#arquiPropose').click();
- await page.waitForFunction(()=>window.OtroCadArqui.preview()?.spec?.dimensionMeaning==='house',null,{timeout:15000});
- const initial=await page.evaluate(()=>({
-  spec:window.OtroCadArqui.preview().spec,
-  floors:window.OtroCadArqui.preview().floors.length,
-  rooms:window.OtroCadArqui.preview().floors.flatMap(f=>f.rooms).map(r=>r.name),
-  previewMarks:document.querySelectorAll('#arquiPreview line,#arquiPreview polygon,#arquiPreview text').length,
-  beforeDraw:window.OtroCadCivilAPI.getObjects().filter(x=>x.aiArchitect).length
- }));
- assert.equal(requests,1);
- assert.equal(initial.spec.houseWidth,10);
- assert.equal(initial.spec.lotDepth,16.5);
- assert.equal(initial.floors,2);
- assert.equal(initial.rooms.filter(name=>/BAÑO/.test(name)).length,2,'Two baths requested: do not add a social WC');
- assert.equal(initial.spec.socialBath,false,'Master + shared bath excludes extra social bath');
- assert.equal(initial.spec.patioLaundry,true,'Laundry must actually be placed in the backyard');
- assert.equal(initial.spec.kitchenExtra,0,'No unsolicited 50cm kitchen extension');
- assert.equal(initial.beforeDraw,0,'Preview must not mutate CAD before approval');
- assert(initial.previewMarks>200,'SVG must contain the actual drawing geometry');
- console.log('Chrome: vista previa generada; aprobando entidades CAD');
+ await page.waitForFunction(()=>window.OtroCadArqui.preview()?.layoutKind==='compact-coherent-v3',
+  null,{timeout:16000});
+ const plan=await page.evaluate(()=>{
+  const p=window.OtroCadArqui.preview();
+  return {spec:p.spec,levels:p.floors.length,roomNames:p.floors.flatMap(f=>f.rooms.map(r=>r.name)),
+   stairs:p.floors.map(f=>f.stair),audits:p.audit,
+   draftGeometry:document.querySelectorAll('#arquiPreview line,#arquiPreview polygon,#arquiPreview text').length,
+   beforeCAD:window.OtroCadCivilAPI.getObjects().filter(x=>x.aiArchitect).length};
+ });
+ assert.deepEqual([plan.spec.houseWidth,plan.spec.houseDepth],[10,8]);
+ assert.equal(plan.spec.garageSpaces,2);
+ assert.equal(plan.spec.patioLaundry,true);
+ assert.equal(plan.spec.bathrooms,2);
+ assert.equal(plan.levels,2);
+ assert.deepEqual(plan.audits,[]);
+ assert.equal(plan.stairs[0].x,plan.stairs[1].x);
+ assert.equal(plan.stairs[0].y,plan.stairs[1].y);
+ assert(plan.draftGeometry>200);
+ assert.equal(plan.beforeCAD,0,'Preview must not edit drawing until approval');
+ await page.screenshot({path:OUT+'/01-propuesta-estatica.png',fullPage:true});
  await page.locator('#arquiDraw').click();
  await page.waitForFunction(()=>
   /Plano creado|Diseño actualizado/.test(document.getElementById('arquiProgress')?.textContent||'')&&
-  window.OtroCadCivilAPI.getObjects().filter(x=>x.aiArchitect).length>350,
-  null,{timeout:18000});
- const geometry=await page.evaluate(()=>{
-  const objects=window.OtroCadCivilAPI.getObjects().filter(x=>x.aiArchitect);
-  const layers={};
-  for(const e of objects)layers[e.layer]=(layers[e.layer]||0)+1;
-  const labels=objects.filter(e=>e.type==='text').map(e=>e.text);
-  return {entityCount:objects.length,layers,labels};
+  window.OtroCadCivilAPI.getObjects().filter(e=>e.aiArchitect).length>400,
+  null,{timeout:20000});
+ const result=await page.evaluate(()=>{
+  const shapes=window.OtroCadCivilAPI.getObjects().filter(e=>e.aiArchitect);
+  const layers=[...new Set(shapes.map(e=>e.layer))];
+  const texts=shapes.filter(e=>e.type==='text').map(e=>e.text);
+  return {entities:shapes.length,layers,
+   baths:texts.filter(x=>/BAÑO MÁSTER|BAÑO COMPARTIDO/.test(x)),
+   stairTreads:shapes.filter(x=>x.aiElement==='stair-tread').length,
+   landings:shapes.filter(x=>x.aiElement==='turn-landing').length,
+   parking:texts.filter(x=>/PARQUEO [12]/.test(x)),
+   patio:texts.filter(x=>x.includes('PATIO POSTERIOR')),
+   laundry:texts.filter(x=>x.includes('LAVANDERÍA'))};
  });
- assert(geometry.layers['AI-ARQ-MUROS']>0);
- assert(geometry.layers['AI-ARQ-PATIO']>0);
- assert(geometry.layers['AI-ARQ-GARAJE']>0);
- assert(geometry.layers['AI-ARQ-COTAS']>0);
- assert(geometry.labels.includes('PARQUEO 1')&&geometry.labels.includes('PARQUEO 2'));
- assert(geometry.labels.some(x=>x.includes('LAVANDERÍA')));
- assert(geometry.labels.some(x=>x.includes('PATIO POSTERIOR')));
- assert(errors.length===0,'Browser JS errors: '+errors.join(' | '));
- fs.mkdirSync('/tmp/otrocad-browser-smoke',{recursive:true});
- await page.screenshot({path:'/tmp/otrocad-browser-smoke/preview-and-cad.png',fullPage:true});
- // Clean evidence for design feedback: real plan in OtroCAD, without the assistant panel covering upper floor.
- await page.evaluate(()=>{const panel=document.getElementById('arquiPanel');if(panel)panel.hidden=true});
- await page.screenshot({path:'/tmp/otrocad-browser-smoke/plano-dos-plantas-sin-panel.png',fullPage:true});
- await page.evaluate(()=>{const panel=document.getElementById('arquiPanel');if(panel)panel.hidden=false});
- // Repeat UI audit at iPhone-sized viewport: no provider selector or API key.
+ assert(result.entities>400);
+ assert.equal(result.baths.length,2);
+ assert(result.stairTreads>=28);
+ assert(result.landings===2);
+ assert.equal(result.parking.length,2);
+ assert(result.patio.length>=1);
+ assert(result.laundry.length>=1);
+ await page.screenshot({path:OUT+'/02-modelo-cad-completo.png',fullPage:true});
+ await page.evaluate(()=>{document.getElementById('arquiPanel').hidden=true});
+ await page.screenshot({path:OUT+'/03-plano-sin-panel.png',fullPage:true});
+ await page.evaluate(()=>{document.getElementById('arquiPanel').hidden=false});
  await page.setViewportSize({width:390,height:844});
- await page.waitForTimeout(160);
- const mobile=await page.evaluate(()=>{
-  const panel=document.getElementById('arquiPanel');
-  const quota=document.getElementById('arquiCloudStatus');
-  const advanced=document.getElementById('arquiAiSettings');
-  const rect=panel.getBoundingClientRect();
-  return {panelWidth:rect.width,panelLeft:rect.left,
-   quotaVisible:!!quota&&quota.getBoundingClientRect().height>0,
-   advancedHidden:advanced.hidden,
-   mode:document.getElementById('arquiMode')?.textContent||''};
- });
- assert(mobile.panelWidth<=390,'Panel de IA debe caber en el teléfono');
- assert(mobile.panelLeft>=0,'Panel no debe salirse por la izquierda');
- assert(mobile.quotaVisible,'El contador de IA debe ser visible en celular');
- assert(mobile.advancedHidden,'Nadie debe escoger un proveedor de IA');
- await page.screenshot({path:'/tmp/otrocad-browser-smoke/iphone-auto-ia.png',fullPage:true});
- fs.writeFileSync('/tmp/otrocad-browser-smoke/report.json',JSON.stringify({
-  tested:new Date().toISOString(),url:target,model:'Cloudflare Workers AI (intercepted mock)',
-  requests,initial:{...initial,spec:{lotWidth:initial.spec.lotWidth,lotDepth:initial.spec.lotDepth,
-   houseWidth:initial.spec.houseWidth,houseDepth:initial.spec.houseDepth,patioDepth:initial.spec.patioDepth}},
-  geometry:{entityCount:geometry.entityCount,layers:geometry.layers,labels:geometry.labels.filter(x=>/PARQUEO|PATIO|LAVANDERÍA/.test(x))},
-  jsErrors:errors
- },null,2));
- console.log('CHROME REAL BROWSER PASS: automatic model mock -> SVG preview -> approved '+geometry.entityCount+' editable CAD entities');
+ await page.screenshot({path:OUT+'/04-iphone-interfaz-local.png',fullPage:true});
+ assert.equal(await page.locator('#arquiAiSettings').count(),0);
+ assert.equal(remoteCalls.length,0,'No cloud-model requests or third-party AI calls');
+ assert.equal(errors.length,0,'Browser errors: '+errors.join('; '));
+ fs.writeFileSync(OUT+'/result.json',JSON.stringify({prompt,plan,result,remoteCalls,errors},null,2));
+ console.log('PASS static OtroCAD: '+result.entities+' editable CAD entities, actual U stairs and 2 bathrooms, 0 AI calls.');
  await browser.close();
-})().catch(async error=>{
- console.error('ERROR navegador El Arqui:',error);
- try{
-  fs.mkdirSync('/tmp/otrocad-browser-smoke',{recursive:true});
-  if(activePage){
-   const details=await activePage.evaluate(()=>({
-    url:location.href,readyState:document.readyState,
-    mode:document.getElementById('arquiMode')?.textContent,
-    summary:document.getElementById('arquiSummary')?.textContent,
-    context:document.getElementById('arquiContext')?.textContent,
-    message:Array.from(document.querySelectorAll('#arquiMessages .arqui-msg')).slice(-3).map(e=>e.textContent?.slice(0,200)),
-    objectCount:window.OtroCadCivilAPI?.getObjects?.().length||0
-   })).catch(e=>({error:String(e)}));
-   console.error('Chrome network trace:',JSON.stringify(requestLog));
-   fs.writeFileSync('/tmp/otrocad-browser-smoke/failure.json',JSON.stringify({error:String(error),details,requestLog},null,2));
-   await activePage.screenshot({path:'/tmp/otrocad-browser-smoke/failure.png',timeout:4500}).catch(()=>{});
-  }
- }catch(e){console.error('Error recolectando diagnóstico',e)}
- try{await activeBrowser?.close()}catch(e){console.error('Error cerrando navegador',e)}
- process.exitCode=1;
-});
+})().catch(e=>{console.error(e);process.exitCode=1});
