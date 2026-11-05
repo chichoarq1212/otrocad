@@ -48,7 +48,21 @@
    status:'Reglas explícitas del motor; no atribuidas a libros ni ordenanzas',url:'',locator:'Motor local · versión 2026-11-04',
    summary:'Zonificación social, privada y de servicio; habitaciones con área útil objetivo de 9 m² y ancho útil de 2,80 m; revisar luz, ventilación y mobiliario. Los retiros son supuestos hasta contrastarlos con el predio.'}
  ];
- function builtins(){return catalog.map(x=>({...x,reviewedAt:'2026-11-04'}))}
+ function builtins(){
+  const cards=[...catalog];
+  if(knowledge?.guides)for(const g of knowledge.guides)cards.push({
+   id:'guide-'+g.id,source:'OtroCAD · biblioteca estática',title:g.title,
+   kind:'Criterio de diseño local',status:'Guía propia incorporada · sin consultas de IA',
+   url:'',locator:'editor/arqui-knowledge.js · guides',summary:g.text
+  });
+  if(knowledge?.sheets)for(const p of knowledge.sheets)cards.push({
+   id:'sheet-'+p.id,source:'OtroCAD · formatos de planos',title:p.title,
+   kind:'Formato orientativo de lámina',status:'Ficha de organización; no se crea automáticamente el layout',
+   url:'',locator:'editor/arqui-knowledge.js · sheets',
+   summary:'Contenido: '+p.contents.join(', ')+'. Escalas posibles de presentación: '+p.scales.join(', ')+'.'
+  });
+  return cards.map(x=>({...x,reviewedAt:'2026-11-04'}));
+ }
  function review(plan){
   if(!plan?.floors)return[];
   const out=[],s=plan.spec;
@@ -76,7 +90,9 @@
   let selected=catalog.filter(x=>q.includes(norm(x.source)));
   if(!selected.length)selected=catalog;
   const local=search(query,get(),3);
-  return selected.map(x=>x.source+': '+x.summary+' Fuente: '+x.locator).join('\n\n')+(local.length?'\n\nExtractos personales (sin verificación de edición):\n'+local.map(x=>x.source+' · '+x.title+': '+x.excerpt).join('\n'):'')+
+  const advice=knowledge?.explain?.(query,4)||[];
+  const notes=advice.map(x=>x.title+': '+x.text).join('\n\n');
+  return (notes?notes+'\n\n':'')+selected.map(x=>x.source+': '+x.summary+' Fuente: '+x.locator).join('\n\n')+(local.length?'\n\nExtractos personales (sin verificación de edición):\n'+local.map(x=>x.source+' · '+x.title+': '+x.excerpt).join('\n'):'')+
    (plan?'\n\nRevisión del plano actual:\n'+review(plan).map(x=>x.message).join('\n'):'');
  }
 
