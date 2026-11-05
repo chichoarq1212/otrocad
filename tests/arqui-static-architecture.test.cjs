@@ -72,7 +72,7 @@ for(let i=0;i<doorArcs.length;i++)for(let j=i+1;j<doorArcs.length;j++){
  assert(!collisionOnPlane(a,b),'Door swing projections overlap: '+i+' '+j);
 }
 const content=fs.readFileSync('editor/arqui-assistant.js','utf8');
-assert(!/fetch\(|OpenRouter|ARQUI_AUTO_ENABLED|\\/api\\/arqui|arquiAiProvider|arquiAiKey/.test(content),'Assistant must not contain online inference code');
+for(const forbidden of ['fetch(', 'OpenRouter','ARQUI_AUTO_ENABLED','/api/arqui','arquiAiProvider','arquiAiKey']) assert(!content.includes(forbidden),'Offline assistant must not contain '+forbidden);
 const html=fs.readFileSync('editor/index.html','utf8');
 assert(html.includes('src="arqui-knowledge.js"'));
 assert(!html.includes('src="arqui-user-ai.js"'));
