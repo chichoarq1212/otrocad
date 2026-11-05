@@ -10,13 +10,14 @@ CAD 2D gratuito en desarrollo para arquitectura, dibujo técnico, ingeniería, t
 - Compilaciones: https://github.com/chichoarq1212/otrocad/actions
 - Versiones: https://github.com/chichoarq1212/otrocad/releases
 
-## El Arqui IA sin facturación central (BYOK, open source)
+## El Arqui IA automático · sin configuraciones para visitantes
 
-- Dentro de El Arqui → **Conectar mi IA**, cada persona puede iniciar sesión con OpenRouter (OAuth PKCE) y usar el modelo gratuito `openrouter/free`, o conectar Gemini/Groq con su propia clave y cuota.
-- La IA se comunica desde el navegador directamente con el proveedor elegido. La web de OtroCAD **no consume Cloudflare Workers AI**, no mantiene una clave maestra de IA y no paga las consultas de los visitantes.
-- Las claves solo viven en la pestaña abierta; el flujo OAuth almacena temporalmente un verificador y elimina el estado de autorización al finalizar. La IA gratuita tiene límites y disponibilidad sujetos a terceros. OpenAI API personal es opcional y puede implicar costos para ese usuario.
-- Sin cuenta, el motor CAD local sigue disponible. Las propuestas remotas requieren revisión antes de dibujar y no sustituyen comprobaciones profesionales.
-- [Guía gratuita de uso, privacidad y conexión](docs/ARQUI_IA_SIN_COSTO.md).
+- El visitante abre **Dibujo → El Arqui IA**, escribe lo que quiere y recibe una propuesta arquitectónica 2D editable, sin elegir proveedor de IA ni pegar claves.
+- Backend opcional Cloudflare Workers AI, **desactivado hasta que el propietario lo active** en su cuenta Workers Free con `ARQUI_AUTO_ENABLED=yes`.
+- Cuotas atómicas en Cloudflare: **2 consultas por IP/conexión al día UTC y 20 consultas para todo OtroCAD al día**, para limitar consumo. Los dispositivos con la misma IP comparten cupo.
+- **No habilitar Workers Paid si se requiere cero facturación.** El plan Workers Free agota la franquicia y después bloquea inferencias; en Paid pueden cobrarse usos excedentes.
+- Si falta activar el servicio o se agotan los cupos, el editor CAD local sigue funcionando y los diseños no se pierden.
+- [Guía del administrador para activar la IA automáticamente y sin sobrecostos](docs/ARQUI_IA_AUTOMATICA.md).
 
 ## Capacidades del editor web
 
