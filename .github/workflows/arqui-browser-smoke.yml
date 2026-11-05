@@ -1,0 +1,50 @@
+name: Verificar El Arqui en navegador real
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'editor/**'
+      - 'tests/arqui-browser-smoke.cjs'
+      - 'scripts/build-pages.cjs'
+      - '.github/workflows/arqui-browser-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar motor de pruebas del navegador
+        run: npm install --no-save --no-audit --no-fund playwright-core@1.56.1
+      - name: Construir sitio OtroCAD
+        run: node scripts/build-pages.cjs
+      - name: Servir editor en localhost
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --directory dist >/tmp/otrocad-http.log 2>&1 &
+          for i in $(seq 1 25); do
+            if curl --fail --silent http://127.0.0.1:4173/editor/ >/dev/null; then
+              echo "Editor servido correctamente"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/otrocad-http.log
+          exit 1
+      - name: Probar IA gratuita simulada → plano CAD real en Chrome
+        run: node tests/arqui-browser-smoke.cjs
+      - name: Conservar captura y resultado del navegador
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arqui-browser-smoke
+          path: /tmp/otrocad-browser-smoke/
+          if-no-files-found: ignore
