@@ -159,6 +159,8 @@ async function roundTrip(download){
  await snapshot('tour-mobile');
  check('Interfaz móvil vertical sin pérdida de editor',{canvasWidth:mobile.canvas.width});
  checkpoint='arqui';
+ // El Arqui intentionally only appears in DIBUJO, not ARCHIVO/CIVIL/MEP.
+ await page.locator('#tabs [data-tab="draw"]').click();
  await page.evaluate(()=>window.OtroCadArqui.open());
  assert(await page.locator('#arquiPanel').isVisible());
  const stats=await page.evaluate(()=>({knowledge:window.OtroCadArchitecturalKnowledge.version,
