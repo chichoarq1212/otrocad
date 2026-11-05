@@ -1,0 +1,50 @@
+name: Auditoría completa OtroCAD en navegador real
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tests/otrocad-full-tour-browser.cjs"
+      - ".github/workflows/otrocad-full-tour.yml"
+      - "editor/**"
+      - "scripts/build-pages.cjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar Chromium automatizado
+        run: npm install --no-save --no-audit --no-fund playwright-core@1.56.1
+      - name: Construir salida de aplicación web estática
+        run: node scripts/build-pages.cjs
+      - name: Servir OtroCAD localmente
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --directory dist >/tmp/otrocad-fulltour-server.log 2>&1 &
+          for i in $(seq 1 25); do
+            if curl --fail --silent http://127.0.0.1:4173/editor/ >/dev/null; then
+              echo "OtroCAD local iniciado"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/otrocad-fulltour-server.log
+          exit 1
+      - name: Recorrer la aplicación y verificar herramientas reales
+        run: node tests/otrocad-full-tour-browser.cjs
+      - name: Conservar diagnóstico y capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: otrocad-full-tour-evidence
+          path: /tmp/otrocad-full-tour/
+          if-no-files-found: ignore
