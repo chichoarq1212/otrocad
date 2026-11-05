@@ -84,6 +84,8 @@ jobs:
           node tests/arqui-house-layout.test.cjs
           node --check tests/arqui-assistant.test.cjs
           node tests/arqui-assistant.test.cjs
+          node --check tests/arqui-online-to-cad.test.cjs
+          node tests/arqui-online-to-cad.test.cjs
           node --check editor/arqui-professional.js
           node --check editor/cad-file-ui.js
           node --check tests/arqui-professional.test.cjs
