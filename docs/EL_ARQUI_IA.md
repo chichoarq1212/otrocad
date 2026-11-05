@@ -1,5 +1,12 @@
 # El Arqui IA — Arquitectura asistida en OtroCAD
 
+## Noviembre 2026 · IA en línea por usuario, sin facturación compartida
+
+La arquitectura vigente NO emplea Cloudflare Workers AI ni una API central pagada por el dueño.
+Cada usuario puede conectar **OpenRouter con un clic mediante OAuth PKCE** y solicitar solamente `openrouter/free`, o usar su propia cuenta API gratuita de Gemini/Groq. También admite OpenAI API personal, opcional y potencialmente facturable al usuario. Las claves residen solo en memoria de la pestaña y nunca se guardan en GitHub, OtroCAD o Cloudflare; la autorización OAuth usa un verificador temporal de sesión, que se elimina al regresar.
+
+El módulo de dibujo geométrico sigue siendo local y está disponible sin clave; la IA remota interpreta lenguaje natural y propone un programa validado antes de crear geometría CAD editable. Los planes municipales, estructura y distribuciones espaciales completamente libres requieren comprobación independiente. Ver [guía actual de IA sin costo compartido](ARQUI_IA_SIN_COSTO.md).
+
 ## Actualización del 4 de noviembre de 2026 · conversación y fuentes
 
 - El flujo comienza con un pedido en texto. Los ajustes se muestran en un desplegable después de generar la propuesta; no es necesario rellenar el formulario.
@@ -10,7 +17,7 @@
 - La biblioteca incorpora fichas públicas de Neufert (nota editorial GG de la 16.ª edición, 2013) y Plazola (catálogo universitario UPAEP). Son referencias bibliográficas y tipológicas: **no se incorporaron los libros completos ni se extrajeron de ellos tablas dimensionales**.
 - Se verificaron reglas seleccionadas de la actualización NEC-HS-AU 2019 (Acuerdo 007-19; Registro Oficial 924): campo de aplicación pp. RO 12–13, circulación tabla 1 p. RO 19 y puertas tabla 7 p. RO 27. La revisión comprueba el ancho libre del pasillo entre caras de muro y mantiene pendientes marcos, altura, giros, mobiliario, ruta y normativa del predio. Las viviendas privadas reciben estos criterios como orientación salvo exigencia aplicable.
 - Las áreas útiles aproximadas descuentan espesores; los objetivos propios de habitaciones permanecen identificados como reglas de OtroCAD. Los retiros propuestos no se presentan como retiros legales de Quito u otra ciudad.
-- **Nueva integración en línea:** el editor de Cloudflare consulta automáticamente `/api/arqui` y `/api/arqui/status`; Cloudflare Workers AI u OpenAI pueden interpretar pedidos conversacionales con todo el programa y proponer revisiones. El motor CAD 2D sigue generando geometría editable local, no BIM libre. El backend está implementado y probado con respuestas simuladas, pero permanece desactivado hasta que el propietario configure Cloudflare Access, su audiencia y `ARQUI_ACCESS_ENABLED=yes`; véase `docs/ARQUI_IA_OPENAI_SETUP.md`.
+- **Conexión personal ya incorporada:** El Arqui incluye un selector de cuenta propia y OAuth OpenRouter, con modos gratuitos sujetos a cuota. No hay backend central de inferencia facturable. El motor CAD local sigue requiriendo aceptación antes de escribir geometría.
 
 Fuentes públicas consultadas:
 
@@ -57,6 +64,6 @@ Aspectos que aún requieren desarrollo y revisión de un arquitecto:
 - Estructura portante, escaleras reglamentarias, instalaciones MEP, puertas de evacuación, detalles y coordinación entre especialidades.
 - Distribuciones alternativas y optimización de adyacencias con inteligencia generativa completa.
 - Construcción y modificación libre de objetos BIM 3D, muros paramétricos, familias y detección de interferencias.
-- Activación productiva del modelo en línea: la ruta y el binding Cloudflare ya están incluidos, pero requieren credenciales de Cloudflare Access y control del propietario; OpenAI es opcional mediante secreto servidor, nunca incrustado en JS público.
+- Los servicios de IA en línea se autorizan individualmente por cada usuario; OpenRouter funciona mediante OAuth, Gemini/Groq mediante clave personal. No hay API central ni suscripción ChatGPT reutilizable automáticamente.
 
 Esta primera etapa es una **demostración funcional de dibujo arquitectónico progresivo y editable**, no un proyecto final listo para construir.
