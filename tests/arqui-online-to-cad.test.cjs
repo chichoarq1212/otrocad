@@ -1,7 +1,11 @@
 'use strict';
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const planner=require('../editor/arqui-planner.js');
+const basePlanner=require('../editor/arqui-planner.js');
+global.window={OtroCadArquiPlanner:basePlanner};
+require('../editor/arqui-house-layout.js');
+const planner=global.window.OtroCadArquiPlanner;
+delete global.window;
 const professional=require('../editor/arqui-professional.js');
 const userBridge=require('../editor/arqui-user-ai.js');
 const oauthBridge=require('../editor/arqui-oauth.js');
