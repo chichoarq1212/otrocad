@@ -10,6 +10,14 @@ CAD 2D gratuito en desarrollo para arquitectura, dibujo técnico, ingeniería, t
 - Compilaciones: https://github.com/chichoarq1212/otrocad/actions
 - Versiones: https://github.com/chichoarq1212/otrocad/releases
 
+## El Arqui IA sin facturación central (BYOK, open source)
+
+- Dentro de El Arqui → **Conectar mi IA**, cada persona puede iniciar sesión con OpenRouter (OAuth PKCE) y usar el modelo gratuito `openrouter/free`, o conectar Gemini/Groq con su propia clave y cuota.
+- La IA se comunica desde el navegador directamente con el proveedor elegido. La web de OtroCAD **no consume Cloudflare Workers AI**, no mantiene una clave maestra de IA y no paga las consultas de los visitantes.
+- Las claves solo viven en la pestaña abierta; el flujo OAuth almacena temporalmente un verificador y elimina el estado de autorización al finalizar. La IA gratuita tiene límites y disponibilidad sujetos a terceros. OpenAI API personal es opcional y puede implicar costos para ese usuario.
+- Sin cuenta, el motor CAD local sigue disponible. Las propuestas remotas requieren revisión antes de dibujar y no sustituyen comprobaciones profesionales.
+- [Guía gratuita de uso, privacidad y conexión](docs/ARQUI_IA_SIN_COSTO.md).
+
 ## Capacidades del editor web
 
 ### Dibujo y precisión
