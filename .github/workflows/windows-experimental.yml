@@ -5,12 +5,14 @@ on:
     paths:
       - 'desktop/**'
       - 'editor/**'
+      - 'tests/arqui-static-architecture.test.cjs'
       - 'scripts/build-pages.cjs'
       - '.github/workflows/windows-experimental.yml'
   pull_request:
     paths:
       - 'desktop/**'
       - 'editor/**'
+      - 'tests/arqui-static-architecture.test.cjs'
       - 'scripts/build-pages.cjs'
       - '.github/workflows/windows-experimental.yml'
   workflow_dispatch:
