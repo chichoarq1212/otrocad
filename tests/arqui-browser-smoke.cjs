@@ -79,7 +79,10 @@ let activeBrowser=null,activePage=null,requestLog=[];
  assert(initial.previewMarks>200,'SVG must contain the actual drawing geometry');
  console.log('Chrome: vista previa generada; aprobando entidades CAD');
  await page.locator('#arquiDraw').click();
- await page.waitForFunction(()=>window.OtroCadCivilAPI.getObjects().filter(x=>x.aiArchitect).length>300,null,{timeout:15000});
+ await page.waitForFunction(()=>
+  /Plano creado|Diseño actualizado/.test(document.getElementById('arquiProgress')?.textContent||'')&&
+  window.OtroCadCivilAPI.getObjects().filter(x=>x.aiArchitect).length>350,
+  null,{timeout:18000});
  const geometry=await page.evaluate(()=>{
   const objects=window.OtroCadCivilAPI.getObjects().filter(x=>x.aiArchitect);
   const layers={};
