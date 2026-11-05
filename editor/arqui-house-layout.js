@@ -55,6 +55,8 @@
     patioDepth:0,patioLaundry:false,rearDoor:false,laundry:false,garden:false,
     gardenFrontDepth:0,gardenBackDepth:0,kitchenIsland:false,bathrooms:0});
   }
+  const bathCount=s.match(/\b(\d+)\s*banos?\b/);
+  if(bathCount)parsed.bathrooms=Number(bathCount[1]);
   if(site){parsed.lotWidth=site[0];parsed.lotDepth=site[1]}
   if(house){parsed.houseWidth=house[0];parsed.houseDepth=house[1];
    if(!site){parsed.lotWidth=house[0];parsed.lotDepth=house[1]}}
@@ -71,7 +73,7 @@
    const matched=[...s.matchAll(/\bretiros?\s*(?:de\s*)?(frontal|frente|anterior|posterior|atras|fondo|lateral(?:es)?|costados)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?/g)];
    for(const m of matched)parsed[labels[m[1]]]=decimal(m[2]);
    if(/\bretiros?\b/.test(s)){
-    const after=s.slice(s.search(/\bretiros?\b/));
+    const after=s.slice(s.search(/\bretiros?\b/)).split(/\b(?:jardin|patio|lavanderia|cocina|garaje|garage|parqueadero|estacionamiento)\b/)[0];
     for(const m of after.matchAll(/\b(frontal|frente|anterior|posterior|atras|fondo|lateral(?:es)?|costados)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?/g))
      parsed[labels[m[1]]]=decimal(m[2]);
    }
@@ -244,7 +246,19 @@
  }
  function design(input){
   const s=validateSpec(input);
-  return s.dimensionMeaning==='house'?designHouse(s):designLocal(s);
+  if(s.dimensionMeaning==='house')return designHouse(s);
+  const legacy=designLocal(s);
+  legacy.spec={...legacy.spec,...s};
+  legacy.gardens=[];
+  if(s.gardenFrontDepth>0)legacy.gardens.push({
+   where:'front',x:s.sideSetback,y:Math.max(0,s.frontSetback-s.gardenFrontDepth),
+   width:Math.max(0,s.lotWidth-2*s.sideSetback),depth:s.gardenFrontDepth,offsetX:0});
+  if(s.gardenBackDepth>0)legacy.gardens.push({
+   where:'rear',x:s.sideSetback,y:s.lotDepth-s.backSetback,
+   width:Math.max(0,s.lotWidth-2*s.sideSetback),depth:s.gardenBackDepth,offsetX:0});
+  legacy.warnings=[...(legacy.warnings||[]),
+   'Predio indicado por el usuario. Sin huella construida expresa, las dimensiones de la vivienda son una propuesta y no un dato del encargo.'];
+  return legacy;
  }
  function interpret(text,base={}){
   const old=interpretLocal(text,base);
