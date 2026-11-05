@@ -93,7 +93,7 @@ jobs:
           unzip -Z1 /tmp/otrocad-android-local.apk | grep -Fxq "assets/editor/arqui-knowledge.js"
           unzip -p /tmp/otrocad-android-local.apk assets/editor/arqui-assistant.js > /tmp/arqui-android-local.js
           grep -Fiq "Motor Local" /tmp/arqui-android-local.js
-          if grep -Eq 'fetch\\(|/api/arqui|OpenRouter|ARQUI_AUTO_ENABLED' /tmp/arqui-android-local.js; then
+          if grep -Fq 'fetch(' /tmp/arqui-android-local.js || grep -Eq '/api/arqui|OpenRouter|ARQUI_AUTO_ENABLED' /tmp/arqui-android-local.js; then
             echo "::error::El APK todavía contiene un conector de IA remoto."
             exit 1
           fi
