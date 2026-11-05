@@ -8,7 +8,7 @@ const nodes={};
 const sent=[],messages=[],previews=[];
 let reply={spec:{lotWidth:15,lotDepth:10},reason:'Entendí que el terreno mide 15 por 10 y la vivienda 12 por 8. ¿Qué retiros deseas?',requiresReview:true};
 const ctx={
- busy:false,pending:false,draftTimer:null,draftDirty:false,restoreAcceptedPreview(){},plan:{},previewEntities:[{}],endpoint:{href:'https://arqui.example/api/arqui'},
+ busy:false,pending:false,autoEnabled:true,draftTimer:null,draftDirty:false,restoreAcceptedPreview(){},plan:{},previewEntities:[{}],endpoint:{href:'https://arqui.example/api/arqui'},
  conversation:[{role:'user',content:'Primero imagino una casa acogedora'},{role:'assistant',content:'Cuéntame del terreno.'}],
  restoreModel(){},refs:{consult:()=>null,search:()=>[]},
  fromInputs:()=>({lotWidth:12,lotDepth:20,bedrooms:3}),
