@@ -240,6 +240,7 @@ function generate(plan,options={}){
   dimension(X+f.hallStart+f.hallWidth,Y+D,X+W,Y+D,.60,compact(W-f.hallStart-f.hallWidth)+' m');
  }
  function site(){
+  if(!s.siteDeclared)return; // no user-provided land means NO lot boundary or setbacks
   const w=s.lotWidth,d=s.lotDepth;
   if(!Number.isFinite(w)||!Number.isFinite(d))return;
   // Site boundary and labeled setbacks; no invented legal compliance.
@@ -252,11 +253,14 @@ function generate(plan,options={}){
  }
  function northAndTitle(){
   const x=s.lotWidth+1.0,y=1.0;
+  if(s.siteDeclared){
   ln(x,y,x,y+1.28,'AI-ARQ-SIMBOLOGÍA',art.title,'north');
   ln(x,y+1.28,x-.22,y+.93,'AI-ARQ-SIMBOLOGÍA',art.title,'north');
   ln(x,y+1.28,x+.22,y+.93,'AI-ARQ-SIMBOLOGÍA',art.title,'north');
   text(x-.10,y+1.50,'N',.22,'AI-ARQ-SIMBOLOGÍA',art.title);
-  const y2=s.lotDepth+1.8;
+  }
+  const ground=plan.floors[0];
+  const y2=Math.max(s.lotDepth,ground.y+ground.depth+(s.patioDepth||0)+(s.gardenBackDepth||0))+1.8;
   text(0,y2,'EL ARQUI LOCAL  |  ANTEPROYECTO ARQUITECTÓNICO',.32,'AI-ARQ-LÁMINA',art.title);
   text(0,y2+.4,'PLANTAS AMUEBLADAS · MUROS '+compact(wallOut)+'/'+compact(wallIn)+' m · ESCALA MODELO 1:1',.19,'AI-ARQ-LÁMINA',art.text);
   text(0,y2+.73,'LA ESCALA FINAL DE IMPRESIÓN SE AJUSTA EN LAYOUT · MEDIDAS Y NORMATIVA A VERIFICAR',.145,'AI-ARQ-LÁMINA',art.dim);
@@ -417,9 +421,9 @@ function generate(plan,options={}){
    const entryX=(plan.floors[0]?.hallStart||5)+((plan.floors[0]?.hallWidth||1.36)/2);
    const pedestrianX=Math.max(g.x+g.width+.2,entryX-.5);
    const pathWidth=Math.min(1.05,Math.max(.6,entryX+.5-pedestrianX));
-   rect(pedestrianX,0,pathWidth,s.frontSetback,'pedestrian-entry','AI-ARQ-PATIO',art.site,.035);
-   text(pedestrianX+.10,1.1,'ACCESO',.13,'AI-ARQ-PATIO',art.title);
-   text(pedestrianX+.10,1.35,'PEATONAL',.13,'AI-ARQ-PATIO',art.title);
+   rect(pedestrianX,s.siteDeclared?0:g.y,pathWidth,s.siteDeclared?s.frontSetback:g.depth+.2,'pedestrian-entry','AI-ARQ-PATIO',art.site,.035);
+   text(pedestrianX+.10,(s.siteDeclared?0:g.y)+1.1,'ACCESO',.13,'AI-ARQ-PATIO',art.title);
+   text(pedestrianX+.10,(s.siteDeclared?0:g.y)+1.35,'PEATONAL',.13,'AI-ARQ-PATIO',art.title);
   }
   const sideBySide=g.layout==='side-by-side'&&g.spaces===2;
   const spaces=sideBySide?2:(g.spaces===2&&d>10?2:1);
@@ -446,6 +450,19 @@ function generate(plan,options={}){
    const lw=Math.min(2.4,q.width*.28),ld=Math.min(1.5,q.depth*.58);
    rect(q.x+q.width-lw-.25,q.y+q.depth-ld-.25,lw,ld,'laundry','AI-ARQ-PATIO',art.furniture,.12);
    text(q.x+q.width-lw-.20,q.y+q.depth-ld+.10,'LAVANDERÍA',.15,'AI-ARQ-PATIO',art.title);
+  }
+ }
+ if(plan.gardens?.length){
+  for(const g of plan.gardens){
+   if(g.width<.8||g.depth<=0)continue;
+   const gx=g.x+(g.offsetX||0);
+   rect(gx,g.y,g.width,g.depth,'garden','AI-ARQ-PATIO',art.site,.07);
+   for(const [ax,ay,bx,by] of [[gx,g.y,gx+g.width,g.y],[gx+g.width,g.y,gx+g.width,g.y+g.depth],
+     [gx+g.width,g.y+g.depth,gx,g.y+g.depth],[gx,g.y+g.depth,gx,g.y]])
+    ln(ax,ay,bx,by,'AI-ARQ-PATIO',art.site,'garden-boundary');
+   text(gx+.18,g.y+Math.min(g.depth*.52,.85),
+    (g.where==='rear'?'JARDÍN POSTERIOR':'JARDÍN FRONTAL')+' · '+compact(g.depth)+' m',
+    .16,'AI-ARQ-PATIO',art.title,'garden-label');
   }
  }
  if(s.style!=='esquematico')northAndTitle();
