@@ -36,13 +36,14 @@
   const patio=s.match(/\bpatio\s*(?:(?:trasero|posterior)\s*)?(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?\s*(?:de\s*)?(?:fondo|profundidad)?/)||
    s.match(/\bpatio.{0,35}?\b(?:fondo|profundidad)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?/);
   if(patio)parsed.patioDepth=decimal(patio[1]);
+  if(patio&&parsed.patioDepth>0)parsed.rearDoor=true; // one physical route from kitchen to rear patio
   if(/(?:puerta\s*(?:trasera|posterior)|salir\s+(?:al?|hacia\s+el)\s*patio)/.test(s))parsed.rearDoor=true;
   if(/\b(?:lavanderia|area de lavado)\b/.test(s)&&/\bpatio\b/.test(s))parsed.patioLaundry=true;
-  if(/(?:bano\s+compartido|comparten\s+(?:un\s+)?bano)/.test(s)&&/(?:bano\s*(?:master|principal)|suite)/.test(s)){
+  if(/(?:bano\s+compartido|comparten\s+(?:un\s+)?bano|bano\s+para\s+(?:los\s+)?(?:otros\s+)?2)/.test(s)&&/(?:bano\s*(?:master|principal)|(?:master|principal).{0,26}bano|suite)/.test(s)){
    parsed.bathrooms=2;parsed.mainSuite=true;parsed.socialBath=false;
   }
-  if(/(?:parque|parquear|parqueadero|garaje|estacionamiento).{0,25}?\b2\s*(?:carros|autos|vehiculos|puestos|plazas)/.test(s)||
-    /\b2\s*(?:carros|autos|vehiculos)\b/.test(s)&&/\bparque\b/.test(s)){
+  if(/(?:parque|parquear|parqueadero|garaje|estacionamiento).{0,35}?\b(?:dos|2)\s*(?:carros|autos|vehiculos|puestos|plazas)/.test(s)||
+    /\b(?:dos|2)\s*(?:carros|autos|vehiculos)\b/.test(s)&&/(?:parque|garaje|estacionamiento)/.test(s)){
    parsed.garage=true;parsed.garageSpaces=2;
   }
   if(site){parsed.dimensionMeaning='site';parsed.siteAssumed=false;
