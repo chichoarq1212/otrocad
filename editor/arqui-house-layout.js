@@ -67,7 +67,7 @@
   if(s.floors!==2)throw Error('La propuesta de casa '+W+' × '+D+' m con tres dormitorios, dos baños y zona social requiere estudiar dos plantas. No fingiré que cabe en una sola.');
   if(!s.garage&&s.frontSetback>0)throw Error('Revisa la franja frontal asignada al parqueo.');
   if(s.garageSpaces===2&&s.frontSetback<5.3)throw Error('Dos carros frontales requieren una profundidad preliminar de 5,3 m para parqueo.');
-  const hall=1.3,rightW=clamp((W-hall)*.43,3.7,4.8),leftW=round(W-hall-rightW);
+  const hall=1.35,rightW=clamp((W-hall)*.43,3.7,4.8),leftW=round(W-hall-rightW);
   if(leftW<3.65)throw Error('No queda ancho suficiente para sala, cocina y circulación.');
   const startX=s.sideSetback,startY=s.frontSetback;
   function makeFloor(level,left,right){
