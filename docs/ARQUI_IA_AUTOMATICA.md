@@ -20,7 +20,7 @@
 - El backend reserva un cupo **antes** de llamar al modelo, usando un único Durable Object con almacenamiento SQLite y transacciones atómicas: actualizar el teléfono o borrar el almacenamiento local **no reinicia el límite**.
 - Consultas fallidas tras reservar cupo también cuentan, para evitar abuso.
 - La dirección IP no se guarda en la tabla. Para contabilizar se deriva un hash SHA-256 a partir de la IP, un identificador y el día.
-- Se usa exclusivamente un modelo pequeño Workers AI compatible con el plan gratuito: `@cf/meta/llama-3.1-8b-instruct`, con `max_tokens=1200`; sin reintentos ni cadenas de modelos.
+- Se usa exclusivamente un modelo pequeño Workers AI compatible con el plan gratuito: `@cf/meta/llama-3.1-8b-instruct-fast`, con `max_tokens=1200`; sin reintentos ni cadenas de modelos.
 - Cualquier falla de identificación, presupuesto, cuota o IA produce **rechazo seguro**; nunca se infiere sin cuota.
 - **El propietario debe mantener Cloudflare Workers en el plan Free si exige $0 de cargos por inferencia.** Cloudflare Workers AI Free incluye 10.000 neurons/día y bloquea operaciones al llegar al límite. En **Workers Paid**, el uso superior a la franquicia gratuita puede facturarse; las restricciones de 20 consultas no garantizan $0 absoluto en un plan de pago.
 - No se pueden garantizar 2 consultas por *persona* sin crear identidades: el límite se controla por IP (sin registro), y la cuota global protege el consumo del proyecto.
@@ -54,3 +54,5 @@ Referencias oficiales (comprobar cambios futuros de condiciones):
 ### Privacidad
 
 El pedido arquitectónico se transmite a Cloudflare Workers AI para la interpretación. La vista previa, la edición y el guardado del plano permanecen en OtroCAD. No introducir planos confidenciales o datos personales sensibles sin revisar los términos de Cloudflare.
+
+**Comprobación del 4 de noviembre de 2026:** el nombre original `@cf/meta/llama-3.1-8b-instruct` fue dado de baja el 30 de mayo de 2026. Se corrigió al modelo activo `@cf/meta/llama-3.1-8b-instruct-fast`, con soporte de respuestas JSON. No se modifica el límite de dos solicitudes por IP y veinte globales. La prueba productiva debe validar una respuesta real, no solo el indicador `online: true`.
