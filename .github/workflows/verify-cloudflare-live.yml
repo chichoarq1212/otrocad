@@ -81,12 +81,23 @@ jobs:
           grep -Fiq 'motor arquitectónico' dist/index.html
           grep -Fq '0 créditos' dist/editor/arqui-assistant.js
           echo "Static deployment verified: model APIs retired; no AI quota can be consumed."
-          APK_ARTIFACT="https://github.com/chichoarq1212/otrocad/actions/runs/41954042054/artifacts/13381887860"
-          WINDOWS_ARTIFACT="https://github.com/chichoarq1212/otrocad/actions/runs/41954074602/artifacts/13382552312"
-          # The APK and Windows installer archives were verified in their own
-          # Android emulator and Windows offline-install workflow runs.
-          grep -Fq "$APK_ARTIFACT" dist/index.html
-          grep -Fq "$APK_ARTIFACT" dist/descargas/index.html
-          grep -Fq "$WINDOWS_ARTIFACT" dist/descargas/index.html
-          ! grep -Fq "releases/download/android-0.6.1-test" dist/index.html
-          echo "Cloudflare hosts zero-AI editor; latest verified Android and Windows binary artifacts linked correctly."
+          APK="https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.1-test/OtroCAD-Android-0.6.1-alpha.apk"
+          WINDOWS_EXE="https://github.com/chichoarq1212/otrocad/releases/download/windows-experimental-41947943166-1/OtroCAD-Windows-0.6.1-experimental-Setup.exe"
+          grep -Fq "$APK" dist/index.html
+          grep -Fq "$APK" dist/descargas/index.html
+          grep -Fq "$WINDOWS_EXE" dist/descargas/index.html
+          ! grep -Fq "actions/runs/" dist/index.html
+          echo "Comprobando APK real descargable, con biblioteca estática sin llamadas a IA."
+          curl --fail --location --silent --show-error --max-time 90 "$APK" -o /tmp/otrocad-android-local.apk
+          unzip -tq /tmp/otrocad-android-local.apk
+          unzip -Z1 /tmp/otrocad-android-local.apk | grep -Fxq "assets/editor/arqui-knowledge.js"
+          unzip -p /tmp/otrocad-android-local.apk assets/editor/arqui-assistant.js > /tmp/arqui-android-local.js
+          grep -Fiq "Motor Local" /tmp/arqui-android-local.js
+          if grep -Eq 'fetch\\(|/api/arqui|OpenRouter|ARQUI_AUTO_ENABLED' /tmp/arqui-android-local.js; then
+            echo "::error::El APK todavía contiene un conector de IA remoto."
+            exit 1
+          fi
+          curl --fail --location --silent --show-error --max-time 120 "$WINDOWS_EXE" -o /tmp/otrocad-windows-local.exe
+          test -s /tmp/otrocad-windows-local.exe
+          test "$(head -c 2 /tmp/otrocad-windows-local.exe)" = "MZ"
+          echo "Cloudflare estático, APK local sin IA e instalador Windows directo comprobados."
