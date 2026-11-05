@@ -18,7 +18,8 @@ const prompt='Quiero una casa 10 x 8 con 3 habitaciones - dos de ellas con baño
 const spec=engine.parsePrompt(prompt);
 assert.equal(spec.dimensionMeaning,'house');
 assert.deepEqual([spec.houseWidth,spec.houseDepth],[10,8]);
-assert.deepEqual([spec.lotWidth,spec.lotDepth],[10,16.5]);
+assert.deepEqual([spec.lotWidth,spec.lotDepth],[10,8]);
+assert.equal(spec.siteDeclared,false);
 assert.equal(spec.bathrooms,2);
 assert.equal(spec.garageSpaces,2);
 assert.equal(spec.rearDoor,true);
