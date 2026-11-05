@@ -14,7 +14,7 @@ const mockSpec={
 const brief='Quiero una casa de 10 por 8 metros, tres habitaciones, una máster con baño y dos con baño compartido, sala comedor, cocina con isla, patio de 3 metros atrás con lavandería, puerta al patio y parque para dos carros.';
 const answer={spec:mockSpec,reason:'Propuesta de dos plantas en casa 10x8, terreno de referencia 10x16.5 pendiente de confirmar.',requiresReview:false};
 
-let activeBrowser=null,activePage=null;
+let activeBrowser=null,activePage=null,requestLog=[];
 (async()=>{
  const binaries=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'];
  const binary=binaries.find(x=>fs.existsSync(x));
@@ -24,7 +24,7 @@ let activeBrowser=null,activePage=null;
  const errors=[];
  page.on('pageerror',e=>errors.push(String(e).slice(0,320)));
  let requests=0;
- const requestLog=[];
+ requestLog=[];
  page.on('requestfailed',req=>requestLog.push({url:req.url(),error:req.failure()?.errorText}));
  await page.route('**/api/v1/chat/completions', async route=>{
   const req=route.request();
