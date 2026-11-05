@@ -24,14 +24,28 @@ let activeBrowser=null,activePage=null;
  const errors=[];
  page.on('pageerror',e=>errors.push(String(e).slice(0,320)));
  let requests=0;
- await page.route('https://openrouter.ai/api/v1/chat/completions', async route=>{
-  requests++;
+ const requestLog=[];
+ page.on('requestfailed',req=>requestLog.push({url:req.url(),error:req.failure()?.errorText}));
+ await page.route('**/api/v1/chat/completions', async route=>{
   const req=route.request();
+  requestLog.push({url:req.url(),method:req.method()});
+  if(req.method()==='OPTIONS'){
+   await route.fulfill({status:204,headers:{
+    'Access-Control-Allow-Origin':'*',
+    'Access-Control-Allow-Methods':'POST, OPTIONS',
+    'Access-Control-Allow-Headers':'authorization, content-type',
+    'Access-Control-Max-Age':'1200'
+   }});
+   return;
+  }
+  requests++;
   const sent=req.postDataJSON();
   assert.equal(sent.model,'openrouter/free');
   assert(sent.messages[1].content.includes('casa de 10 por 8'));
-  await route.fulfill({status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},
-   body:JSON.stringify({choices:[{message:{content:JSON.stringify(answer)}}]})});
+  await route.fulfill({status:200,contentType:'application/json',headers:{
+    'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'POST, OPTIONS',
+    'Access-Control-Allow-Headers':'authorization, content-type'
+   },body:JSON.stringify({choices:[{message:{content:JSON.stringify(answer)}}]})});
  });
  const target=process.env.OTROCAD_TEST_URL||'http://127.0.0.1:4173/editor/';
  page.setDefaultTimeout(8500);console.log('Chrome: navegando a '+target);
@@ -103,7 +117,8 @@ let activeBrowser=null,activePage=null;
     message:Array.from(document.querySelectorAll('#arquiMessages .arqui-msg')).slice(-3).map(e=>e.textContent?.slice(0,200)),
     objectCount:window.OtroCadCivilAPI?.getObjects?.().length||0
    })).catch(e=>({error:String(e)}));
-   fs.writeFileSync('/tmp/otrocad-browser-smoke/failure.json',JSON.stringify({error:String(error),details},null,2));
+   console.error('Chrome network trace:',JSON.stringify(requestLog));
+   fs.writeFileSync('/tmp/otrocad-browser-smoke/failure.json',JSON.stringify({error:String(error),details,requestLog},null,2));
    await activePage.screenshot({path:'/tmp/otrocad-browser-smoke/failure.png',timeout:4500}).catch(()=>{});
   }
  }catch(e){console.error('Error recolectando diagnóstico',e)}
