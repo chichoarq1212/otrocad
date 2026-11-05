@@ -410,6 +410,7 @@ async function propose(text){
     if(!response.ok){
       const err=await response.json().catch(()=>null);
       if(response.status===503)throw Error('LOCAL_FALLBACK');
+      if(response.status===502)throw Error('AI_ERROR');
       if(response.status===429)throw Error('QUOTA: '+(err?.error||'Cupo de IA agotado'));
       throw Error('REMOTE: '+(err?.error||'El servicio IA está temporalmente inaccesible.'));
      }
@@ -426,14 +427,17 @@ async function propose(text){
     const msg=String(error.message||'');
     if(msg.startsWith('QUOTA:')){
      refreshAutoStatus();
-     message('bot',msg.slice(7)+' Usaré la interpretación local para no generar gastos.');
+     message('bot',msg.slice(7)+' Prepararé una propuesta local sin consumir nuevas consultas.');
+    }else if(msg==='AI_ERROR'){
+     refreshAutoStatus();
+     message('bot','La IA ha consumido una consulta pero no pudo completar la propuesta. Intentaré dibujarla localmente sin gastar otra.');
     }else if(msg.startsWith('REMOTE:')){
      message('bot',msg.slice(7)+' No he modificado el plano.');
      return;
     }else{
      if(msg==='LOCAL_FALLBACK')autoEnabled=false;
      refreshAutoStatus();
-     message('bot','IA automática no disponible; dibujaré localmente sin consumir consultas.');
+     message('bot','IA automática no disponible; intentaré generar una propuesta local. No realizaré otra consulta de IA.');
     }
    }finally{clearTimeout(timeout)}
   }
