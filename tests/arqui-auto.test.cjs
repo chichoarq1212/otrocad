@@ -17,7 +17,10 @@ const sql={
 };
 const budget=new ArquiBudget({storage:{sql,transactionSync:fn=>fn()}},{});
 const counters={ai:0};
-const env={AI:{run:async()=>{counters.ai++;return{response:JSON.stringify({
+const env={AI:{run:async(model,params)=>{
+ assert.equal(model,'@cf/meta/llama-3.1-8b-instruct-fast','Never use the deprecated model');
+ assert.equal(params.response_format?.type,'json_schema','Require structured JSON output');
+ counters.ai++;return{response:JSON.stringify({
  spec:{dimensionMeaning:'house',houseWidth:10,houseDepth:8,bedrooms:3,
   floors:2,bathrooms:2,garageSpaces:2,patioDepth:3},reason:'Anteproyecto editable',
  requiresReview:false})};}},
