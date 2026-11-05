@@ -26,7 +26,7 @@ root.innerHTML=[
  '<div class="arqui-tabs" role="tablist"><button id="arquiTabDesign" class="active" type="button" aria-selected="true">Diseñar</button>',
  '<button id="arquiTabLibrary" type="button" aria-selected="false">Biblioteca técnica</button></div>',
  '<div class="arqui-pane" id="arquiDesignPane">',
- '<p id="arquiLocalStatus" class="arqui-context" role="status">Simulación local de IA · biblioteca técnica incorporada · sin consultas externas</p>',
+ '<p id="arquiLocalStatus" class="arqui-context" role="status">Simulación local de IA · biblioteca técnica incorporada · 0 créditos · sin consultas externas</p>',
  '<div class="arqui-chat" id="arquiMessages" role="log" aria-live="polite"></div>',
  '<form id="arquiForm" class="arqui-form"><label for="arquiPrompt">¿Qué deseas diseñar o modificar?</label>',
  '<textarea id="arquiPrompt" rows="4" maxlength="2200" placeholder="Quiero una casa de 12 por 20 con tres dormitorios y dos baños. Después: amplía la cocina 50 cm."></textarea>',
