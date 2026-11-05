@@ -11,54 +11,106 @@
  const clean=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
  const decimal=t=>Number(t.replace(',','.'));
+
  function validateSpec(input){
   const s=validateLocal(input);
-  if(input.dimensionMeaning!=='house')return s;
-  s.dimensionMeaning='house';
+  s.dimensionMeaning=input.dimensionMeaning==='house'?'house':'site';
+  s.siteDeclared=!!input.siteDeclared;
+  s.siteAssumed=false;
+  s.explicitHouse=!!input.explicitHouse;s.explicitSite=!!input.explicitSite;
   s.houseWidth=Number(input.houseWidth||s.lotWidth);
   s.houseDepth=Number(input.houseDepth||s.lotDepth);
-  s.patioDepth=Number(input.patioDepth||0);
-  s.patioLaundry=!!input.patioLaundry;
-  s.rearDoor=!!input.rearDoor;
-  s.siteAssumed=!!input.siteAssumed;
-  s.assumedLevels=!!input.assumedLevels;
+  s.patioDepth=Number(input.patioDepth||0);s.patioLaundry=!!input.patioLaundry;
+  s.rearDoor=!!input.rearDoor;s.assumedLevels=!!input.assumedLevels;
+  s.garden=!!input.garden;s.gardenFrontDepth=Number(input.gardenFrontDepth||0);
+  s.gardenBackDepth=Number(input.gardenBackDepth||0);
   if(!Number.isFinite(s.houseWidth)||s.houseWidth<8||s.houseWidth>60||
     !Number.isFinite(s.houseDepth)||s.houseDepth<5||s.houseDepth>80||
-    !Number.isFinite(s.patioDepth)||s.patioDepth<0||s.patioDepth>20)
-   throw Error('Las medidas de la casa o del patio no son válidas.');
+    ![s.patioDepth,s.gardenFrontDepth,s.gardenBackDepth].every(v=>Number.isFinite(v)&&v>=0&&v<=20))
+   throw Error('Las medidas de la casa, patio o jardín no son válidas.');
   return s;
  }
  function parsePrompt(text,base={}){
-  const s=clean(text);
+  // Convert human numerals only for interpretation, never alter the user's words.
+  const nums={un:1,una:1,uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,doce:12};
+  const q=clean(text),s=q.replace(/\b(un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce)\b/g,x=>nums[x]);
   const parsed={...base,...parseLocal(text,base)};
-  const house=s.match(/\b(?:casa|vivienda|construccion)\s*(?:de\s*)?(\d{1,3}(?:[.,]\d+)?)\s*(?:m(?:etros?)?)?\s*(?:[x×]|por)\s*(\d{1,3}(?:[.,]\d+)?)/);
-  const site=s.match(/\b(?:terreno|lote|solar|predio)\s*(?:(?:es|de|mide)\s*)?\d{1,3}(?:[.,]\d+)?\s*(?:m(?:etros?)?)?\s*(?:[x×]|por)\s*\d{1,3}/);
-  const patio=s.match(/\bpatio\s*(?:(?:trasero|posterior)\s*)?(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?\s*(?:de\s*)?(?:fondo|profundidad)?/)||
-   s.match(/\bpatio.{0,35}?\b(?:fondo|profundidad)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?/);
+  function dimensions(noun){
+   const re=new RegExp('\\b(?:'+noun+')\\b\\s*(?:(?:de|mide|es|con|del|unos?)\\s*){0,4}'+
+    '(\\d{1,3}(?:[.,]\\d+)?)\\s*(?:m|metros?)?\\s*(?:[x×]|por)\\s*(\\d{1,3}(?:[.,]\\d+)?)\\s*(?:m|metros?)?');
+   const m=s.match(re);
+   if(m)return [decimal(m[1]),decimal(m[2])];
+   const alt=new RegExp('\\b(?:'+noun+')\\b.{0,40}?(\\d{1,3}(?:[.,]\\d+)?)\\s*(?:m|metros?)?\\s*(?:de\\s*)?(?:frente|ancho)\\s*(?:y|,|con)\\s*(\\d{1,3}(?:[.,]\\d+)?)\\s*(?:m|metros?)?\\s*(?:de\\s*)?(?:fondo|largo)');
+   const n=s.match(alt);return n?[decimal(n[1]),decimal(n[2])]:null;
+  }
+  const house=dimensions('casa|vivienda|edificacion|construccion');
+  const site=dimensions('terreno|lote|solar|predio|parcela');
+  const fresh=!!(house||site);
+  if(fresh){
+   // The default terrain, retreats, parking and patio are NOT user requirements.
+   Object.assign(parsed,{dimensionMeaning:house?'house':'site',
+    siteDeclared:!!site,siteAssumed:false,explicitSite:!!site,explicitHouse:!!house,
+    garage:false,garageSpaces:1,frontSetback:0,backSetback:0,sideSetback:0,
+    patioDepth:0,patioLaundry:false,rearDoor:false,laundry:false,garden:false,
+    gardenFrontDepth:0,gardenBackDepth:0,kitchenIsland:false,bathrooms:0});
+  }
+  if(site){parsed.lotWidth=site[0];parsed.lotDepth=site[1]}
+  if(house){parsed.houseWidth=house[0];parsed.houseDepth=house[1];
+   if(!site){parsed.lotWidth=house[0];parsed.lotDepth=house[1]}}
+  if(!fresh&&base.dimensionMeaning==='house'){
+   parsed.dimensionMeaning='house';parsed.siteDeclared=!!base.siteDeclared;
+   parsed.houseWidth=Number(base.houseWidth);parsed.houseDepth=Number(base.houseDepth);
+  }
+  // Parse a setback only in an explicitly labelled RETIRO context.
+  if(fresh||/\bretiros?\b/.test(s)){
+   parsed.frontSetback=0;parsed.backSetback=0;parsed.sideSetback=0;
+   const labels={frontal:'frontSetback',frente:'frontSetback',anterior:'frontSetback',
+    posterior:'backSetback',atras:'backSetback',fondo:'backSetback',
+    lateral:'sideSetback',laterales:'sideSetback',costados:'sideSetback'};
+   const matched=[...s.matchAll(/\bretiros?\s*(?:de\s*)?(frontal|frente|anterior|posterior|atras|fondo|lateral(?:es)?|costados)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?/g)];
+   for(const m of matched)parsed[labels[m[1]]]=decimal(m[2]);
+   if(/\bretiros?\b/.test(s)){
+    const after=s.slice(s.search(/\bretiros?\b/));
+    for(const m of after.matchAll(/\b(frontal|frente|anterior|posterior|atras|fondo|lateral(?:es)?|costados)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?/g))
+     parsed[labels[m[1]]]=decimal(m[2]);
+   }
+  }
+  if(/(?:garaje|garage|estacionamiento|parqueadero|parquear|parque\s+\d+\s*carros?)/.test(s)&&
+   !/\bsin\s+(?:garaje|garage|estacionamiento|parqueadero)/.test(s)){
+   parsed.garage=true;
+   if(/(?:garaje|garage|estacionamiento|parqueadero|parque).{0,40}?\b2\s*(?:carros?|autos?|vehiculos?|puestos?|plazas?)/.test(s)||
+     /\b2\s*(?:carros?|autos?|vehiculos?)\b/.test(s))parsed.garageSpaces=2;
+  }
+  if(/\bsin\s+(?:garaje|garage|estacionamiento|parqueadero)/.test(s))parsed.garage=false;
+  if(/cocina\s+con\s+isla|isla\s+(?:en|de)\s+(?:la\s+)?cocina/.test(s))parsed.kitchenIsland=true;
+  const patio=s.match(/\bpatio(?:\s+(?:trasero|posterior))?\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?(?:\s+de\s+(?:fondo|profundidad))?/)||
+   s.match(/\bpatio.{0,38}?\b(?:fondo|profundidad)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?/);
   if(patio)parsed.patioDepth=decimal(patio[1]);
-  if(patio&&parsed.patioDepth>0)parsed.rearDoor=true; // one physical route from kitchen to rear patio
-  if(/(?:puerta\s*(?:trasera|posterior)|salir\s+(?:al?|hacia\s+el)\s*patio)/.test(s))parsed.rearDoor=true;
-  if(/\b(?:lavanderia|area de lavado)\b/.test(s)&&/\bpatio\b/.test(s))parsed.patioLaundry=true;
-  if(/(?:bano\s+compartido|comparten\s+(?:un\s+)?bano|bano\s+para\s+(?:los\s+)?(?:otros\s+)?2)/.test(s)&&/(?:bano\s*(?:master|principal)|(?:master|principal).{0,26}bano|suite)/.test(s)){
+  else if(/\bpatio\b/.test(s)&&fresh)parsed.patioDepth=3; // editorial proposal, not setback
+  if(/puerta\s*(?:trasera|posterior)|salir\s+(?:al?|hacia\s+el)\s*patio/.test(s)||
+     (parsed.patioDepth>0&&fresh))parsed.rearDoor=true;
+  if(/lavanderia|area\s+de\s+lavado|cuarto\s+de\s+lavado/.test(s)){
+   parsed.laundry=true;
+   if(/\bpatio\b/.test(s))parsed.patioLaundry=true;
+  }
+  if(/\b(?:jardin|jardines|area\s+verde)\b/.test(s)){
+   parsed.garden=true;
+   const front=s.match(/\b(?:jardin|area verde)\s*(?:frontal|delantero|al frente)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?/);
+   const rear=s.match(/\b(?:jardin|area verde)\s*(?:posterior|trasero|atras)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(?:m|metros)?/);
+   if(front)parsed.gardenFrontDepth=decimal(front[1]);
+   if(rear)parsed.gardenBackDepth=decimal(rear[1]);
+   if(!front&&!rear&&fresh)parsed.gardenFrontDepth=2;
+  }
+  if(/bano\s+compartido|comparten\s+(?:un\s+)?bano|bano\s+para\s+(?:los\s+)?(?:otros\s+)?2/.test(s)&&
+     /bano\s*(?:master|principal)|(?:master|principal).{0,32}bano|suite/.test(s)){
    parsed.bathrooms=2;parsed.mainSuite=true;parsed.socialBath=false;
   }
-  if(/(?:parque|parquear|parqueadero|garaje|estacionamiento).{0,35}?\b(?:dos|2)\s*(?:carros|autos|vehiculos|puestos|plazas)/.test(s)||
-    /\b(?:dos|2)\s*(?:carros|autos|vehiculos)\b/.test(s)&&/(?:parque|garaje|estacionamiento)/.test(s)){
-   parsed.garage=true;parsed.garageSpaces=2;
+  if(house&&!/\b[12]\s*(?:plantas?|pisos?|niveles?)\b/.test(s)&&parsed.bedrooms>=3){
+   parsed.floors=2;parsed.assumedLevels=true;
   }
-  if(site){parsed.dimensionMeaning='site';parsed.siteAssumed=false;
-   if(base.dimensionMeaning==='house'){parsed.frontSetback=3;parsed.backSetback=2;parsed.sideSetback=.45;}}
-  if(house&&!site){
-   parsed.dimensionMeaning='house';
-   parsed.houseWidth=decimal(house[1]);parsed.houseDepth=decimal(house[2]);
-   parsed.siteAssumed=true;parsed.sideSetback=0;
-   parsed.frontSetback=parsed.garage?5.5:0;
-   parsed.backSetback=Number(parsed.patioDepth||0);
-   parsed.lotWidth=parsed.houseWidth;
-   parsed.lotDepth=round(parsed.houseDepth+parsed.frontSetback+parsed.backSetback);
-   if(parsed.bedrooms>=3&&!/\b1\s*(?:planta|piso|nivel)/.test(s)&&!/\b2\s*(?:planta|piso|nivel)/.test(s)){
-    parsed.floors=2;parsed.assumedLevels=true;
-   }else parsed.assumedLevels=false;
+  if(parsed.dimensionMeaning==='house'&&!parsed.siteDeclared){
+   parsed.lotWidth=parsed.houseWidth;parsed.lotDepth=parsed.houseDepth;
+   parsed.frontSetback=0;parsed.backSetback=0;parsed.sideSetback=0;
   }
   return validateSpec(parsed);
  }
