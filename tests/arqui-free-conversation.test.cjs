@@ -13,6 +13,8 @@ const ctx={
  restoreModel(){},refs:{consult:()=>null,search:()=>[]},
  fromInputs:()=>({lotWidth:12,lotDepth:20,bedrooms:3}),
  planner:{interpret(){throw Error('Local interpreter must not run before remote')},validateSpec:s=>s},
+ validateAiProgram:(current,patch)=>({...current,...patch}),
+ refreshAutoStatus:()=>{},
  message:(role,content)=>{messages.push({role,content});ctx.conversation.push({role:role==='user'?'user':'assistant',content})},
  makePreview:(s)=>{previews.push(s);return true},
  $:id=>nodes[id]||(nodes[id]={disabled:false,checked:false}),
