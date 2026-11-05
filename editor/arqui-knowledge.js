@@ -22,6 +22,12 @@
    url:'https://codes.iccsafe.org/content/IRC2021P1/chapter-3-building-planning',
    sections:'Pasillos, escaleras, huellas, contrahuellas y descansos'}
  ];
+ // Referencias extraídas como criterios propios de la copia privada suministrada
+ // por el autor del proyecto. No se redistribuye el libro, imágenes ni tablas.
+ SOURCES.push({id:'neufert-upload-parte1',name:'Ernst Neufert · Arte de proyectar en arquitectura · Parte 1',
+  scope:'Referencia de diseño y ergonomía; edición escaneada aportada por el usuario, no norma ecuatoriana',
+  year:null,sections:'PDF: pp. 188–191 escaleras; 219–221 accesos y pasillos; 225–228 cocinas; 230 comedores; 231–233 dormitorios; 234–238 baños; 241–242 lavanderías; 247–250 vivienda y orientación',
+  availability:'Solo criterios originales derivados; el libro y sus láminas NO se distribuyen con OtroCAD.'});
  const DIMENSIONS={
   corridor:{clearWidth:1.20,quitoUnifamiliarMinimum:.90,accessible:1.50},
   doors:{entrance:.96,habitable:.86,service:.76,height:2.10},
@@ -148,6 +154,69 @@
   circulation:{functions:['acceder','distribuir','evacuar'],relations:['escalera','acceso'],privacy:'shared'}
  };
  const round=x=>Math.round(x*1000)/1000;
+
+ // Reglas editables de organización espacial: paráfrasis de estudio, NO copia
+ // textual ni reproducción de planchas. El PDF privado no viaja a la web.
+ const NEUFERT_METHOD=[
+  {id:'N01',topic:'programa',pdfPages:[247,248,249],weight:5,
+   principle:'Antes de dibujar, separar dimensiones de edificación, predio y retiros. Nunca inferir un lote de las medidas de una casa.'},
+  {id:'N02',topic:'acceso',pdfPages:[219,220],weight:5,
+   principle:'Un acceso legible conecta el exterior con un espacio social y luego con una circulación privada, sin atravesar dormitorios.'},
+  {id:'N03',topic:'circulacion',pdfPages:[39,40,220,221],weight:5,
+   principle:'Reservar el paso de personas y los giros de puertas antes de colocar muebles; diferenciar pasillo de área útil del recinto.'},
+  {id:'N04',topic:'cocina',pdfPages:[225,226,227,228],weight:5,
+   principle:'Relacionar preparación, fregadero, cocción y almacenamiento. Mesones útiles y pasillos libres preceden a la isla.'},
+  {id:'N05',topic:'cocina',pdfPages:[225,227],weight:4,
+   principle:'No dibujar isla cuando su ubicación obstruya la apertura del refrigerador, horno, cajones o la circulación hacia comedor.'},
+  {id:'N06',topic:'comedor',pdfPages:[230],weight:4,
+   principle:'La mesa debe permitir sacar sillas y pasar detrás; acceso claro entre comedor, cocina y zona de estar.'},
+  {id:'N07',topic:'dormitorios',pdfPages:[231,232,233],weight:5,
+   principle:'La cama, los armarios de fondo práctico, sus aperturas y el recorrido hasta la puerta y ventana condicionan la habitación.'},
+  {id:'N08',topic:'banos',pdfPages:[234,235,236,237,238],weight:5,
+   principle:'Distribuir ducha, inodoro y lavabo verificando áreas de uso; la puerta no debe barrer sanitarios ni impedir la entrada.'},
+  {id:'N09',topic:'suite',pdfPages:[231,232,235,238],weight:5,
+   principle:'El baño de una suite debe tener acceso privado; el compartido debe abrir a un distribuidor accesible desde ambos dormitorios.'},
+  {id:'N10',topic:'escalera',pdfPages:[188,189,190,191],weight:5,
+   principle:'La escalera requiere recorrido continuo, huellas, contrahuellas, descanso, llegada libre y coherencia vertical entre plantas.'},
+  {id:'N11',topic:'ventanas',pdfPages:[173,174,175,176],weight:4,
+   principle:'Orientar aberturas hacia exteriores reales y evitar superponer ventanas con mobiliario alto y puertas.'},
+  {id:'N12',topic:'lavanderia',pdfPages:[241,242],weight:4,
+   principle:'La lavadora requiere acceso, maniobra, abastecimiento, desagüe y ventilación; ubicarla junto al área de servicio sin invadir el patio.'},
+  {id:'N13',topic:'jardines',pdfPages:[214,215,216,217,218],weight:3,
+   principle:'Los jardines son espacios exteriores del programa; no equivalen a retiros reglamentarios ni autorizan dibujar límites de terreno.'},
+  {id:'N14',topic:'vehiculos',pdfPages:[199,244,245],weight:4,
+   principle:'Separar llegada de vehículos del acceso peatonal y considerar barrido y maniobras; no confundir plaza de parqueo con predio.'},
+  {id:'N15',topic:'asoleamiento',pdfPages:[113,114,157,158,159,170],weight:4,
+   principle:'Sin orientación geográfica o ubicación precisa, no atribuir asoleamiento ni trazar un norte ficticio.'}
+ ];
+ function spatialReview(plan){
+  const checked=[],issues=[],spec=plan?.spec||{},rooms=(plan?.floors||[]).flatMap(f=>f.rooms||[]);
+  function checkedRule(id,ok,detail){
+   checked.push({id,ok,detail});
+   if(!ok)issues.push({severity:'warning',rule:id,message:detail});
+  }
+  checkedRule('N01',!spec.siteDeclared||(!spec.siteAssumed&&spec.lotWidth>=spec.houseWidth),
+   'No deducir terrenos o retiros a partir de la huella de la casa.');
+  if(spec.dimensionMeaning==='house'&&!spec.siteDeclared)
+   checkedRule('N15',!plan.site,'No mostrar parcela ni orientación inexistentes.');
+  if(plan.floors?.length===2){
+   const [a,b]=plan.floors.map(f=>f.stair);
+   checkedRule('N10',!!a&&!!b&&a.x===b.x&&a.y===b.y,
+    'Las cajas de escalera deben coincidir en planta baja y alta.');
+  }
+  if(rooms.some(r=>r.kind==='kitchen')){
+   const kitchen=rooms.find(r=>r.kind==='kitchen');
+   checkedRule('N04',kitchen.clearWidth>=3.2,
+    'La cocina debe permitir mesones y movimiento libre; revisar la alternativa con isla.');
+  }
+  if(spec.bedrooms>=2){
+   const common=rooms.filter(r=>r.kind==='bath'&&/COMPARTIDO/.test(r.name));
+   checkedRule('N09',common.length>0,'Reservar al menos un baño accesible desde circulación común.');
+  }
+  if(spec.patioLaundry)checkedRule('N12',!!plan.patio?.laundry,
+   'La lavandería pedida debe dibujarse en el patio, con espacio de servicio.');
+  return {checked,issues,knowledgeVersion:'neufert-criterios-2026.11',source:'Neufert, Parte 1 (PDF privado), fichas de criterio originales'};
+ }
  function stairGeometry({height=DIMENSIONS.stair.height,width=2.6,depth=3.55}={}){
   const s=DIMENSIONS.stair,risers=Math.ceil(height/s.riserTarget/2)*2,
    each=risers/2,riser=round(height/risers),run=round((each-1)*s.tread),
@@ -235,6 +304,6 @@
   }
   return output;
  }
- return Object.freeze({version:'2026.11-estatico-1',sources:SOURCES,dimensions:DIMENSIONS,
-  templates:TEMPLATES,modules:MODULES,guides:GUIDES,sheets:SHEETS,explain,stairGeometry,auditRoom,auditPlan,classify});
+ return Object.freeze({version:'2026.11-neufert-1',sources:SOURCES,dimensions:DIMENSIONS,
+  templates:TEMPLATES,modules:MODULES,guides:GUIDES,sheets:SHEETS,neufertMethod:NEUFERT_METHOD,spatialReview,explain,stairGeometry,auditRoom,auditPlan,classify});
 });
