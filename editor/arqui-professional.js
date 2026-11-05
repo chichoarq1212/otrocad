@@ -117,13 +117,14 @@ function generate(plan,options={}){
   else ln(cx-t*.36,cy,cx+t*.36,cy,layer,glass,'mullion');
  }
  function furniture(r,X,Y){
-  if(s.furniture===false||s.style==='esquematico')return;
+  // Architectural stairs are mandatory geometry even when decorative furniture is hidden.
+  if((s.furniture===false||s.style==='esquematico')&&r.kind!=='stairs')return;
   const x=X+r.x,y=Y+r.y,w=r.width,d=r.depth;
   if(w<1.4||d<1.7)return;
   const inner=.30,usableW=w-.6,usableD=d-.6;
   const drawBed=()=>{
    const bw=Math.min(1.60,usableW*.62),bd=Math.min(1.96,usableD*.65);
-   const bx=r.side==='right'?x+w-bw-.35:x+.35,by=y+Math.min(.78,Math.max(.35,d-bd-.55));
+   const bx=x+(w-bw)/2-(r.side==='master'?.1:0),by=y+Math.min(.75,Math.max(.40,d-bd-.66));
    rect(bx,by,bw,bd,'bed');rect(bx+.06,by+.07,bw-.12,.35,'pillows',undefined,art.furniture,.3);
    ln(bx,by+bd*.45,bx+bw,by+bd*.45);
    const tableW=.34;
@@ -152,15 +153,16 @@ function generate(plan,options={}){
   }
  }; 
  const drawKitchen=()=>{
-   rect(x+.25,y+.34,Math.min(2.45,w-.55),.52,'counter');
-   rect(x+.25,y+.34,.60,.52,'sink');
-   circ(x+.55,y+.61,.13,'sink');
-   for(let i=0;i<4;i++)circ(x+Math.min(1.35,w-1.0)+(i%2)*.2,y+.49+Math.floor(i/2)*.22,.058,'stove');
-   rect(x+.25,y+Math.max(.80,d-1.0),Math.min(1.85,w-.6),.49,'counter');
-   if(s.kitchenIsland!==false&&w>=3.7&&d>=2.8){
+   rect(x+.25,y+.12,Math.min(2.45,w-.55),.52,'counter');
+   rect(x+.25,y+.12,.60,.52,'sink');
+   circ(x+.55,y+.38,.13,'sink');
+   for(let i=0;i<4;i++)circ(x+Math.min(1.35,w-1.0)+(i%2)*.2,y+.23+Math.floor(i/2)*.18,.058,'stove');
+   rect(x+.25,y+d-.68,Math.min(1.85,w-.6),.51,'counter');
+   // .90m circulation at front and rear of the island; hide it if the room does not fit.
+   if(s.kitchenIsland!==false&&w>=3.7&&d>=3.65){
     const iw=1.35,ih=.75,ix=x+w/2-iw/2,iy=y+d/2-ih/2;
     rect(ix,iy,iw,ih,'kitchen-island',undefined,art.furniture,.27);
-    for(const k of [0,1])circ(ix+.34+k*.57,iy-.18,.125,'stool');
+    for(const k of [0,1])circ(ix+iw+.20,iy+.18+k*.35,.125,'stool');
    }
   };
   const drawLiving=()=>{
