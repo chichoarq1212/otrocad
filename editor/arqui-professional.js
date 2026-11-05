@@ -240,7 +240,7 @@ function generate(plan,options={}){
   dimension(X+f.hallStart+f.hallWidth,Y+D,X+W,Y+D,.60,compact(W-f.hallStart-f.hallWidth)+' m');
  }
  function site(){
-  if(!s.siteDeclared)return; // no user-provided land means NO lot boundary or setbacks
+  if(s.siteDeclared===false)return; // explicit no-site suppresses all lot lines; preserve old CAD site-plan files
   const w=s.lotWidth,d=s.lotDepth;
   if(!Number.isFinite(w)||!Number.isFinite(d))return;
   // Site boundary and labeled setbacks; no invented legal compliance.
@@ -253,7 +253,7 @@ function generate(plan,options={}){
  }
  function northAndTitle(){
   const x=s.lotWidth+1.0,y=1.0;
-  if(s.siteDeclared){
+  if(s.siteDeclared!==false){
   ln(x,y,x,y+1.28,'AI-ARQ-SIMBOLOGÍA',art.title,'north');
   ln(x,y+1.28,x-.22,y+.93,'AI-ARQ-SIMBOLOGÍA',art.title,'north');
   ln(x,y+1.28,x+.22,y+.93,'AI-ARQ-SIMBOLOGÍA',art.title,'north');
