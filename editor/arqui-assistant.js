@@ -142,7 +142,7 @@ $('arquiAiLogin').onclick=async()=>{
 if(oauthBridge&&oauthBridge.hasCallback(location.href)){
  (async()=>{
   try{
-   const token=await oauthBridge.complete(location.href,window.sessionStorage||sessionStorage,fetch);
+   const token=await oauthBridge.complete(location.href,window.sessionStorage||sessionStorage,fetch.bind(window));
    aiSelect.value='openrouter';aiKey.value=token;updateAiConnection();
    message('bot','Tu cuenta de OpenRouter está conectada. El Arqui utilizará solo modelos gratuitos mientras esta página permanezca abierta.');
   }catch(error){message('bot','No se completó la conexión OpenRouter: '+String(error.message||error))}
@@ -316,7 +316,7 @@ async function propose(text){
     const reply=await userBridge.request({
      message:prompt,currentSpec:current,conversation:conversation.slice(0,-1).slice(-8),
      referenceExcerpts:linked.map(x=>({source:x.source,title:x.title,text:x.excerpt}))
-    },{provider:personalProvider,key:aiKey.value},{fetch,signal:controller.signal});
+    },{provider:personalProvider,key:aiKey.value},{fetch:fetch.bind(window),signal:controller.signal});
     const patch={...reply.spec};
     if(patch.dimensionMeaning==='house'){
      const w=Number(patch.houseWidth??current.houseWidth??current.lotWidth);
