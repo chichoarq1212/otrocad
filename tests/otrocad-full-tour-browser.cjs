@@ -157,6 +157,24 @@ async function run(){
  validate(!local.cloudSelector,'Old generative AI selector present');
  log('offline-architecture',local);
  await snap(page,'03-arqui-local');
+ // A real touch-capable tablet starts with the ribbon hidden, opens on demand,
+ // and closes after choosing a tool without removing drawing controls.
+ const tablet=await browser.newPage({viewport:{width:1280,height:800},hasTouch:true,deviceScaleFactor:1,serviceWorkers:'block'});
+ await tablet.goto(URL,{waitUntil:'domcontentloaded',timeout:30000});
+ await tablet.waitForFunction(()=>!!window.OtroCadCivilAPI,null,{timeout:20000});
+ validate(await tablet.evaluate(()=>matchMedia('(pointer: coarse)').matches),'Tablet touch emulation unavailable');
+ validate(await tablet.locator('body').evaluate(el=>el.classList.contains('cad-ribbon-collapsed')),'Tablet ribbon should start hidden');
+ validate(await tablet.locator('#ribbonToggle').isVisible(),'Tablet toolbar button missing');
+ await tablet.locator('#ribbonToggle').click();
+ validate(await tablet.locator('#ribbon').isVisible(),'Tablet ribbon did not open');
+ await tablet.locator('[data-tool="line"]').first().click();
+ validate(await tablet.locator('body').evaluate(el=>el.classList.contains('cad-ribbon-collapsed')),'Toolbar did not close after tool selection');
+ validate((await tablet.evaluate(()=>window.OtroCadCivilAPI.getActiveTool()))==='line','Line tool was not selected on tablet');
+ const tabletCanvas=await tablet.locator('#cad').boundingBox();
+ validate(tabletCanvas&&tabletCanvas.width>500&&tabletCanvas.height>350,'Tablet drawing area too small');
+ await snap(tablet,'06-tablet-collapsed');
+ log('tablet-touch-toolbar',{width:tabletCanvas.width,height:tabletCanvas.height});
+ await tablet.close();
  // Verify mobile layout still has usable central canvas and command bar.
  await page.setViewportSize({width:390,height:844});
  await page.waitForTimeout(200);
