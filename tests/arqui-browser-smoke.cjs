@@ -20,9 +20,10 @@ let activeBrowser=null,activePage=null,requestLog=[];
  const binary=binaries.find(x=>fs.existsSync(x));
  const browser=activeBrowser=await chromium.launch({headless:true,...(binary?{executablePath:binary}:{}),
   args:['--no-sandbox','--disable-dev-shm-usage']});
- const page=activePage=await browser.newPage({viewport:{width:1400,height:900},deviceScaleFactor:1});
+ const page=activePage=await browser.newPage({viewport:{width:1400,height:900},deviceScaleFactor:1,serviceWorkers:'block'});
  const errors=[];
  page.on('pageerror',e=>errors.push(String(e).slice(0,320)));
+ page.on('console',msg=>{if(msg.type()==='error')console.error('Chrome console:',msg.text().slice(0,400))});
  let requests=0;
  requestLog=[];
  page.on('requestfailed',req=>requestLog.push({url:req.url(),error:req.failure()?.errorText}));
