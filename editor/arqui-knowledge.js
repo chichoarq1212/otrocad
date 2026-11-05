@@ -23,16 +23,16 @@
    sections:'Pasillos, escaleras, huellas, contrahuellas y descansos'}
  ];
  const DIMENSIONS={
-  corridor:{clearWidth:1.20,accessible:1.50},
+  corridor:{clearWidth:1.20,quitoUnifamiliarMinimum:.90,accessible:1.50},
   doors:{entrance:.96,habitable:.86,service:.76,height:2.10},
   rooms:{
    'living-dining':{minSide:2.70,minArea:16,idealArea:20,category:'social'},
    living:{minSide:2.70,minArea:8.10,category:'social'},
    dining:{minSide:2.70,minArea:8.10,category:'social'},
    kitchen:{minSide:1.50,minArea:6.50,idealSide:2.90,category:'service'},
-   bedroom:{minSide:2.20,minArea:9,idealSide:2.70,category:'private'},
+   bedroom:{minSide:2.20,minArea:8,idealArea:9,idealSide:2.70,category:'private'},
    master:{minSide:2.50,minArea:9,idealSide:3.00,category:'private'},
-   bath:{minSide:1.20,minArea:2.9,idealWidth:1.6,category:'service'},
+   bath:{minSide:1.30,minArea:2.50,idealWidth:1.6,category:'service'},
    laundry:{minSide:1.50,minArea:3,category:'service'},
    'half-bath':{minSide:.90,minArea:1.8,category:'service'},
    patio:{minSide:3.0,minArea:9,category:'exterior'},
@@ -133,6 +133,34 @@
    const a=flights[0].stair,b=flights[1].stair;
    if(Math.abs(a.x-b.x)>.002||Math.abs(a.y-b.y)>.002)
     output.push({severity:'error',message:'La caja de escalera no coincide verticalmente entre plantas.'});
+  }
+  for(const f of plan.floors||[]){
+   if(f.layoutKind!=='compact-coherent-v3')continue;
+   const rooms=(f.rooms||[]).filter(r=>r.kind!=='circulation');
+   for(let i=0;i<rooms.length;i++)for(let j=i+1;j<rooms.length;j++){
+    const a=rooms[i],b=rooms[j];
+    const overlapX=Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x);
+    const overlapY=Math.min(a.y+a.depth,b.y+b.depth)-Math.max(a.y,b.y);
+    if(overlapX>.006&&overlapY>.006)
+     output.push({severity:'error',floor:f.level,room:a.name,
+      message:'Dos ambientes ocupan el mismo espacio: '+a.name+' y '+b.name+' ('+round(overlapX*overlapY)+' m²).'});
+   }
+   for(const side of ['left','right']){
+    const cuts=[0,...(f.partitions?.[side]||[]),f.depth].sort((a,b)=>a-b);
+    for(const d of f.doors?.[side]||[]){
+     const valid=cuts.some((cut,i)=>i<cuts.length-1&&d.y-d.width/2>=cut+.14&&
+       d.y+d.width/2<=cuts[i+1]-.14);
+     if(!valid)output.push({severity:'error',floor:f.level,
+      message:'Puerta '+side+' a '+round(d.y)+' m invade esquina, muro o partición.'});
+     const minimum=d.width<=.8?DIMENSIONS.doors.service:DIMENSIONS.doors.habitable;
+     if(d.width+1e-5<minimum)output.push({severity:'error',floor:f.level,
+      message:'Vano de '+round(d.width)+' m inferior a la referencia '+minimum+' m.'});
+    }
+    const doors=f.doors?.[side]||[];
+    for(let i=0;i<doors.length;i++)for(let j=i+1;j<doors.length;j++)
+     if(Math.abs(doors[i].y-doors[j].y)<(doors[i].width+doors[j].width)/2+.25)
+      output.push({severity:'error',floor:f.level,message:'Dos puertas se superponen en el mismo muro.'});
+   }
   }
   return output;
  }
