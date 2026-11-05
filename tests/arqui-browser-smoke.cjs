@@ -94,6 +94,24 @@ let activeBrowser=null,activePage=null,requestLog=[];
  assert(errors.length===0,'Browser JS errors: '+errors.join(' | '));
  fs.mkdirSync('/tmp/otrocad-browser-smoke',{recursive:true});
  await page.screenshot({path:'/tmp/otrocad-browser-smoke/preview-and-cad.png',fullPage:true});
+ // Repeat UI audit at iPhone-sized viewport: no provider selector or API key.
+ await page.setViewportSize({width:390,height:844});
+ await page.waitForTimeout(160);
+ const mobile=await page.evaluate(()=>{
+  const panel=document.getElementById('arquiPanel');
+  const quota=document.getElementById('arquiCloudStatus');
+  const advanced=document.getElementById('arquiAiSettings');
+  const rect=panel.getBoundingClientRect();
+  return {panelWidth:rect.width,panelLeft:rect.left,
+   quotaVisible:!!quota&&quota.getBoundingClientRect().height>0,
+   advancedHidden:advanced.hidden,
+   mode:document.getElementById('arquiMode')?.textContent||''};
+ });
+ assert(mobile.panelWidth<=390,'Panel de IA debe caber en el teléfono');
+ assert(mobile.panelLeft>=0,'Panel no debe salirse por la izquierda');
+ assert(mobile.quotaVisible,'El contador de IA debe ser visible en celular');
+ assert(mobile.advancedHidden,'Nadie debe escoger un proveedor de IA');
+ await page.screenshot({path:'/tmp/otrocad-browser-smoke/iphone-auto-ia.png',fullPage:true});
  fs.writeFileSync('/tmp/otrocad-browser-smoke/report.json',JSON.stringify({
   tested:new Date().toISOString(),url:target,model:'Cloudflare Workers AI (intercepted mock)',
   requests,initial:{...initial,spec:{lotWidth:initial.spec.lotWidth,lotDepth:initial.spec.lotDepth,
