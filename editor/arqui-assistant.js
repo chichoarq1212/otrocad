@@ -37,8 +37,8 @@ root.innerHTML=[
  '<p id="arquiContext" class="arqui-context">Describe tu idea. Las medidas que falten se mostrarán como supuestos editables.</p>',
  '<details id="arquiDetails" class="arqui-details" hidden><summary>Ajustar medidas de esta propuesta</summary>',
  '<div class="arqui-grid">',
- '<label id="arquiLabelSizeW">Casa ancho (m)<input id="arquiLotW" type="number" min="8" max="60" step=".1" value="12"></label>',
- '<label id="arquiLabelSizeD">Casa fondo (m)<input id="arquiLotD" type="number" min="5" max="80" step=".1" value="20"></label>',
+ '<label id="arquiLabelSizeW"><span id="arquiLabelWText">Casa ancho (m)</span><input id="arquiLotW" type="number" min="8" max="60" step=".1" value="12"></label>',
+ '<label id="arquiLabelSizeD"><span id="arquiLabelDText">Casa fondo (m)</span><input id="arquiLotD" type="number" min="5" max="80" step=".1" value="20"></label>',
  '<label>Plantas<select id="arquiFloors"><option value="1">1 planta</option><option value="2">2 plantas</option></select></label>',
  '<label>Dormitorios<select id="arquiBeds"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>',
  '<label>Baños<select id="arquiBaths"><option value="0">Propuesta del motor</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>',
@@ -103,8 +103,8 @@ function toInputs(s){
  const houseOnly=s.dimensionMeaning==='house'&&!s.siteDeclared;
  $('arquiLotW').value=houseOnly?s.houseWidth:s.lotWidth;
  $('arquiLotD').value=houseOnly?s.houseDepth:s.lotDepth;
- $('arquiLabelSizeW').firstChild.textContent=houseOnly?'CASA ancho (m)':'TERRENO ancho (m)';
- $('arquiLabelSizeD').firstChild.textContent=houseOnly?'CASA fondo (m)':'TERRENO fondo (m)';
+ $('arquiLabelWText').textContent=houseOnly?'CASA ancho (m)':'TERRENO ancho (m)';
+ $('arquiLabelDText').textContent=houseOnly?'CASA fondo (m)':'TERRENO fondo (m)';
  for(const id of ['arquiSetFront','arquiSetBack','arquiSetSide']){
   $(id).closest('label').hidden=houseOnly;
  }
