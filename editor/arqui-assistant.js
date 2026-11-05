@@ -26,7 +26,8 @@ root.innerHTML=[
  '<div class="arqui-tabs" role="tablist"><button id="arquiTabDesign" class="active" type="button" aria-selected="true">Diseñar</button>',
  '<button id="arquiTabLibrary" type="button" aria-selected="false">Biblioteca técnica</button></div>',
  '<div class="arqui-pane" id="arquiDesignPane">',
- '<details id="arquiAiSettings" class="arqui-details"><summary>🌐 Conectar mi IA · gratuita / cuenta propia</summary>',
+ '<p id="arquiCloudStatus" class="arqui-context arqui-cloud-status" role="status">IA automática · comprobando cupo gratuito…</p>',
+ '<details id="arquiAiSettings" class="arqui-details" hidden><summary>Conexión avanzada (opcional)</summary>',
  '<div class="arqui-grid"><label>Servicio de IA<select id="arquiAiProvider">',
  '<option value="none">Sin conexión · motor CAD local</option>',
  '<option value="openrouter">OpenRouter · modelos gratuitos</option>',
@@ -104,11 +105,46 @@ window.addEventListener('pageshow',sync);
 const userBridge=window.OtroCadUserAI,oauthBridge=window.OtroCadArquiOAuth;
 const aiSelect=$('arquiAiProvider'),aiKey=$('arquiAiKey');
 const endpoint=(()=>{
- // Optional community self-hosted proxy; nunca requerir Cloudflare AI de OtroCAD.
- const raw=window.OTROCAD_ARQUI_AI_ENDPOINT;
+ // Same-origin automatic service: no user registration and no API key.
+ const raw=window.OTROCAD_ARQUI_AI_ENDPOINT||(location.hostname?.endsWith('.github.io')?'':new URL('/api/arqui',location.href).href);
  if(typeof raw!=='string'||!raw)return null;
- try{const url=new URL(raw,location.href);return url.protocol==='https:'?url:null}catch(_){return null}
+ try{const url=new URL(raw,location.href);return url.protocol==='https:'||url.hostname==='localhost'||url.hostname==='127.0.0.1'?url:null}
+ catch(_){return null}
 })();
+let autoEnabled=null;
+async function refreshAutoStatus(known=null){
+ const node=$('arquiCloudStatus');
+ if(!endpoint||typeof fetch!=='function'){
+  autoEnabled=false;
+  node.textContent='IA gratuita no configurada · diseño CAD local disponible';
+  $('arquiMode').textContent='IA gratuita no activada · CAD local';
+  return;
+ }
+ try{
+  const data=known||await fetch(new URL('/api/arqui/status',endpoint),{cache:'no-store'}).then(res=>{
+   if(!res.ok)throw Error('status no disponible');return res.json()
+  });
+  autoEnabled=!!data.online;
+  if(!autoEnabled){
+   node.textContent='IA gratuita pendiente de activar · el CAD local funciona sin conexión';
+   $('arquiMode').textContent='IA automática pendiente · CAD local';
+   return;
+  }
+  const remaining=Math.max(0,Number(data.remaining||0));
+  const total=Math.max(1,Number(data.limit||2));
+  const globalLeft=Math.max(0,Number(data.globalRemaining||0));
+  const usable=Math.min(remaining,globalLeft);
+  node.textContent=usable>0?
+   'IA automática gratuita · '+usable+' de '+total+' consultas disponibles hoy':
+   'IA gratuita: cupo agotado por hoy · CAD local disponible';
+  $('arquiMode').textContent=usable>0?'IA automática · sin registro':'Cupo IA agotado · CAD local';
+ }catch(_){
+  autoEnabled=false;
+  node.textContent='IA gratuita temporalmente no disponible · CAD local disponible';
+  $('arquiMode').textContent='IA automática no disponible · CAD local';
+ }
+}
+if(typeof fetch==='function')refreshAutoStatus();
 function updateAiConnection(){
  const provider=aiSelect.value,help=$('arquiAiHelp');
  $('arquiAiLogin').hidden=provider!=='openrouter'||!oauthBridge;
@@ -130,7 +166,9 @@ if(!aiSelect.value)aiSelect.value='none';
 aiSelect.addEventListener('change',updateAiConnection);
 aiKey.addEventListener('input',updateAiConnection);
 $('arquiAiClear').onclick=()=>{aiKey.value='';aiSelect.value='none';updateAiConnection()};
+// Dejar el panel avanzado oculto: una persona no necesita seleccionar proveedor.
 updateAiConnection();
+if(!aiSelect.value||aiSelect.value==='none')refreshAutoStatus();
 $('arquiAiLogin').onclick=async()=>{
  if(!oauthBridge){message('bot','El inicio de sesión de OpenRouter no está disponible.');return}
  try{
@@ -342,7 +380,7 @@ async function propose(text){
     return;
    }finally{clearTimeout(timeout)}
   }
-  if(!remoteAnswered&&endpoint){
+  if(!remoteAnswered&&endpoint&&autoEnabled!==false){
    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
    try{
     const linked=$('arquiSendExcerpts').checked?refs.search(prompt,refs.get(),3):[];
@@ -353,25 +391,31 @@ async function propose(text){
     if(!response.ok){
       const err=await response.json().catch(()=>null);
       if(response.status===503)throw Error('LOCAL_FALLBACK');
+      if(response.status===429)throw Error('QUOTA: '+(err?.error||'Cupo de IA agotado'));
       throw Error('REMOTE: '+(err?.error||'El servicio IA está temporalmente inaccesible.'));
      }
     const data=await response.json();
     if(!data||typeof data.reason!=='string'||typeof data.requiresReview!=='boolean'||!data.spec||typeof data.spec!=='object')throw Error('REMOTE: La respuesta IA no tiene un programa válido.');
     const candidate=planner.validateSpec({...current,...data.spec});
-    $('arquiMode').textContent='IA en línea conectada · propuesta editable';
+    refreshAutoStatus({online:true,remaining:data.remaining,globalRemaining:data.globalRemaining,limit:data.limit||2});
+    $('arquiMode').textContent='IA automática · plano editable';
     remoteAnswered=true;
     if(data.requiresReview){message('bot',data.reason||'Necesito aclarar un detalle antes de dibujar.');return}
     next=candidate;
     if(data.reason)message('bot',data.reason);
    }catch(error){
-    if(String(error.message||'').startsWith('REMOTE:')){
-     message('bot',String(error.message).slice(7)+' La propuesta anterior se conserva.');
+    const msg=String(error.message||'');
+    if(msg.startsWith('QUOTA:')){
+     refreshAutoStatus();
+     message('bot',msg.slice(7)+' Usaré la interpretación local para no generar gastos.');
+    }else if(msg.startsWith('REMOTE:')){
+     message('bot',msg.slice(7)+' No he modificado el plano.');
      return;
+    }else{
+     if(msg==='LOCAL_FALLBACK')autoEnabled=false;
+     refreshAutoStatus();
+     message('bot','IA automática no disponible; dibujaré localmente sin consumir consultas.');
     }
-    $('arquiMode').textContent='IA generativa no conectada · modo local';
-    message('bot',String(error.message)==='LOCAL_FALLBACK'?
-     'IA en línea pendiente de activación. Usaré provisionalmente el motor local.':
-     'No se pudo comunicar con el modelo en línea. Usaré provisionalmente el motor local.');
    }finally{clearTimeout(timeout)}
   }
   if(!remoteAnswered){
