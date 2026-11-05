@@ -1,8 +1,8 @@
 {
   "name": "otrocad-desktop",
-  "version": "0.5.6",
+  "version": "0.6.1",
   "private": true,
-  "description": "OtroCAD para Windows sin conexión, versión alfa experimental",
+  "description": "OtroCAD Windows experimental 0.6.1: editor CAD offline y El Arqui IA online con cuotas protegidas",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
@@ -20,6 +20,7 @@
     },
     "files": [
       "main.cjs",
+      "arqui-proxy.cjs",
       "build/otrocad.ico",
       "dist/**/*"
     ],
@@ -33,7 +34,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "OtroCAD-Windows-0.5.6-experimental-Setup.${ext}",
+      "artifactName": "OtroCAD-Windows-0.6.1-experimental-Setup.${ext}",
       "installerIcon": "build/otrocad.ico",
       "uninstallerIcon": "build/otrocad.ico",
       "installerHeaderIcon": "build/otrocad.ico",
