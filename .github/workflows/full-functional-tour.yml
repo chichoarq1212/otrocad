@@ -1,0 +1,49 @@
+name: Recorrido funcional integral OtroCAD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/otrocad-full-functional-tour.cjs'
+      - '.github/workflows/full-functional-tour.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  functional-tour:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar navegador de pruebas
+        run: npm install --no-save --no-audit --no-fund playwright-core@1.56.1
+      - name: Construir OtroCAD Web sin conexión IA
+        run: node scripts/build-pages.cjs
+      - name: Servir sitio estático local
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --directory dist >/tmp/otrocad-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:4173/editor/ >/dev/null; then
+              echo "OtroCAD servido"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/otrocad-http.log
+          exit 1
+      - name: Recorrer comandos CAD, Civil 3D, MEP, presentaciones, archivos y móvil
+        run: node tests/otrocad-full-functional-tour.cjs
+      - name: Conservar capturas e informe de la prueba
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: otocad-integral-capturas-y-reporte
+          path: /tmp/otrocad-functional-tour/
+          if-no-files-found: warn
