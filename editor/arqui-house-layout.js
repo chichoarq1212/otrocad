@@ -81,7 +81,7 @@
   const stair=k.stairGeometry({height:2.8,width:rightW,depth:stairDepth});
   const groundSplit=round(clamp(D*.50-Number(s.kitchenExtra||0)+Number(s.livingExtra||0),3.6,D-3.85));
   const upperSplit=round(clamp(D*.54+Number(s.bedroomExtra||0),4.15,D-3.15));
-  const lastBath=round(Math.max(1.95,Math.min(2.1,D*.24)));
+  const lastBath=round(Math.max(1.70,Math.min(1.80,D*.215)));
   const secondSplit=round(D-lastBath);
   if(secondSplit-stairDepth<2.75)
    throw Error('La habitación secundaria necesita al menos 2,75 m de fondo entre escalera y baño.');
