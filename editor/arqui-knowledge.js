@@ -69,6 +69,55 @@
   {id:'accessible',title:'Vivienda universalmente accesible',supported:false,
    description:'Guía de circulaciones y radios de giro; requiere comprobación normativa y geométrica específica.'}
  ];
+
+ const GUIDES=[
+  {id:'zoning',title:'Zonificación y privacidad',tags:['zonificacion','distribucion','privacidad','zonas','circulacion'],
+   text:'Ubicar acceso y sala-comedor en área social, cocina relacionada con comedor y lavado, dormitorios en zona privada y baños próximos a sus usuarios. Evitar atravesar dormitorios o baños para llegar a otras habitaciones. El acceso a la suite no debe convertirse en corredor común.'},
+  {id:'stairs',title:'Escalera en U y descansos',tags:['escalera','grada','peldaño','contrahuella','huella','descanso'],
+   text:'Una escalera real requiere dos tramos, huellas, contrahuellas, descansos, altura libre, pasamanos y llegada utilizable a cada planta. Las cajas deben coincidir verticalmente. El motor compacto usa referencia 2,80 m entre pisos, 16 contrahuellas de 17,5 cm y siete huellas de 28 cm por tramo; verificar sección y estructura.'},
+  {id:'doors',title:'Puertas: abatimiento y paso libre',tags:['puerta','acceso','abatimiento','vano','apertura','giro'],
+   text:'Dibujar el vano real en el muro y el arco de apertura, evitando superposición con otros arcos, esquinas, muebles, sanitarios y circulación. Preferir giro hacia pared libre en dormitorios y aperturas no invasivas en baños pequeños. Un ancho nominal de hoja no es necesariamente su ancho libre.'},
+  {id:'windows',title:'Ventanas y ventilación',tags:['ventana','ventilacion','iluminacion','luz','fachada','orientacion'],
+   text:'Priorizar ventanas útiles en dormitorio, estancia y cocina, con posición que no interfiera con armarios ni puertas. Comprobar iluminación, ventilación natural, relación con retiros y asoleamiento del predio. Un baño interior requiere estudio de ventilación mecánica o ducto permitido; no fingir una ventana exterior inexistente.'},
+  {id:'kitchen',title:'Cocinas lineales, L, U y con isla',tags:['cocina','isla','encimera','meson','fregadero','estufa'],
+   text:'Seleccionar cocina lineal si el ancho es escaso, L o U si dos o tres lados admiten la circulación, e isla solo si quedan pasos de trabajo. Módulo de mesón 0,60 m; isla orientativa 1,40 × 0,80 m, dejando aproximadamente 0,90 m de paso y considerando apertura del refrigerador, horno y lavavajillas. Separar zona caliente de circulación principal.'},
+  {id:'bath',title:'Baños y aparatos sanitarios',tags:['baño','bano','ducha','inodoro','sanitario','lavabo'],
+   text:'Distribuir ducha, inodoro y lavamanos con sus espacios de uso libres. La puerta no debe barrer inodoro o ducha. En baño máster, el ingreso es privado desde suite o vestidor; el baño compartido abre desde distribuidor, nunca atravesando otro dormitorio. Agrupar zonas húmedas simplifica instalaciones sin garantizar compatibilidad estructural.'},
+  {id:'bedroom',title:'Dormitorios con mobiliario real',tags:['dormitorio','habitacion','cuarto','cama','closet','armario'],
+   text:'Reservar cama, área de giro, armario y apertura de puertas antes de aceptar el metraje. Referencia de cama matrimonial 1,60 × 2,00 m y closet 0,60 m de fondo; procurar 0,70 m delante del armario y al pie de la cama. No validar una estancia únicamente por área bruta.'},
+  {id:'living',title:'Sala, comedor y acceso',tags:['sala','comedor','estar','sofá','sofa','mesa','acceso'],
+   text:'La sala debe recibir luz y conectarse con acceso y comedor sin que el recorrido principal atraviese el centro del sofá o la mesa. Comedor cercano a la cocina, con espacio posterior para retirar sillas. Separar las áreas de muebles de los pasos de circulación.'},
+  {id:'laundry',title:'Lavandería, patio y salida posterior',tags:['lavanderia','lavado','secado','patio','puerta trasera'],
+   text:'Relacionar cocina y lavado para reducir recorridos, sin cruzar la preparación de alimentos. Si el lavado está en patio, prever cubierta o protección, drenaje, ventilación, conexión y acceso posterior realmente representado. No confundir patio de 3 m de profundidad con retiro legal.'},
+  {id:'parking',title:'Parqueo y acceso peatonal',tags:['parqueo','garaje','vehiculo','carro','estacionamiento'],
+   text:'Representar el número real de plazas y diferenciarlas de los caminos peatonales. Una bahía orientativa de automóvil mide 2,50 × 5,00 m, pero radios de giro y apertura de puertas dependen del vehículo, el lote y la normativa. Dos autos en paralelo no equivalen a dos en tándem.'},
+  {id:'site',title:'Terreno, retiros y parcela hipotética',tags:['terreno','lote','retiro','alineacion','implantacion','parcela'],
+   text:'Distinguir expresamente dimensiones de CASA y de TERRENO. No inventar retiros municipales, frente de calle, servidumbres, pendiente o ubicación. Si se desconocen, mostrar el dibujo de implantación como HIPOTÉTICO y solicitar validación del predio antes de proyectar estructura o permisos.'},
+  {id:'wall',title:'Muros, espesores y hachurados',tags:['muro','pared','espesor','hatch','hachurado','corte'],
+   text:'Dibujar espesores de muro con geometría editable y hachurado distinto a carpintería o mobiliario. Los espesores se ajustan según material y sistema constructivo: no asumir que una pared de 0,15 m satisface requisitos sísmicos, acústicos o contra incendio.'},
+  {id:'dimension',title:'Cotas, ejes y presentación CAD',tags:['cota','acotar','eje','plano','rotulo','escala','lamina'],
+   text:'Cotar exteriores, ejes principales, dimensiones totales y parciales con lectura jerárquica. Diferenciar área útil de área construida. Separar muros, aberturas, muebles, hatch, texto, cotas y terreno en capas. La escala real se configura al imprimir; el modelo se dibuja a tamaño verdadero.'},
+  {id:'access',title:'Accesibilidad y continuidad de recorridos',tags:['accesible','accesibilidad','silla de ruedas','rampa','pasillo'],
+   text:'Las rutas accesibles requieren comprobar paso libre continuo, radios de giro, puertas, cambios de nivel, baños, pendientes y señalización. Un pasillo de 1,20 m por sí solo no certifica accesibilidad. En viviendas de varios pisos se requiere solución vertical adecuada para el usuario.'},
+  {id:'safety',title:'Revisión estructural y seguridad',tags:['estructura','cimentacion','seguridad','construccion','necesario'],
+   text:'Un anteproyecto 2D no calcula cimentación, vigas, muros portantes ni acciones sísmicas. Escalera, ventilación, instalaciones, rutas de evacuación y seguridad deben revisarse con profesionales y normativa aplicable. No convertir la vista previa en un plano ejecutivo sin cálculo.'}
+ ];
+ const SHEETS=[
+  {id:'site',title:'Plano de implantación',contents:['linderos','retiros verificados','norte','accesos','cuadro de áreas','cotas globales'],scales:['1:100','1:200']},
+  {id:'ground',title:'Planta arquitectónica',contents:['muros y vanos','nombres de ambientes','mobiliario a escala','cotas','áreas útiles','norte'],scales:['1:50','1:75','1:100']},
+  {id:'upper',title:'Planta alta',contents:['núcleo de escalera superpuesto','baños','dormitorios','ventanas','cotas','vacíos'],scales:['1:50','1:75','1:100']},
+  {id:'roof',title:'Planta de cubierta',contents:['pendientes','bajantes','cumbreras','cotas','voladizos'],scales:['1:50','1:100']},
+  {id:'section',title:'Corte arquitectónico',contents:['niveles','escalera en sección','altura libre','losas','cubierta','mobiliario clave'],scales:['1:50','1:75']},
+  {id:'elevation',title:'Fachadas',contents:['alzados','niveles','aberturas','materiales','accesos'],scales:['1:50','1:100']},
+  {id:'door-window',title:'Cuadro de puertas y ventanas',contents:['identificador','tipo','ancho','altura','material','ubicación'],scales:['1:20','1:50']},
+  {id:'details',title:'Detalles constructivos',contents:['uniones','espesores','impermeabilización','escalera y barandas'],scales:['1:5','1:10','1:20']}
+ ];
+ function explain(question,limit=4){
+  const normal=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const words=[...new Set(normal(question).match(/[a-z]{4,}/g)||[])];
+  return GUIDES.map(g=>({...g,score:g.tags.reduce((v,tag)=>v+(words.some(w=>normal(tag).includes(w)||w.includes(normal(tag)))?1:0),0)}))
+   .filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,limit).map(({score,...rest})=>rest);
+ }
  const MODULES={
   social:{functions:['recibir','convivir','comer'],relations:['acceso','comedor','cocina'],privacy:'public'},
   kitchen:{functions:['preparar','cocinar','almacenar'],relations:['comedor','lavado'],privacy:'service'},
@@ -165,5 +214,5 @@
   return output;
  }
  return Object.freeze({version:'2026.11-estatico-1',sources:SOURCES,dimensions:DIMENSIONS,
-  templates:TEMPLATES,modules:MODULES,stairGeometry,auditRoom,auditPlan,classify});
+  templates:TEMPLATES,modules:MODULES,guides:GUIDES,sheets:SHEETS,explain,stairGeometry,auditRoom,auditPlan,classify});
 });
