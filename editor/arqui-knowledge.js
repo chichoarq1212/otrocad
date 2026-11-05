@@ -67,7 +67,29 @@
   {id:'narrow',title:'Casa en lote angosto',supported:false,
    description:'Guía tipológica para adosamiento y circulación longitudinal, todavía sin distribución automática.'},
   {id:'accessible',title:'Vivienda universalmente accesible',supported:false,
-   description:'Guía de circulaciones y radios de giro; requiere comprobación normativa y geométrica específica.'}
+   description:'Guía de circulaciones y radios de giro; requiere comprobación normativa y geométrica específica.'},
+  {id:'corner',title:'Casa en lote esquinero',supported:false,
+   description:'Relación con dos frentes, privacidad de dormitorios, esquinas visibles, iluminación y accesos diferenciados.'},
+  {id:'semi-detached',title:'Vivienda adosada a medianera',supported:false,
+   description:'Organización de locales iluminados en fachadas libres; ductos y patios sujetos a normativa.'},
+  {id:'courtyard-L',title:'Casa en L con patio',supported:false,
+   description:'Área social vinculada al patio y recámaras protegidas; revisar cubiertas y ventilación cruzada.'},
+  {id:'courtyard-U',title:'Casa en U con jardín central',supported:false,
+   description:'Tres alas que rodean espacio abierto; verificar anchos, recorridos y asoleamiento.'},
+  {id:'loft',title:'Vivienda loft y espacio flexible',supported:false,
+   description:'Ambientes integrados, privacidad de baño y alcoba; verificar alturas y aislamiento.'},
+  {id:'slope',title:'Vivienda en terreno inclinado',supported:false,
+   description:'Niveles escalonados, accesos y drenajes condicionados por topografía y estudio de suelos.'},
+  {id:'duplex-two-families',title:'Dúplex de dos unidades independientes',supported:false,
+   description:'Accesos separados, seguridad y aislamiento; no confundir con una casa unifamiliar de dos plantas.'},
+  {id:'studio',title:'Suite y vivienda de un dormitorio',supported:false,
+   description:'Cocina compacta, baño, circulación corta y espacio social flexible; requiere generador específico.'},
+  {id:'single-story-2',title:'Casa de dos dormitorios y una planta',supported:false,
+   description:'Entrada, sala-comedor, cocina, dos dormitorios y baño cercano al distribuidor.'},
+  {id:'family-4',title:'Casa familiar de cuatro dormitorios',supported:false,
+   description:'Zonificación de dormitorios, baños y áreas sociales; no forzar cuatro cuartos en esquema de tres.'},
+  {id:'multigenerational',title:'Casa multigeneracional',supported:false,
+   description:'Privacidad, dormitorio de planta baja, baño y accesos universales; revisar accesibilidad real.'}
  ];
 
  const GUIDES=[
