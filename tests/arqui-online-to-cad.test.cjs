@@ -4,6 +4,7 @@ const fs=require('node:fs');
 const planner=require('../editor/arqui-planner.js');
 const professional=require('../editor/arqui-professional.js');
 const userBridge=require('../editor/arqui-user-ai.js');
+const oauthBridge=require('../editor/arqui-oauth.js');
 const refs=require('../editor/arqui-references.js');
 const script=fs.readFileSync('editor/arqui-assistant.js','utf8');
 const nodes={};
@@ -61,7 +62,7 @@ const api={
  fit:()=>{fitCalled=true},
 };
 const store={entries:new Map(),getItem(k){return this.entries.get(k)||null},setItem(k,v){this.entries.set(k,v)}};
-const window={OtroCadUserAI:userBridge,OtroCadArquiPlanner:planner,OtroCadArquiProfessional:professional,OtroCadArquiReferences:refs,OtroCadCivilAPI:api,addEventListener(){}};
+const window={OtroCadUserAI:userBridge,OtroCadArquiOAuth:oauthBridge,OtroCadArquiPlanner:planner,OtroCadArquiProfessional:professional,OtroCadArquiReferences:refs,OtroCadCivilAPI:api,addEventListener(){}};
 const context={window,document,location:{href:'https://example.org/editor/'},localStorage:store,
  MutationObserver:class{observe(){}},queueMicrotask:cb=>cb(),URL,AbortController,
  confirm:text=>{confirmations.push(text);return true},console,setTimeout,clearTimeout,Date,Number,Math};
