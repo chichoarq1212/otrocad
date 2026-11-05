@@ -51,6 +51,7 @@
    Object.assign(parsed,{dimensionMeaning:house?'house':'site',
     siteDeclared:!!site,siteAssumed:false,explicitSite:!!site,explicitHouse:!!house,
     garage:false,garageSpaces:1,frontSetback:0,backSetback:0,sideSetback:0,
+    mainSuite:false,walkInCloset:false,socialBath:false,
     patioDepth:0,patioLaundry:false,rearDoor:false,laundry:false,garden:false,
     gardenFrontDepth:0,gardenBackDepth:0,kitchenIsland:false,bathrooms:0});
   }
@@ -75,10 +76,10 @@
      parsed[labels[m[1]]]=decimal(m[2]);
    }
   }
-  if(/(?:garaje|garage|estacionamiento|parqueadero|parquear|parque\s+\d+\s*carros?)/.test(s)&&
+  if(/(?:garaje|garage|estacionamiento|parqueadero|parqueo|parquear|parque\s+\d+\s*carros?)/.test(s)&&
    !/\bsin\s+(?:garaje|garage|estacionamiento|parqueadero)/.test(s)){
    parsed.garage=true;
-   if(/(?:garaje|garage|estacionamiento|parqueadero|parque).{0,40}?\b2\s*(?:carros?|autos?|vehiculos?|puestos?|plazas?)/.test(s)||
+   if(/(?:garaje|garage|estacionamiento|parqueadero|parqueo|parque).{0,40}?\b2\s*(?:carros?|autos?|vehiculos?|puestos?|plazas?)/.test(s)||
      /\b2\s*(?:carros?|autos?|vehiculos?)\b/.test(s))parsed.garageSpaces=2;
   }
   if(/\bsin\s+(?:garaje|garage|estacionamiento|parqueadero)/.test(s))parsed.garage=false;
@@ -123,8 +124,16 @@
   if(s.bedrooms!==3||s.floors!==2)
    throw Error('La tipología compacta verificada atiende 3 dormitorios y 2 plantas. Para otro programa selecciona una tipología y dimensiones compatibles.');
   if(s.accessible)throw Error('El proyecto accesible exige una distribución distinta, radios de giro y continuidad vertical; no se certifica automáticamente.');
-  if(s.garage&&s.garageSpaces===2&&s.frontSetback<5.3)
+  if(s.siteDeclared&&s.garage&&s.garageSpaces===2&&s.frontSetback<5.3)
    throw Error('El parqueo de dos vehículos necesita una franja frontal mínima propuesta de 5,3 m.');
+  if(s.siteDeclared){
+   if(W+2*s.sideSetback>s.lotWidth+.001||
+      D+s.frontSetback+s.backSetback>s.lotDepth+.001)
+    throw Error('La casa de '+W+' × '+D+' m no cabe con los retiros indicados en el terreno de '+
+     s.lotWidth+' × '+s.lotDepth+' m. No reduciré ni inventaré los retiros.');
+   if(s.gardenFrontDepth>s.frontSetback+.001&&s.frontSetback>0)
+    throw Error('El jardín frontal solicitado no cabe dentro del retiro frontal declarado.');
+  }
   const H=1.36,rightW=clamp((W-H)*.43,3.7,4.8),L=round(W-H-rightW),R=round(L+H);
   if(L<4.5)throw Error('El ancho útil no permite integrar la suite y la circulación.');
   const wallInner=s.wallInner,wallOut=s.wallOuter;
@@ -159,7 +168,7 @@
   corridor.clearWidth=hallClear;corridor.netArea=round(hallClear*D);
   const basic={width:W,depth:D,hallStart:L,hallWidth:H,
    layoutKind:'compact-coherent-v3',stair:{x:R,y:0,width:rightW,depth:stairDepth,height:2.8,
-    spec:stair},sitePlan:'hypothetical',usableHall:hallClear};
+    spec:stair},sitePlan:s.siteDeclared?'declared':'none',usableHall:hallClear};
   const ground={
    ...basic,level:1,x:X,y:Y,
    leftParts:[{name:'SALA - COMEDOR',y:0,depth:groundSplit},{name:'COCINA CON ISLA',y:groundSplit,depth:round(D-groundSplit)}],
@@ -204,22 +213,31 @@
     right:[1.35,stairDepth+(secondSplit-stairDepth)/2,secondSplit+lastBath/2]}
   };
   const floors=[ground,upper],garage=s.garage?{
-   x:.2,y:.2,width:s.garageSpaces===2?5.1:2.7,depth:5.1,
+   x:s.siteDeclared?s.sideSetback+.2:.2,y:s.siteDeclared?.2:-5.3,
+   width:s.garageSpaces===2?5.1:2.7,depth:5.1,
    spaces:s.garageSpaces,layout:'side-by-side'}:null;
-  const patio=s.patioDepth>0?{x:0,y:Y+D,width:s.lotWidth,depth:s.patioDepth,laundry:!!s.patioLaundry}:null;
+  const patio=s.patioDepth>0?{
+   x:s.siteDeclared?X:0,y:Y+D,width:W,depth:s.patioDepth,laundry:!!s.patioLaundry}:null;
+  const gardens=[];
+  if(s.gardenFrontDepth>0)gardens.push({where:'front',x:s.siteDeclared?X:0,
+   y:s.siteDeclared?Math.max(0,Y-s.gardenFrontDepth):-s.gardenFrontDepth,
+   width:s.garage?Math.max(0,W-5.4):W,
+   depth:s.gardenFrontDepth,offsetX:s.garage?5.4:0});
+  if(s.gardenBackDepth>0)gardens.push({where:'rear',x:X,
+   y:Y+D+(s.patioDepth||0),width:W,depth:s.gardenBackDepth,offsetX:0});
   const warnings=[
    'Tipología local: dos plantas con escalera en U exactamente superpuesta y dos baños (máster con entrada privada y compartido al pasillo).',
    'Circulación libre prevista '+hallClear+' m. Escalera: '+stair.risers+' contrahuellas de '+stair.riser+
     ' m, huellas de '+stair.tread+' m y descanso de '+stair.landing+' m (referencia, no cálculo estructural).',
-   'Parcela de '+s.lotWidth+' × '+s.lotDepth+' m '+(s.siteAssumed?'HIPOTÉTICA, NO LOTE VERIFICADO.':'indicada, retiros pendientes de contrastar.')+
-   ' Verificar ventanas y ventilación de baño máster (posible extracción mecánica), altura libre bajo escalera y normativa local.'
+   (s.siteDeclared?'Terreno declarado por el usuario: '+s.lotWidth+' × '+s.lotDepth+' m. Retiros introducidos: '+s.frontSetback+' / '+s.backSetback+' / '+s.sideSetback+' m.':'NO se definió terreno ni retiros: se representa solo la huella construida y las áreas exteriores expresamente mencionadas.')+
+   ' Verificar ventilación del baño máster, altura libre bajo escalera y normativa local.'
   ];
   const audit=k.auditPlan({spec:s,floors});
   const invalid=audit.filter(x=>x.severity==='error');
   if(invalid.length)throw Error('Revisión espacial: '+invalid.slice(0,3).map(x=>x.message).join(' '));
   if(audit.some(x=>x.severity==='error'))
    warnings.push('Se detectaron dimensiones por revisar: la biblioteca local las muestra, pero no equivalen a licencia municipal.');
-  return {spec:s,floors,warnings,audit,garage,patio,layoutKind:'compact-coherent-v3',
+  return {spec:s,floors,warnings,audit,garage,patio,gardens,layoutKind:'compact-coherent-v3',
    knowledgeVersion:k.version,references:{criterios:'RTAU Quito 2024; MIDUVI VIS 2024; IRC comparativo',
     Plazola:'referencia bibliográfica; libro no incluido',Neufert:'referencia bibliográfica; libro no incluido'},
    provenance:'Anteproyecto estático local sin IA; verificar sitio, ordenanza, escaleras, luz, ventilación, estructura y accesibilidad.'};
