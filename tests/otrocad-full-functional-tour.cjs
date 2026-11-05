@@ -123,6 +123,7 @@ async function roundTrip(download){
  check('Presentaciones de papel / Layout',{tabs:layouts.slice(0,8)});
  await command('MODEL');
  checkpoint='files';
+ await page.locator('#tabs [data-tab="file"]').click();
  const [project]=await Promise.all([
   page.waitForEvent('download',{timeout:15000}),page.locator('#project').click()
  ]);
