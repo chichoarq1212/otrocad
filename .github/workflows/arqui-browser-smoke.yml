@@ -1,4 +1,4 @@
-name: Verificar El Arqui en navegador real
+name: Verificar motor arquitectónico estático en Chrome
 
 on:
   push:
@@ -39,12 +39,12 @@ jobs:
           done
           cat /tmp/otrocad-http.log
           exit 1
-      - name: Probar IA gratuita simulada → plano CAD real en Chrome
+      - name: Probar biblioteca local → escaleras → plano CAD sin llamadas IA
         run: node tests/arqui-browser-smoke.cjs
       - name: Conservar captura y resultado del navegador
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: arqui-browser-smoke
+          name: arqui-local-browser-capturas
           path: /tmp/otrocad-browser-smoke/
           if-no-files-found: ignore
