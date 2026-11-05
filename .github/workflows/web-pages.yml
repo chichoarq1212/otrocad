@@ -76,6 +76,9 @@ jobs:
           node --check editor/arqui-oauth.js
           node --check tests/arqui-user-ai.test.cjs
           node tests/arqui-user-ai.test.cjs
+          node --check workers/arqui-auto.js
+          node --check tests/arqui-auto.test.cjs
+          node tests/arqui-auto.test.cjs
           node --check editor/arqui-references.js
           node --check editor/arqui-assistant.js
           node --check tests/arqui-planner.test.cjs
