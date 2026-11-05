@@ -32,7 +32,7 @@ jobs:
         shell: pwsh
         run: |
           node scripts/build-pages.cjs
-          node tests/arqui-windows-proxy.test.cjs
+          node tests/arqui-static-architecture.test.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m pip install --disable-pip-version-check Pillow==11.3.0
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
