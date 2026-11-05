@@ -2,6 +2,7 @@
 const { app, BrowserWindow, session, protocol } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const { serveArquiRequest } = require('./arqui-proxy.cjs');
 const smoke = process.argv.includes('--smoke-test');
 
 protocol.registerSchemesAsPrivileged([{
@@ -16,6 +17,9 @@ app.whenReady().then(async () => {
   await protocol.handle('otrocad', async request => {
     const url = new URL(request.url);
     if (url.hostname !== 'app') return new Response('Not found', { status: 404 });
+    if (url.pathname === '/api/arqui' || url.pathname === '/api/arqui/status') {
+      return serveArquiRequest(request, { offline: smoke });
+    }
     let relative;
     try { relative = decodeURIComponent(url.pathname).replace(/^\/+/, ''); }
     catch (_) { return new Response('Bad path', { status: 400 }); }
@@ -35,7 +39,9 @@ app.whenReady().then(async () => {
     } catch (_) { return new Response('Not found', { status: 404 }); }
   });
 
-  // Only the bundled application origin is permitted; the packaged editor works without network access.
+  // The renderer remains isolated from Internet hosts. Main-process API proxy is
+  // the only network exception, and it forwards exclusively two fixed OtroCAD paths.
+  // Drawing and DWG operations continue to work fully offline.
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
     callback({ cancel: !details.url.startsWith('otrocad:') && !details.url.startsWith('data:') && !details.url.startsWith('blob:') && !details.url.startsWith('devtools:') });
   });
