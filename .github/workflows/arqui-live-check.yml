@@ -41,3 +41,10 @@ jobs:
           else:
               print('Automatic AI backend enabled; current per-connection remaining:',data['remaining'])
           PY
+          echo "Checking simplified client UI is deployed"
+          curl --fail --silent --show-error --location --max-time 20 \
+            https://otrocad.cristhian-torres-arq.workers.dev/editor/arqui-assistant.js \
+            -o /tmp/arqui-assistant-live.js
+          grep -Fq 'id="arquiCloudStatus"' /tmp/arqui-assistant-live.js
+          grep -Fq 'id="arquiAiSettings" class="arqui-details" hidden' /tmp/arqui-assistant-live.js
+          echo "Live OtroCAD has automatic quota UI and hidden provider setup."
