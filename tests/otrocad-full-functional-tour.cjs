@@ -149,6 +149,17 @@ async function roundTrip(download){
  const imported=await entityCount();
  assert.equal(imported,parsed.shapes.length,'JSON import count mismatch');
  check('Reimportación de proyecto y objetos editables',{objects:imported});
+ checkpoint='dxf-roundtrip';
+ await page.locator('#file').setInputFiles({name:'tour-reimport.dxf',mimeType:'application/dxf',buffer:dxf.contents});
+ await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('tour-reimport.dxf'),null,{timeout:13000});
+ const dxfImported=await page.evaluate(()=>({
+  count:window.OtroCadCivilAPI.getObjects().length,
+  types:[...new Set(window.OtroCadCivilAPI.getObjects().map(o=>o.type))],
+  status:document.querySelector('#status')?.textContent
+ }));
+ assert(dxfImported.count>=10,'DXF exported by OtroCAD should import with editable entities');
+ assert(dxfImported.types.includes('line'),'DXF round trip lost all lines');
+ check('Reimportación DXF real con geometría editable',dxfImported);
  checkpoint='mobile';
  await page.setViewportSize({width:390,height:844});
  const mobile=await page.evaluate(()=>{
