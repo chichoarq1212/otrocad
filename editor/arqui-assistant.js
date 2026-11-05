@@ -108,7 +108,7 @@ const endpoint=(()=>{
  // Same-origin automatic service: no user registration and no API key.
  const raw=window.OTROCAD_ARQUI_AI_ENDPOINT||(location.hostname?.endsWith('.github.io')?'':new URL('/api/arqui',location.href).href);
  if(typeof raw!=='string'||!raw)return null;
- try{const url=new URL(raw,location.href);return url.protocol==='https:'||url.hostname==='localhost'||url.hostname==='127.0.0.1'?url:null}
+ try{const url=new URL(raw,location.href);return url.protocol==='https:'||(url.protocol==='otrocad:'&&url.hostname==='app')||url.hostname==='localhost'||url.hostname==='127.0.0.1'?url:null}
  catch(_){return null}
 })();
 let autoEnabled=null;
