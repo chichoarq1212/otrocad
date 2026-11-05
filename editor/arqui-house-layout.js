@@ -4,6 +4,7 @@
 (function(root){
  'use strict';
  const prev=root.OtroCadArquiPlanner;
+ const knowledge=root.OtroCadArchitecturalKnowledge;
  if(!prev)return;
  const parseLocal=prev.parsePrompt,validateLocal=prev.validateSpec,designLocal=prev.design,interpretLocal=prev.interpret;
  const round=n=>Math.round(n*1000)/1000;
@@ -61,66 +62,105 @@
   return validateSpec(parsed);
  }
  function designHouse(s){
-  const W=s.houseWidth,D=s.houseDepth;
-  if(W<9.4||D<7.7)throw Error('La casa de '+W+' × '+D+' m necesita otra tipología para acomodar los dormitorios y sus baños sin espacios insuficientes.');
-  if(s.bedrooms!==3)throw Error('Esta distribución compacta todavía está ajustada a tres habitaciones; no aplicaré un número diferente sin rediseñarla.');
-  if(s.floors!==2)throw Error('La propuesta de casa '+W+' × '+D+' m con tres dormitorios, dos baños y zona social requiere estudiar dos plantas. No fingiré que cabe en una sola.');
-  if(!s.garage&&s.frontSetback>0)throw Error('Revisa la franja frontal asignada al parqueo.');
-  if(s.garageSpaces===2&&s.frontSetback<5.3)throw Error('Dos carros frontales requieren una profundidad preliminar de 5,3 m para parqueo.');
-  const hall=1.35,rightW=clamp((W-hall)*.43,3.7,4.8),leftW=round(W-hall-rightW);
-  if(leftW<3.65)throw Error('No queda ancho suficiente para sala, cocina y circulación.');
-  const startX=s.sideSetback,startY=s.frontSetback;
-  function makeFloor(level,left,right){
-   const partsL=[],partsR=[],rooms=[];
-   function add(items,x0,width,side,parts){
-    let y=0;
-    for(let i=0;i<items.length;i++){
-     const item=items[i],depth=round(i===items.length-1?D-y:item.depth);
-     const part={name:item.name,y:round(y),depth,kind:item.kind||'room'};
-     parts.push(part);
-     const clearWidth=round(width-(s.wallOuter+s.wallInner)/2),clearDepth=round(depth-(s.wallOuter+s.wallInner)/2);
-     rooms.push({name:item.name,kind:part.kind,side,x:x0,y:round(y),width,depth,
-      area:round(width*depth),clearWidth,clearDepth,netArea:round(clearWidth*clearDepth)});
-     y+=depth;
-    }
-   }
-   add(left,0,leftW,'left',partsL);add(right,leftW+hall,rightW,'right',partsR);
-   rooms.push({name:'PASILLO',kind:'circulation',side:'center',x:leftW,y:0,width:hall,depth:D,
-    area:round(hall*D),clearWidth:round(hall-s.wallInner),clearDepth:D,netArea:round((hall-s.wallInner)*D)});
-   return {level,x:startX+(level-1)*(s.lotWidth+3),y:startY,width:W,depth:D,
-    hallStart:leftW,hallWidth:hall,rooms,leftParts:partsL,rightParts:partsR};
+  const W=s.houseWidth,D=s.houseDepth,k=knowledge;
+  if(!k)throw Error('Falta cargar la biblioteca arquitectónica local.');
+  if(W<9.4||D<7.7)
+   throw Error('Casa '+W+' × '+D+' m: la tipología de tres dormitorios en dos plantas necesita al menos 9,4 × 7,7 m. No forzaré habitaciones ni escaleras demasiado pequeñas.');
+  if(s.bedrooms!==3||s.floors!==2)
+   throw Error('La tipología compacta verificada atiende 3 dormitorios y 2 plantas. Para otro programa selecciona una tipología y dimensiones compatibles.');
+  if(s.accessible)throw Error('El proyecto accesible exige una distribución distinta, radios de giro y continuidad vertical; no se certifica automáticamente.');
+  if(s.garage&&s.garageSpaces===2&&s.frontSetback<5.3)
+   throw Error('El parqueo de dos vehículos necesita una franja frontal mínima propuesta de 5,3 m.');
+  const H=1.36,rightW=clamp((W-H)*.43,3.7,4.8),L=round(W-H-rightW),R=round(L+H);
+  if(L<4.5)throw Error('El ancho útil no permite integrar la suite y la circulación.');
+  const wallInner=s.wallInner,wallOut=s.wallOuter;
+  const hallClear=round(H-wallInner);
+  if(hallClear<k.dimensions.corridor.clearWidth-.01)
+   throw Error('Pasillo libre '+hallClear+' m insuficiente para el objetivo de '+k.dimensions.corridor.clearWidth+' m.');
+  const stairDepth=round(clamp(D*.44,3.48,3.74));
+  const stair=k.stairGeometry({height:2.8,width:rightW,depth:stairDepth});
+  const groundSplit=round(clamp(D*.50-Number(s.kitchenExtra||0)+Number(s.livingExtra||0),3.6,D-3.85));
+  const upperSplit=round(clamp(D*.54+Number(s.bedroomExtra||0),4.15,D-3.15));
+  const lastBath=round(Math.max(1.95,Math.min(2.1,D*.24)));
+  const secondSplit=round(D-lastBath);
+  if(secondSplit-stairDepth<2.75)
+   throw Error('La habitación secundaria necesita al menos 2,75 m de fondo entre escalera y baño.');
+  const suiteWidth=round(Math.min(1.85,Math.max(1.65,L*.34)));
+  const suiteX=round(L-suiteWidth),vestDepth=round(Math.min(2.07,upperSplit*.48));
+  if(suiteX<2.85||upperSplit-vestDepth<2.05)
+   throw Error('No se puede dibujar el baño máster con acceso privado y dormitorio útil.');
+  const X=s.sideSetback,Y=s.frontSetback;
+  function room(name,kind,side,x,y,w,d){
+   const clearW=round(w-(wallOut+wallInner)/2),clearD=round(d-(wallOut+wallInner)/2);
+   return {name,kind,side,x:round(x),y:round(y),width:round(w),depth:round(d),
+    area:round(w*d),clearWidth:clearW,clearDepth:clearD,netArea:round(clearW*clearD)};
   }
-  const ground=makeFloor(1,[
-    {name:'SALA - COMEDOR',depth:round(clamp(D*.49+Number(s.livingExtra||0)-Number(s.kitchenExtra||0),3.15,D-2.9))},
-    {name:s.kitchenIsland?'COCINA CON ISLA':'COCINA',depth:round(D*.51)}
-   ],[
-    {name:'ESCALERA',kind:'stairs',depth:round(D*.47)},
-    {name:s.socialBath?'BAÑO SOCIAL / SERVICIO':'ESTAR / ACCESO',kind:s.socialBath?'bath':'room'}
-   ]);
-  const upper=makeFloor(2,[
-    {name:s.mainSuite?'DORMITORIO PRINCIPAL':'DORMITORIO 1',kind:'bedroom',depth:round(D*.65)},
-    {name:'BAÑO MÁSTER',kind:'bath'}
-   ],[
-    {name:'DORMITORIO 2',kind:'bedroom',depth:round(D*.35)},
-    {name:'DORMITORIO 3',kind:'bedroom',depth:round(D*.35)},
-    {name:'BAÑO COMPARTIDO',kind:'bath'}
-   ]);
-  const floors=[ground,upper];
-  const garage=s.garage?{x:.3,y:.2,width:s.garageSpaces===2?6.0:3,depth:5.1,spaces:s.garageSpaces,layout:'side-by-side'}:null;
-  const patio=s.patioDepth>0?{x:0,y:startY+D,width:s.lotWidth,depth:s.patioDepth,laundry:s.patioLaundry}:null;
+  const corridor=room('PASILLO','circulation','center',L,0,H,D);
+  corridor.clearWidth=hallClear;corridor.netArea=round(hallClear*D);
+  const basic={width:W,depth:D,hallStart:L,hallWidth:H,
+   layoutKind:'compact-coherent-v3',stair:{x:R,y:0,width:rightW,depth:stairDepth,height:2.8,
+    spec:stair},sitePlan:'hypothetical',usableHall:hallClear};
+  const ground={
+   ...basic,level:1,x:X,y:Y,
+   leftParts:[{name:'SALA - COMEDOR',y:0,depth:groundSplit},{name:'COCINA CON ISLA',y:groundSplit,depth:round(D-groundSplit)}],
+   rightParts:[{name:'ESCALERA',y:0,depth:stairDepth},{name:'ESTAR / ESTUDIO',y:stairDepth,depth:round(D-stairDepth)}],
+   rooms:[
+    room('SALA - COMEDOR','living-dining','left',0,0,L,groundSplit),
+    room(s.kitchenIsland?'COCINA CON ISLA':'COCINA','kitchen','left',0,groundSplit,L,D-groundSplit),
+    room('ESCALERA','stairs','right',R,0,rightW,stairDepth),
+    room('ESTAR / ESTUDIO','study','right',R,stairDepth,rightW,D-stairDepth),
+    corridor
+   ],
+   partitions:{left:[groundSplit],right:[stairDepth]},
+   doors:{left:[{y:1.85,width:.96},{y:groundSplit+(D-groundSplit)/2,width:.86}],
+    right:[{y:2.25,width:.90},{y:stairDepth+(D-stairDepth)/2,width:.86}]},
+   openings:{frontDoor:true,backDoor:!!s.rearDoor,openSocial:!!s.openKitchen},
+   windows:{left:[1.25,groundSplit+(D-groundSplit)*.60],
+    right:[1.35,stairDepth+(D-stairDepth)*.65]}
+  };
+  const master=room('DORMITORIO PRINCIPAL','bedroom','master',0,0,suiteX,upperSplit);
+  master.kind='bedroom';master.roomType='master';
+  const vestibule=room('ACCESO / CLOSET MÁSTER','closet','suite-vestibule',suiteX,0,suiteWidth,vestDepth);
+  const masterBath=room('BAÑO MÁSTER','bath','suite-bath',suiteX,vestDepth,suiteWidth,upperSplit-vestDepth);
+  const upper={
+   ...basic,level:2,x:X+(s.lotWidth+3),y:Y,
+   leftParts:[{name:'SUITE MÁSTER',y:0,depth:upperSplit},{name:'DORMITORIO 3',y:upperSplit,depth:round(D-upperSplit)}],
+   rightParts:[{name:'ESCALERA',y:0,depth:stairDepth},{name:'DORMITORIO 2',y:stairDepth,depth:round(secondSplit-stairDepth)},
+    {name:'BAÑO COMPARTIDO',y:secondSplit,depth:lastBath}],
+   rooms:[
+    master,vestibule,masterBath,
+    room('DORMITORIO 3','bedroom','left',0,upperSplit,L,D-upperSplit),
+    room('ESCALERA','stairs','right',R,0,rightW,stairDepth),
+    room('DORMITORIO 2','bedroom','right',R,stairDepth,rightW,secondSplit-stairDepth),
+    room('BAÑO COMPARTIDO','bath','right',R,secondSplit,rightW,lastBath),
+    {...corridor}
+   ],
+   partitions:{left:[upperSplit],right:[stairDepth,secondSplit],suiteX,suiteBathY:vestDepth,suiteEndY:upperSplit},
+   doors:{left:[{y:1.05,width:.86},{y:upperSplit+(D-upperSplit)/2,width:.86}],
+    right:[{y:2.25,width:.90},{y:stairDepth+(secondSplit-stairDepth)/2,width:.86},
+     {y:secondSplit+lastBath/2,width:.76}]},
+   openings:{frontDoor:false,backDoor:false,openSocial:false},
+   windows:{left:[1.30,upperSplit+(D-upperSplit)/2],
+    right:[1.35,stairDepth+(secondSplit-stairDepth)/2,secondSplit+lastBath/2]}
+  };
+  const floors=[ground,upper],garage=s.garage?{
+   x:.2,y:.2,width:s.garageSpaces===2?5.1:2.7,depth:5.1,
+   spaces:s.garageSpaces,layout:'side-by-side'}:null;
+  const patio=s.patioDepth>0?{x:0,y:Y+D,width:s.lotWidth,depth:s.patioDepth,laundry:!!s.patioLaundry}:null;
   const warnings=[
-   'Se interpretaron '+W+' × '+D+' m como medidas de CASA, no del terreno.',
-   'Parcela hipotética de '+s.lotWidth+' × '+s.lotDepth+' m: incluye '+s.frontSetback+' m de franja frontal para parqueo y '+s.patioDepth+' m de patio. Confirmar el predio real.',
-   'Se propone dos plantas y escalera conceptual. Verificar huellas, descansos, altura libre, estructura, ventilación y ordenanzas locales antes de construir.'
+   'Tipología local: dos plantas con escalera en U exactamente superpuesta y dos baños (máster con entrada privada y compartido al pasillo).',
+   'Circulación libre prevista '+hallClear+' m. Escalera: '+stair.risers+' contrahuellas de '+stair.riser+
+    ' m, huellas de '+stair.tread+' m y descanso de '+stair.landing+' m (referencia, no cálculo estructural).',
+   'Parcela de '+s.lotWidth+' × '+s.lotDepth+' m '+(s.siteAssumed?'HIPOTÉTICA, NO LOTE VERIFICADO.':'indicada, retiros pendientes de contrastar.')+
+   ' Verificar ventanas y ventilación de baño máster (posible extracción mecánica), altura libre bajo escalera y normativa local.'
   ];
-  if(s.assumedLevels)warnings.unshift('Dos plantas propuestas por el motor para acomodar los tres dormitorios y sus dos baños; puedes solicitar otra alternativa.');
-  const audit=floors.flatMap(f=>f.rooms.filter(r=>r.kind==='bedroom'&&r.netArea<9).map(r=>({
-   severity:'warning',floor:f.level,room:r.name,
-   message:'Dormitorio por debajo del objetivo orientativo de 9 m²: '+r.netArea+' m².'
-  })));
-  return {spec:s,floors,warnings,audit,garage,patio,
-   references:{Plazola:'sin biblioteca autorizada vinculada',Neufert:'sin biblioteca autorizada vinculada'},
-   provenance:'Anteproyecto esquemático sin confirmación del terreno, aprobación normativa ni viabilidad estructural.'};
+  const audit=k.auditPlan({spec:s,floors});
+  if(audit.some(x=>x.severity==='error'))
+   warnings.push('Se detectaron dimensiones por revisar: la biblioteca local las muestra, pero no equivalen a licencia municipal.');
+  return {spec:s,floors,warnings,audit,garage,patio,layoutKind:'compact-coherent-v3',
+   knowledgeVersion:k.version,references:{criterios:'RTAU Quito 2024; MIDUVI VIS 2024; IRC comparativo',
+    Plazola:'referencia bibliográfica; libro no incluido',Neufert:'referencia bibliográfica; libro no incluido'},
+   provenance:'Anteproyecto estático local sin IA; verificar sitio, ordenanza, escaleras, luz, ventilación, estructura y accesibilidad.'};
  }
  function design(input){
   const s=validateSpec(input);
