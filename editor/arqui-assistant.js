@@ -223,7 +223,7 @@ function makePreview(next,announce=false){
     (info.siteDeclared?'El terreno de '+info.lotWidth+' × '+info.lotDepth+' m fue indicado en el encargo. Retiros registrados: frontal '+info.frontSetback+', posterior '+info.backSetback+', lateral '+info.sideSetback+' m. ':
     'NO se inventa ninguna parcela ni retiro. Solo dibujo exteriores que realmente hayas solicitado: '+(info.garage?'parqueo; ':'')+(info.patioDepth?'patio; ':'')+(info.garden?'jardín; ':'')+'los demás quedan sin definir. ');
    const baths=plan.floors.reduce((n,f)=>n+f.rooms.filter(r=>r.kind==='bath').length,0);
-   const detail='Organicé '+rooms+' espacios, '+info.bedrooms+' dormitorios, '+baths+' baños y '+(plan.garage?plan.garage.spaces+' parqueo(s)':'sin plaza de estacionamiento dibujada')+
+   const detail='Te propongo '+rooms+' espacios, '+info.bedrooms+' dormitorios, '+baths+' baños y '+(plan.garage?plan.garage.spaces+' parqueo(s)':'sin plaza de estacionamiento dibujada')+
     '. Muros exteriores de '+Math.round(info.wallOuter*100)+' cm e interiores de '+Math.round(info.wallInner*100)+' cm; '+(info.furniture?'mobiliario, ':'')+(info.wallHatch?'hachurado, ':'')+(info.dimensions?'cotas, ':'')+
     'puertas y ventanas reales. Áreas por planta: '+areas.join(' / ')+' m² útiles aproximados. ';
    const notes=plan.warnings.slice(0,2).join(' ');
