@@ -1,11 +1,14 @@
 # El Arqui IA — Arquitectura asistida en OtroCAD
 
-## Noviembre 2026 · IA en línea por usuario, sin facturación compartida
+## Noviembre 2026 · IA automática sin configuración del visitante
 
-La arquitectura vigente NO emplea Cloudflare Workers AI ni una API central pagada por el dueño.
-Cada usuario puede conectar **OpenRouter con un clic mediante OAuth PKCE** y solicitar solamente `openrouter/free`, o usar su propia cuenta API gratuita de Gemini/Groq. También admite OpenAI API personal, opcional y potencialmente facturable al usuario. Las claves residen solo en memoria de la pestaña y nunca se guardan en GitHub, OtroCAD o Cloudflare; la autorización OAuth usa un verificador temporal de sesión, que se elimina al regresar.
+La integración vigente utiliza una **ruta automática del mismo dominio** `/api/arqui` y **no pide al usuario seleccionar OpenRouter, Gemini o API keys**. Es un backend opcional para el propietario, con modelo pequeño de Cloudflare Workers AI.
 
-El módulo de dibujo geométrico sigue siendo local y está disponible sin clave; la IA remota interpreta lenguaje natural y propone un programa validado antes de crear geometría CAD editable. Los planes municipales, estructura y distribuciones espaciales completamente libres requieren comprobación independiente. Ver [guía actual de IA sin costo compartido](ARQUI_IA_SIN_COSTO.md).
+Para limitar el consumo: **2 consultas por IP/día UTC** y **20 para todo OtroCAD/día UTC**. Las cuotas se reservan con SQLite Durable Objects; si el cupo se agota o falta un componente, no se llama al modelo. En modo Workers **Free**, los créditos de Workers AI tienen límite gratuito y se bloquean al agotarse. No afirmar $0 en Workers Paid.
+
+**La IA remota está desactivada hasta que el propietario configure `ARQUI_AUTO_ENABLED=yes` en Cloudflare y confirme los bindings `AI` y `ARQUI_BUDGET`**. Mientras tanto funciona el diseño CAD local. Las propuestas IA y el modelo local aún no sustituyen un diseño arquitectónico libre ni la revisión normativa. Consulta [guía actual de activación segura](ARQUI_IA_AUTOMATICA.md).
+
+El modo BYOK con OAuth fue una etapa anterior de desarrollo; el panel de proveedores se ocultó porque agregaba fricción al visitante.
 
 ## Actualización del 4 de noviembre de 2026 · conversación y fuentes
 
