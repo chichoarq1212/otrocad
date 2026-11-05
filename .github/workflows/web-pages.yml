@@ -79,6 +79,8 @@ jobs:
           node tests/arqui-planner.test.cjs
           node --check tests/arqui-house-layout.test.cjs
           node tests/arqui-house-layout.test.cjs
+          node --check tests/arqui-natural-language.test.cjs
+          node tests/arqui-natural-language.test.cjs
           node --check tests/arqui-static-architecture.test.cjs
           node tests/arqui-static-architecture.test.cjs
           node --check tests/arqui-assistant.test.cjs
