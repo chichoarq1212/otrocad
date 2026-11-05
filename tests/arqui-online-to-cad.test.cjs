@@ -100,7 +100,8 @@ async function testOnlineToEditableCad(){
  };
  const captured=[];
  let httpStatus=200;
- context.fetch=async(url,options)=>{
+ context.fetch=async function(url,options){
+  assert.strictEqual(this,window,'Browser fetch must retain Window receiver');
   captured.push({url,options});
   if(httpStatus===429)return {ok:false,status:429,json:async()=>({error:{message:'limit'}})};
   return {ok:true,status:200,json:async()=>({choices:[{message:{content:JSON.stringify(answer)}}]})};
