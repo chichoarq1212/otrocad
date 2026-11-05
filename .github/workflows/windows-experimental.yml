@@ -32,6 +32,8 @@ jobs:
         shell: pwsh
         run: |
           node scripts/build-pages.cjs
+          node tests/arqui-windows-proxy.test.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m pip install --disable-pip-version-check Pillow==11.3.0
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python desktop/create_windows_icon.py icon-512.png desktop/build/otrocad.ico
@@ -73,7 +75,7 @@ jobs:
         with:
           tag_name: windows-experimental-${{ github.run_id }}-${{ github.run_attempt }}
           target_commitish: ${{ github.sha }}
-          name: OtroCAD Windows 0.5.6 experimental · ${{ github.run_id }}
+          name: OtroCAD Windows 0.6.1 experimental · ${{ github.run_id }}
           prerelease: true
           make_latest: false
           body: |
