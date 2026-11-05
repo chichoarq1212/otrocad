@@ -3,6 +3,8 @@
 **Versión 2026.11.4** — la IA generativa, el backend Workers AI, el inicio de sesión y las claves API fueron retirados del proyecto. No existe endpoint para inferencia y el editor funciona en web, PWA/Android y Windows sin consultar modelos externos.
 
 ## Biblioteca incorporada (código abierto de OtroCAD)
+
+Incluye **17 fichas de tipologías residenciales**, **15 guías de diseño** y **8 formatos orientativos de planos**, disponibles localmente. Las fichas distinguen distribuciones automáticas implementadas de programas que todavía requieren diseño manual.
 - `editor/arqui-knowledge.js`: fichas locales de vivienda, dimensiones orientativas, escaleras en U, mobiliario, relaciones entre áreas social/privada/servicio, reglas auditables y tipologías.
 - `editor/arqui-references.js`: fichas bibliográficas públicas de **Neufert** y **Plazola**, fuentes municipales ecuatorianas, bibliografía y extractos TXT/MD que los usuarios cargan en su dispositivo. **No están incorporados los libros protegidos por derechos de autor**.
 - `editor/arqui-house-layout.js`: interpreta instrucciones frecuentes en español, diferencia casa vs terreno, resuelve la tipología compacta de tres dormitorios en dos plantas.
