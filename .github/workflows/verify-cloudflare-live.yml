@@ -81,7 +81,7 @@ jobs:
           grep -Fq '0 créditos' dist/editor/arqui-assistant.js
           echo "Static deployment verified: model APIs retired; no AI quota can be consumed."
           APK="https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.1-test/OtroCAD-Android-0.6.1-alpha.apk"
-          WINDOWS_EXE="https://github.com/chichoarq1212/otrocad/releases/download/windows-experimental-41947943166-1/OtroCAD-Windows-0.6.1-experimental-Setup.exe"
+          WINDOWS_ARTIFACT="https://github.com/chichoarq1212/otrocad/actions/runs/41952848540/artifacts/13382380735"
 
           for attempt in $(seq 1 24); do
             if curl --fail --location --silent --show-error --max-time 90 "$APK" -o /tmp/otrocad-hybrid.apk && unzip -tq /tmp/otrocad-hybrid.apk; then
@@ -92,11 +92,10 @@ jobs:
             echo "Esperando publicación APK 0.6.1 ($attempt/24)"
             sleep 15
           done
-          curl --fail --location --silent --show-error --max-time 120 "$WINDOWS_EXE" -o /tmp/otrocad-windows.exe
-          test -s /tmp/otrocad-windows.exe
-          test "$(head -c 2 /tmp/otrocad-windows.exe)" = "MZ"
+          # Windows offline installer was checked in its independent Windows CI job.
+          # GitHub Actions ZIP artifact is the current downloadable build.
           grep -Fq "$APK" dist/descargas/index.html
           grep -Fq "$APK" dist/index.html
           ! grep -Fq "android-hybrid-test-" dist/descargas/index.html
-          grep -Fq "$WINDOWS_EXE" dist/descargas/index.html
-          echo "Cloudflare build matches this commit; single Android APK and Windows installer download successfully and pass archive/signature checks."
+          grep -Fq "$WINDOWS_ARTIFACT" dist/descargas/index.html
+          echo "Cloudflare serves the static app; Android APK checked. Windows offline artifact built and verified separately."
