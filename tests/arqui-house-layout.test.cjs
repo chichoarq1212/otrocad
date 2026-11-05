@@ -1,7 +1,8 @@
 'use strict';
 const assert=require('node:assert/strict');
 const planner=require('../editor/arqui-planner.js');
-global.window={OtroCadArquiPlanner:planner};
+const knowledge=require('../editor/arqui-knowledge.js');
+global.window={OtroCadArquiPlanner:planner,OtroCadArchitecturalKnowledge:knowledge};
 require('../editor/arqui-house-layout.js');
 const engine=global.window.OtroCadArquiPlanner;
 const professional=require('../editor/arqui-professional.js');
