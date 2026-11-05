@@ -72,12 +72,13 @@ jobs:
           Get-FileHash $installer.FullName -Algorithm SHA256
       - name: Publicar instalador experimental
         if: github.event_name == 'push'
-        continue-on-error: true # GitHub token may lack releases:write; keep downloadable workflow artifact.
+        continue-on-error: true # Retain workflow artifact if GitHub refuses release replacement.
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: windows-experimental-${{ github.run_id }}-${{ github.run_attempt }}
+          tag_name: windows-experimental-41947943166-1
+          overwrite_files: true
           target_commitish: ${{ github.sha }}
-          name: OtroCAD Windows 0.6.1 experimental · ${{ github.run_id }}
+          name: OtroCAD Windows 0.6.1 · motor arquitectónico estático (sin IA)
           prerelease: true
           make_latest: false
           body: |
