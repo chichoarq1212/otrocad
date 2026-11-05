@@ -45,9 +45,9 @@ root.innerHTML=[
  '<label class="arqui-checkbox"><input id="arquiAccessible" type="checkbox"> Criterio accesible</label>',
  '<label class="arqui-checkbox"><input id="arquiGarage" type="checkbox" checked> Garaje / parqueo</label>',
  '<label>Plazas de parqueo<select id="arquiGarageCount"><option value="1">1 auto</option><option value="2">2 autos (tándem si cabe)</option></select></label>',
- '<label>Retiro frontal (m)<input id="arquiSetFront" type="number" min="0" max="12" step=".1" value="3"></label>',
- '<label>Retiro posterior (m)<input id="arquiSetBack" type="number" min="0" max="12" step=".1" value="2"></label>',
- '<label>Retiro lateral (m)<input id="arquiSetSide" type="number" min="0" max="5" step=".1" value=".45"></label>',
+ '<label id="arquiSetLabelFront">Retiro frontal (m)<input id="arquiSetFront" type="number" min="0" max="12" step=".1" value="3"></label>',
+ '<label id="arquiSetLabelBack">Retiro posterior (m)<input id="arquiSetBack" type="number" min="0" max="12" step=".1" value="2"></label>',
+ '<label id="arquiSetLabelSide">Retiro lateral (m)<input id="arquiSetSide" type="number" min="0" max="5" step=".1" value=".45"></label>',
  '<label>Muro exterior (cm)<input id="arquiWallOuter" type="number" min="10" max="45" step="1" value="20"></label>',
  '<label>Muro interior (cm)<input id="arquiWallInner" type="number" min="7" max="35" step="1" value="15"></label>',
  '<label>Presentación<select id="arquiStyle"><option value="concurso">Concurso · amueblado</option><option value="profesional">Profesional · técnico</option><option value="esquematico">Esquemático</option></select></label>',
@@ -105,8 +105,8 @@ function toInputs(s){
  $('arquiLotD').value=houseOnly?s.houseDepth:s.lotDepth;
  $('arquiLabelWText').textContent=houseOnly?'CASA ancho (m)':'TERRENO ancho (m)';
  $('arquiLabelDText').textContent=houseOnly?'CASA fondo (m)':'TERRENO fondo (m)';
- for(const id of ['arquiSetFront','arquiSetBack','arquiSetSide']){
-  $(id).closest('label').hidden=houseOnly;
+ for(const id of ['arquiSetLabelFront','arquiSetLabelBack','arquiSetLabelSide']){
+  $(id).hidden=houseOnly;
  }
  $('arquiFloors').value=String(s.floors);$('arquiBeds').value=String(s.bedrooms);
  $('arquiGarage').checked=s.garage;$('arquiBaths').value=String(s.bathrooms);$('arquiAccessible').checked=s.accessible;
