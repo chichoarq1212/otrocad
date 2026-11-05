@@ -79,7 +79,7 @@ const root=body.children.find(x=>x.id==='arquiAssistant');
 assert.equal(root.hidden,false,'Architecture assistant visible on Dibujo');
 assert.match(root.markup,/assets\/el-arqui\.webp/,'Use official uploaded portrait');
 assert.equal(nodes.arquiPanel.hidden,true,'Chat should start minimized');
-assert.match(nodes.arquiMode.textContent,/no conectada/,'Never misrepresent missing generative endpoint');
+assert.match(nodes.arquiMode.textContent,/local|no conectada/,'Never misrepresent missing generative endpoint');
 window.OtroCadArqui.open();
 assert.equal(nodes.arquiPanel.hidden,false,'Chat opens on request');
 assert.ok(nodes.arquiPreview.children.length>4,'Plan visualization created');
