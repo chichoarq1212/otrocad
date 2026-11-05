@@ -79,7 +79,7 @@ jobs:
           prerelease: true
           make_latest: false
           body: |
-            Instalador experimental sin firma. Icono oficial OtroCAD en EXE, accesos directos y NSIS. Incluye runtime DWG WebAssembly local. La compilación instala, abre y prueba dibujo y recuperación con red bloqueada. Sigue pendiente la validación en un PC físico.
+            Instalador experimental offline sin firma. Incluye CAD, DWG WebAssembly y biblioteca local para diseño residencial con escaleras, circulación, puertas, mobiliario y cotas. Sin IA generativa, cuentas, servicios remotos ni créditos. CI instala y abre sin red. Pendiente validación física.
           files: desktop/release/*-Setup.exe
       - uses: actions/upload-artifact@v4
         if: always() && hashFiles('desktop/release/*-Setup.exe') != ''
