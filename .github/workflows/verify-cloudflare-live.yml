@@ -69,6 +69,16 @@ jobs:
               exit 1
             fi
           done
+          # A static application must not expose the old paid AI backend.
+          api_code=$(curl --silent --location --max-time 20 -o /tmp/otrocad-api-disabled -w '%{http_code}' \
+            "$BASE/api/arqui/status?verify=${GITHUB_SHA}" || true)
+          if [ "$api_code" != 404 ]; then
+            echo "::error::Old generative AI endpoint still responds with HTTP $api_code. Static deployment incomplete."
+            exit 1
+          fi
+          grep -Fq 'Motor arquitectónico' dist/index.html
+          grep -Fq '0 créditos' dist/editor/arqui-assistant.js
+          echo "Static deployment verified: model APIs retired; no AI quota can be consumed."
           APK="https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.1-test/OtroCAD-Android-0.6.1-alpha.apk"
           WINDOWS_EXE="https://github.com/chichoarq1212/otrocad/releases/download/windows-experimental-41947943166-1/OtroCAD-Windows-0.6.1-experimental-Setup.exe"
 
