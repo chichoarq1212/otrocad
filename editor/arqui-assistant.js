@@ -158,7 +158,8 @@ function validateAiProgram(current,change,requestText=''){
  if(/\bpatio\b/.test(ask)&&/\b(?:lavanderia|area\s+de\s+lavado)\b/.test(ask)){
   patch.patioLaundry=true;patch.laundry=true;
  }
- if(!/(?:amplia|agranda|aumenta|reduce|achica|ensancha|estrecha|extiende|disminuye).{0,35}cocina|cocina.{0,35}(?:centimetros?|cm|metro(?:s)?\b|mas\s+grande|mas\s+pequena)/.test(ask)){
+ const kitchenResize=/(?:amplia|agranda|aumenta|reduce|achica|ensancha|estrecha|extiende|disminuye).{0,24}\bcocina\b|\bcocina\b.{0,24}(?:mas\s+grande|mas\s+pequena|amplia|agranda|aumenta|reduce|achica|ensancha|estrecha|extiende|disminuye)/.test(ask);
+ if(!kitchenResize){
   patch.kitchenExtra=current.kitchenExtra||0;
  }
  if(patch.dimensionMeaning==='house'||(current.dimensionMeaning==='house'&&patch.dimensionMeaning!=='site')){
