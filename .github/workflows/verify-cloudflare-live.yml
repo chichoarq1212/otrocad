@@ -30,7 +30,7 @@ jobs:
         run: |
           node scripts/build-pages.cjs
           node scripts/verify-pages.cjs
-          grep -q '0.6.1' dist/descargas/index.html
+          grep -q '0.6.2' dist/descargas/index.html
       - name: Verify deployed files match this exact build and the APK downloads
         if: github.event_name != 'pull_request'
         shell: bash
@@ -81,7 +81,7 @@ jobs:
           grep -Fq 'El Arqui IA' dist/index.html
           grep -Fq '0 créditos' dist/editor/arqui-assistant.js
           echo "Static deployment verified: model APIs retired; no AI quota can be consumed."
-          APK="https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.1-test/OtroCAD-Android-0.6.1-alpha.apk"
+          APK="https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.2-test/OtroCAD-Android-0.6.2-alpha.apk"
           WINDOWS_EXE="https://github.com/chichoarq1212/otrocad/releases/download/windows-experimental-41947943166-1/OtroCAD-Windows-0.6.1-experimental-Setup.exe"
           grep -Fq "$APK" dist/index.html
           grep -Fq "$APK" dist/descargas/index.html
