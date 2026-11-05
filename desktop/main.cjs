@@ -73,6 +73,13 @@ app.whenReady().then(async () => {
             return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
           })()`);
           if (!bounds) throw new Error('No se encontró el lienzo');
+          const arqui = await window.webContents.executeJavaScript(`(async()=>{
+            const ok=!!window.OtroCadArqui;
+            const res=await fetch('otrocad://app/api/arqui/status');
+            return {loaded:ok,status:res.status};
+          })()`);
+          if (!arqui.loaded || arqui.status !== 503)
+            throw new Error('La IA Windows no respeta el modo sin red: ' + JSON.stringify(arqui));
           for (const x of [bounds.x - 60, bounds.x + 60]) {
             window.webContents.sendInputEvent({type:'mouseDown', x, y:bounds.y, button:'left', clickCount:1});
             window.webContents.sendInputEvent({type:'mouseUp', x, y:bounds.y, button:'left', clickCount:1});
