@@ -2,8 +2,32 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "otrocad",
   "compatibility_date": "2026-11-01",
+  "main": "./workers/arqui-auto.js",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "404-page"
-  }
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ARQUI_BUDGET",
+        "class_name": "ArquiBudget"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "arqui_budget_sqlite_v1",
+      "new_sqlite_classes": [
+        "ArquiBudget"
+      ]
+    }
+  ]
 }
