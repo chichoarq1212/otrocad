@@ -23,7 +23,7 @@ export class ArquiBudget {
      'SELECT used FROM quota WHERE day=? AND who=?',today,key).toArray()[0]?.used||0);
    const result=this.ctx.storage.transactionSync(()=>{
     const mine=usedFor(who),global=usedFor('*');
-    if(request.method==='POST'&&mine<PER_USER_PER_DAY&&global<GLOBAL_PER_DAY){
+    if(body.reserve===true&&mine<PER_USER_PER_DAY&&global<GLOBAL_PER_DAY){
      this.ctx.storage.sql.exec('INSERT INTO quota (day,who,used) VALUES (?,?,1) ON CONFLICT(day,who) DO UPDATE SET used=used+1',today,who);
      this.ctx.storage.sql.exec('INSERT INTO quota (day,who,used) VALUES (?,?,1) ON CONFLICT(day,who) DO UPDATE SET used=used+1',today,'*');
      return {accepted:true,remaining:PER_USER_PER_DAY-mine-1,globalRemaining:GLOBAL_PER_DAY-global-1};
@@ -46,8 +46,8 @@ async function userKey(req,env){
 const budgetRequest=async(req,env,method)=>{
  const who=await userKey(req,env);
  const stub=env.ARQUI_BUDGET.get(env.ARQUI_BUDGET.idFromName('otrocad-global-architect-ai'));
- const response=await stub.fetch('https://quota.internal/count',{method,
-  headers:{'Content-Type':'application/json'},body:JSON.stringify({who,day:day()})});
+ const response=await stub.fetch('https://quota.internal/count',{method:'POST',
+  headers:{'Content-Type':'application/json'},body:JSON.stringify({who,day:day(),reserve:method==='POST'})});
  if(!response.ok)throw Error('Servicio de límites no disponible');
  const payload=await response.json();
  if(typeof payload.remaining!=='number'||typeof payload.globalRemaining!=='number')throw Error('Cuota inválida');
