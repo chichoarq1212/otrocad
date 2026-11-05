@@ -95,3 +95,9 @@ header{height:36px!important;min-height:36px!important;flex:0 0 36px;padding:3px
 #tabs button[data-tab="mep"].active,#tabs button[data-tab="hvac"].active{background:#185be8;color:white}
 .mep-summary-table{width:100%;border-collapse:collapse;font:12px system-ui}.mep-summary-table th,.mep-summary-table td{padding:7px;border-bottom:1px solid #d8e4f3;text-align:left}
 @media(max-width:480px){#stage>#dynamic.cad-coordinate-input{max-width:calc(100% - 16px);width:310px}#stage>#dynamic.cad-coordinate-input input{width:92px}#stage>#dynamic #dynHint{white-space:normal}}
+
+/* Tablet and touch devices: use the full drawing area until tools are requested. */
+@media (max-width:1400px) and (pointer:coarse){
+ #ribbonToggle{display:block;flex:0 0 auto;min-height:32px;padding:4px 10px;background:#fff;color:#164b9e;border:1px solid #fff;border-radius:6px;font-size:12px;font-weight:700}
+ body.cad-ribbon-collapsed #ribbon{display:none!important}
+}
