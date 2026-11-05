@@ -27,26 +27,22 @@ let activeBrowser=null,activePage=null,requestLog=[];
  let requests=0;
  requestLog=[];
  page.on('requestfailed',req=>requestLog.push({url:req.url(),error:req.failure()?.errorText}));
- await page.route('**/api/v1/chat/completions', async route=>{
+ await page.route('**/api/arqui/status',async route=>{
+  requestLog.push({url:route.request().url(),method:'GET'});
+  await route.fulfill({status:200,contentType:'application/json',
+   body:JSON.stringify({online:true,limit:2,remaining:2,globalRemaining:20,reset:'00:00 UTC'})});
+ });
+ await page.route('**/api/arqui',async route=>{
   const req=route.request();
   requestLog.push({url:req.url(),method:req.method()});
-  if(req.method()==='OPTIONS'){
-   await route.fulfill({status:204,headers:{
-    'Access-Control-Allow-Origin':'*',
-    'Access-Control-Allow-Methods':'POST, OPTIONS',
-    'Access-Control-Allow-Headers':'authorization, content-type',
-    'Access-Control-Max-Age':'1200'
-   }});
-   return;
-  }
+  assert.equal(req.method(),'POST');
   requests++;
   const sent=req.postDataJSON();
-  assert.equal(sent.model,'openrouter/free');
-  assert(sent.messages[1].content.includes('casa de 10 por 8'));
-  await route.fulfill({status:200,contentType:'application/json',headers:{
-    'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'POST, OPTIONS',
-    'Access-Control-Allow-Headers':'authorization, content-type'
-   },body:JSON.stringify({choices:[{message:{content:JSON.stringify(answer)}}]})});
+  assert.equal(sent.mode,'architecture');
+  assert(sent.message.includes('casa de 10 por 8'));
+  await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+   ...answer,remaining:1,limit:2,globalRemaining:19
+  })});
  });
  const target=process.env.OTROCAD_TEST_URL||'http://127.0.0.1:4173/editor/';
  page.setDefaultTimeout(8500);console.log('Chrome: navegando a '+target);
@@ -57,9 +53,8 @@ let activeBrowser=null,activePage=null,requestLog=[];
  console.log('Chrome: OtroCAD inicializado, abriendo El Arqui');
  await page.evaluate(()=>window.OtroCadArqui.open());
  assert.equal(await page.locator('#arquiPanel').isVisible(),true);
- await page.locator('#arquiAiSettings summary').click();
- await page.locator('#arquiAiProvider').selectOption('openrouter');
- await page.locator('#arquiAiKey').fill('sk-or-fake-only-browser-automated-test');
+ assert.equal(await page.locator('#arquiAiSettings').isVisible(),false,'No provider dropdown should be visible');
+ await page.waitForFunction(()=>document.querySelector('#arquiCloudStatus')?.textContent?.includes('consultas disponibles'),null,{timeout:12000});
  await page.locator('#arquiPrompt').fill(brief);
  console.log('Chrome: enviando solicitud al modelo simulado');
  await page.locator('#arquiPropose').click();
@@ -100,13 +95,13 @@ let activeBrowser=null,activePage=null,requestLog=[];
  fs.mkdirSync('/tmp/otrocad-browser-smoke',{recursive:true});
  await page.screenshot({path:'/tmp/otrocad-browser-smoke/preview-and-cad.png',fullPage:true});
  fs.writeFileSync('/tmp/otrocad-browser-smoke/report.json',JSON.stringify({
-  tested:new Date().toISOString(),url:target,model:'openrouter/free (intercepted mock)',
+  tested:new Date().toISOString(),url:target,model:'Cloudflare Workers AI (intercepted mock)',
   requests,initial:{...initial,spec:{lotWidth:initial.spec.lotWidth,lotDepth:initial.spec.lotDepth,
    houseWidth:initial.spec.houseWidth,houseDepth:initial.spec.houseDepth,patioDepth:initial.spec.patioDepth}},
   geometry:{entityCount:geometry.entityCount,layers:geometry.layers,labels:geometry.labels.filter(x=>/PARQUEO|PATIO|LAVANDERÍA/.test(x))},
   jsErrors:errors
  },null,2));
- console.log('CHROME REAL BROWSER PASS: per-user AI response -> SVG preview -> approved '+geometry.entityCount+' editable CAD entities');
+ console.log('CHROME REAL BROWSER PASS: automatic model mock -> SVG preview -> approved '+geometry.entityCount+' editable CAD entities');
  await browser.close();
 })().catch(async error=>{
  console.error('ERROR navegador El Arqui:',error);
