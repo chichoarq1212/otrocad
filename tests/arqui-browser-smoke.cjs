@@ -7,12 +7,13 @@ const {chromium}=require('playwright-core');
 const mockSpec={
  dimensionMeaning:'house',houseWidth:10,houseDepth:8,siteAssumed:true,
  lotWidth:10,lotDepth:16.5,frontSetback:5.5,backSetback:3,sideSetback:0,
- floors:2,bedrooms:3,bathrooms:2,mainSuite:true,socialBath:false,
- kitchenIsland:true,patioDepth:3,patioLaundry:true,rearDoor:true,
+ floors:2,bedrooms:3,bathrooms:2,mainSuite:true,socialBath:true,
+ kitchenIsland:true,patioDepth:3,patioLaundry:false,rearDoor:true,
+ kitchenExtra:0.5,style:'residencial',
  garage:true,garageSpaces:2
 };
 const brief='Quiero una casa de 10 por 8 metros, tres habitaciones, una máster con baño y dos con baño compartido, sala comedor, cocina con isla, patio de 3 metros atrás con lavandería, puerta al patio y parque para dos carros.';
-const answer={spec:mockSpec,reason:'Propuesta de dos plantas en casa 10x8, terreno de referencia 10x16.5 pendiente de confirmar.',requiresReview:false};
+const answer={spec:mockSpec,reason:'Se asume que el terreno mide 12 x 20 metros, aunque la casa es 10 x 8.',requiresReview:false};
 
 let activeBrowser=null,activePage=null,requestLog=[];
 (async()=>{
@@ -70,6 +71,10 @@ let activeBrowser=null,activePage=null,requestLog=[];
  assert.equal(initial.spec.houseWidth,10);
  assert.equal(initial.spec.lotDepth,16.5);
  assert.equal(initial.floors,2);
+ assert.equal(initial.rooms.filter(name=>/BAÑO/.test(name)).length,2,'Two baths requested: do not add a social WC');
+ assert.equal(initial.spec.socialBath,false,'Master + shared bath excludes extra social bath');
+ assert.equal(initial.spec.patioLaundry,true,'Laundry must actually be placed in the backyard');
+ assert.equal(initial.spec.kitchenExtra,0,'No unsolicited 50cm kitchen extension');
  assert.equal(initial.beforeDraw,0,'Preview must not mutate CAD before approval');
  assert(initial.previewMarks>200,'SVG must contain the actual drawing geometry');
  console.log('Chrome: vista previa generada; aprobando entidades CAD');
@@ -91,6 +96,7 @@ let activeBrowser=null,activePage=null,requestLog=[];
  assert(geometry.layers['AI-ARQ-COTAS']>0);
  assert(geometry.labels.includes('PARQUEO 1')&&geometry.labels.includes('PARQUEO 2'));
  assert(geometry.labels.some(x=>x.includes('LAVANDERÍA')));
+ assert(geometry.labels.some(x=>x.includes('PATIO POSTERIOR')));
  assert(errors.length===0,'Browser JS errors: '+errors.join(' | '));
  fs.mkdirSync('/tmp/otrocad-browser-smoke',{recursive:true});
  await page.screenshot({path:'/tmp/otrocad-browser-smoke/preview-and-cad.png',fullPage:true});
