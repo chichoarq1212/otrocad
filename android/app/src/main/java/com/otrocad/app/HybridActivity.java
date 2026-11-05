@@ -46,7 +46,7 @@ public class HybridActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.WHITE);
         LinearLayout bar=new LinearLayout(this);bar.setPadding(8,3,8,3);bar.setBackgroundColor(0xff185be8);
         indicator=new TextView(this);indicator.setTextColor(Color.WHITE);indicator.setTextSize(12);indicator.setGravity(17);
-        notice("OtroCAD · EDITOR LOCAL");bar.addView(indicator,new LinearLayout.LayoutParams(0,44,1));
+        notice("OtroCAD");bar.addView(indicator,new LinearLayout.LayoutParams(0,44,1));
         Button reload=new Button(this);reload.setText("Web");reload.setTextColor(Color.WHITE);reload.setAllCaps(false);reload.setOnClickListener(v->loadOnline());bar.addView(reload,new LinearLayout.LayoutParams(52,44));
         root.addView(bar,new LinearLayout.LayoutParams(-1,50));
 
@@ -75,8 +75,8 @@ public class HybridActivity extends Activity {
                 return local!=null?local:super.shouldInterceptRequest(view,request);
             }
             @Override public void onPageFinished(WebView view,String url){
-                if(url.startsWith(OFFLINE)){offline=true;notice("OtroCAD · EDITOR LOCAL · sin internet");}
-                else if(url.startsWith(ONLINE)){offline=false;notice("OtroCAD · WEB EN LÍNEA");}
+                if(url.startsWith(OFFLINE)){offline=true;notice("OtroCAD");}
+                else if(url.startsWith(ONLINE)){offline=false;notice("OtroCAD");}
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
                 Uri u=request.getUrl();String host=u.getHost();
@@ -94,7 +94,7 @@ public class HybridActivity extends Activity {
         // keep DOM storage and project drawings intact.
         android.content.SharedPreferences p=getSharedPreferences("otrocad-updates",MODE_PRIVATE);
         String installed=p.getString("editor-version","");
-        String current="0.6.1-local-arquitectura-20261104";
+        String current="0.6.2-tablet-retratos-20261104";
         if(!current.equals(installed)){
             web.clearCache(true);
             p.edit().putString("editor-version",current).apply();
@@ -142,7 +142,7 @@ public class HybridActivity extends Activity {
         if(caps==null||!caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)){loadOffline();return;}
         web.loadUrl(ONLINE);
     }
-    private void loadOffline(){offline=true;notice("OtroCAD · EDITOR LOCAL · sin internet");web.loadUrl(OFFLINE);}
+    private void loadOffline(){offline=true;notice("OtroCAD");web.loadUrl(OFFLINE);}
     @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
     @Override protected void onDestroy(){if(web!=null)web.destroy();super.onDestroy();}
 }

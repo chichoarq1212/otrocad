@@ -40,10 +40,10 @@ jobs:
       - name: Compilar APK híbrido con editor offline
         run: gradle -p android assembleDebug --no-daemon
       - name: Preparar APK con nombre de versión
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-hibrido-0.6.1-debug.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-hibrido-0.6.2-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: OtroCAD-Android-hibrido-0.6.1-debug
-          path: OtroCAD-Android-hibrido-0.6.1-debug.apk
+          name: OtroCAD-Android-hibrido-0.6.2-debug
+          path: OtroCAD-Android-hibrido-0.6.2-debug.apk
           if-no-files-found: error
       # Esta tarea solo genera un artefacto de pruebas; no modifica releases anteriores.

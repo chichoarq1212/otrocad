@@ -78,7 +78,7 @@ jobs:
             echo "::error::Old generative AI endpoint still responds with HTTP $api_code. Static deployment incomplete."
             exit 1
           fi
-          grep -Fiq 'motor arquitectónico' dist/index.html
+          grep -Fq 'El Arqui IA' dist/index.html
           grep -Fq '0 créditos' dist/editor/arqui-assistant.js
           echo "Static deployment verified: model APIs retired; no AI quota can be consumed."
           APK="https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.1-test/OtroCAD-Android-0.6.1-alpha.apk"
@@ -92,7 +92,7 @@ jobs:
           unzip -tq /tmp/otrocad-android-local.apk
           unzip -Z1 /tmp/otrocad-android-local.apk | grep -Fxq "assets/editor/arqui-knowledge.js"
           unzip -p /tmp/otrocad-android-local.apk assets/editor/arqui-assistant.js > /tmp/arqui-android-local.js
-          grep -Fiq "Motor Local" /tmp/arqui-android-local.js
+          grep -Fq "El Arqui IA" /tmp/arqui-android-local.js
           if grep -Fq 'fetch(' /tmp/arqui-android-local.js || grep -Eq '/api/arqui|OpenRouter|ARQUI_AUTO_ENABLED' /tmp/arqui-android-local.js; then
             echo "::error::El APK todavía contiene un conector de IA remoto."
             exit 1
