@@ -34,7 +34,8 @@ const response=content=>({ok:true,status:200,json:async()=>content});
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent');
  assert.equal(geminiCalls[0].opts.headers['x-goog-api-key'],'MY-GEMINI-KEY');
  assert(!geminiCalls[0].url.includes('MY-GEMINI-KEY'));
- const fallback=ai.parseOutput('\\`\\`\\`json\n'+JSON.stringify(mock)+'\n\\`\\`\\`');
+ const backticks=String.fromCharCode(96).repeat(3);
+ const fallback=ai.parseOutput(backticks+'json\n'+JSON.stringify(mock)+'\n'+backticks);
  assert.equal(fallback.requiresReview,false);
  await assert.rejects(()=>ai.request(payload,{provider:'openrouter',key:'sk-or-free-user'},{
   fetch:async()=>({ok:false,status:429})
