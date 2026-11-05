@@ -1,4 +1,4 @@
-/* El Arqui · Motor Local · assistant for architecture and CAD Dibujo only.
+/* El Arqui IA · assistant for architecture and CAD Dibujo only.
  * Phase 1: offline validated concept plans, preview/approval and real progressive CAD.
  * No generative AI network dependency: language is interpreted with local rules.
  */
@@ -17,16 +17,16 @@ const conversation=[];
 let draftTimer=null,draftDirty=false;
 const root=document.createElement('div');root.id='arquiAssistant';root.className='jaimito-root arqui-root';root.hidden=true;
 root.innerHTML=[
- '<button id="arquiMascot" class="jaimito-mascot arqui-mascot" type="button" aria-label="Abrir El Arqui · Motor Local" aria-controls="arquiPanel" aria-expanded="false">',
- '<img id="arquiPortrait" class="arqui-portrait" src="assets/el-arqui.webp" draggable="false" alt="El Arqui · Motor Local, arquitecto con planos, camisa negra y bigote">',
- '<span class="jaimito-mascot-tag">El Arqui <b>LOCAL</b></span></button>',
- '<section id="arquiPanel" class="arqui-panel" aria-label="El Arqui · Motor Local · Diseño arquitectónico" hidden>',
- '<header class="arqui-head"><div><strong>📐 El Arqui · Motor Local</strong><small id="arquiMode">Biblioteca residencial local · sin créditos</small></div>',
+ '<button id="arquiMascot" class="jaimito-mascot arqui-mascot" type="button" aria-label="Abrir El Arqui IA" aria-controls="arquiPanel" aria-expanded="false">',
+ '<img id="arquiPortrait" class="arqui-portrait" src="assets/el-arqui.webp" draggable="false" alt="El Arqui IA, arquitecto con planos, camisa negra y bigote">',
+ '<span class="jaimito-mascot-tag">El Arqui <b>IA</b></span></button>',
+ '<section id="arquiPanel" class="arqui-panel" aria-label="El Arqui IA · Diseño arquitectónico" hidden>',
+ '<header class="arqui-head"><div><strong>📐 El Arqui IA</strong><small id="arquiMode">Biblioteca residencial local · sin créditos</small></div>',
  '<button type="button" id="arquiClose" title="Minimizar" aria-label="Minimizar">−</button></header>',
  '<div class="arqui-tabs" role="tablist"><button id="arquiTabDesign" class="active" type="button" aria-selected="true">Diseñar</button>',
  '<button id="arquiTabLibrary" type="button" aria-selected="false">Biblioteca técnica</button></div>',
  '<div class="arqui-pane" id="arquiDesignPane">',
- '<p id="arquiLocalStatus" class="arqui-context" role="status">Motor arquitectónico autónomo · biblioteca técnica incorporada · 0 créditos · sin consultas externas</p>',
+ '<p id="arquiLocalStatus" class="arqui-context" role="status">Simulación local de IA · biblioteca técnica incorporada · sin consultas externas</p>',
  '<div class="arqui-chat" id="arquiMessages" role="log" aria-live="polite"></div>',
  '<form id="arquiForm" class="arqui-form"><label for="arquiPrompt">¿Qué deseas diseñar o modificar?</label>',
  '<textarea id="arquiPrompt" rows="4" maxlength="2200" placeholder="Quiero una casa de 12 por 20 con tres dormitorios y dos baños. Después: amplía la cocina 50 cm."></textarea>',
@@ -79,7 +79,7 @@ root.innerHTML=[
 document.body.append(root);
 const avatar=$('arquiMascot'),panel=$('arquiPanel'),chat=$('arquiMessages');
 const toolbar=document.createElement('button');toolbar.id='arquiRibbon';toolbar.type='button';
-toolbar.textContent='📐 El Arqui · Motor Local';toolbar.title='Diseñar plantas arquitectónicas editables por instrucciones';
+toolbar.textContent='📐 El Arqui IA';toolbar.title='Diseñar plantas arquitectónicas editables por instrucciones';
 toolbar.hidden=true;toolbar.onclick=()=>open();tabs.append(toolbar);
 function visible(){const tab=tabs.querySelector('[data-tab].active');return !!tab&&allowed.has(tab.dataset.tab)}
 function sync(){const state=visible();root.hidden=!state;toolbar.hidden=!state;if(!state)close()}
@@ -95,7 +95,7 @@ function message(role,text){
  conversation.push({role:role==='user'?'user':'assistant',content:String(text).slice(0,2200)});
  while(conversation.length>12)conversation.shift();
  const item=document.createElement('div');item.className='arqui-msg '+role;
- const head=document.createElement('strong');head.textContent=role==='user'?'Tú':'El Arqui · Motor Local';
+ const head=document.createElement('strong');head.textContent=role==='user'?'Tú':'El Arqui IA';
  const body=document.createElement('p');body.textContent=String(text);item.append(head,body);
  chat.append(item);chat.scrollTop=chat.scrollHeight;while(chat.childElementCount>14)chat.firstChild.remove();
 }
@@ -288,7 +288,7 @@ $('arquiDraw').onclick=async()=>{
  const unrelated=current.filter(x=>!x.aiArchitect);
  if(unrelated.length&&!previous.length&&!confirm('El dibujo ya contiene elementos. Se añadirá la planta arquitectónica sin borrar lo existente. ¿Continuar?'))return;
  const manual=previous.length&&(!baseline||signature(previous)!==baseline);
- if(previous.length&&!confirm((manual?'Este diseño tiene cambios manuales o procede de una versión anterior. Al regenerar se sustituirán esas ediciones dentro del diseño de El Arqui. ':'')+'Se reemplazará únicamente el último diseño de El Arqui · Motor Local. Los demás objetos no se modificarán. ¿Continuar?'))return;
+ if(previous.length&&!confirm((manual?'Este diseño tiene cambios manuales o procede de una versión anterior. Al regenerar se sustituirán esas ediciones dentro del diseño de El Arqui. ':'')+'Se reemplazará únicamente el último diseño de El Arqui IA. Los demás objetos no se modificarán. ¿Continuar?'))return;
  busy=true;
  $('arquiDraw').disabled=true;$('arquiStop').hidden=false;
  const id=projectId||'arqui-'+Date.now().toString(36);
@@ -299,14 +299,14 @@ $('arquiDraw').onclick=async()=>{
   api.ensureLayer?.(layer,color);
  try{
   if(previous.length){
-   api.replaceObjects(x=>x.aiArchitect&&x.aiProjectId===id,shapes,'El Arqui · Motor Local · diseño actualizado · '+shapes.length+' entidades');
+   api.replaceObjects(x=>x.aiArchitect&&x.aiProjectId===id,shapes,'El Arqui IA · diseño actualizado · '+shapes.length+' entidades');
    $('arquiProgress').textContent='Diseño actualizado. Usa Ctrl+Z para deshacer.';
   }else{
    const ctrl=new AbortController();activeStream=ctrl;
    await api.addObjectsAnimated(shapes,{
     batchSize:32,delayMs:24,signal:ctrl.signal,
     onProgress:(done,total)=>{$('arquiProgress').textContent='Dibujando en vivo: '+done+' / '+total+' entidades CAD…'},
-    message:'El Arqui · Motor Local · anteproyecto dibujado con '+shapes.length+' entidades'
+    message:'El Arqui IA · anteproyecto dibujado con '+shapes.length+' entidades'
    });
    $('arquiProgress').textContent='Plano creado · '+shapes.length+' entidades editables. Ctrl+Z deshace el proyecto.';
   }
@@ -319,10 +319,10 @@ $('arquiStop').onclick=()=>activeStream?.abort();
 $('arquiErase').onclick=()=>{
  if(busy||!projectId)return;
  const all=api.getObjects().filter(x=>x.aiArchitect&&x.aiProjectId===projectId);
- if(!all.length){message('bot','No hay un diseño anterior de El Arqui · Motor Local en este dibujo.');return}
- if(!confirm('¿Eliminar solo las '+all.length+' entidades del último diseño de El Arqui · Motor Local?'))return;
- api.removeObjects(x=>x.aiArchitect&&x.aiProjectId===projectId,'El Arqui · Motor Local · diseño retirado');
- projectId=null;baseline=null;lastModelKey=null;message('bot','Retirado el diseño de El Arqui · Motor Local sin modificar otros elementos.');
+ if(!all.length){message('bot','No hay un diseño anterior de El Arqui IA en este dibujo.');return}
+ if(!confirm('¿Eliminar solo las '+all.length+' entidades del último diseño de El Arqui IA?'))return;
+ api.removeObjects(x=>x.aiArchitect&&x.aiProjectId===projectId,'El Arqui IA · diseño retirado');
+ projectId=null;baseline=null;lastModelKey=null;message('bot','Retirado el diseño de El Arqui IA sin modificar otros elementos.');
 };
 function tabPage(type){
  const design=type==='design';

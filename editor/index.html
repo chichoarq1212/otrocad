@@ -295,6 +295,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 <footer id="statusbar"><button id="gridToggle">GRID F7</button><button id="orthoToggle">ORTHO F8</button><button id="snapToggle">SNAP F9</button><button id="polarToggle">POLAR F10</button><button id="osnapToggle">OSNAP F3</button><button id="draftQuick" title="Configurar ORTHO, OSNAP, POLAR y SNAP">⚙ DRAFTING</button><button id="crossToggle">CRUZ</button><button id="importReport" type="button" hidden title="Ver elementos importados con ajustes de compatibilidad">Informe CAD</button><button id="copyImportReport" type="button" hidden title="Copiar el diagnóstico de importación">Copiar diagnóstico</button><button id="convertedDxf" type="button" hidden title="Descargar en este dispositivo el DXF intermedio del DWG">DXF convertido</button><span id="status">OtroCAD · Motor geométrico alfa</span><span id="offlineState" role="status" style="font-size:11px;margin-left:auto;opacity:.8">Preparando modo sin conexión…</span></footer><input id="file" type="file" accept=".json,.dxf,.dwg" hidden><script src="demo/vivienda.js"></script><script src="library/furnishings.js"></script><script src="editor.js"></script><script src="cad-file-ui.js"></script><script src="civil-points.js"></script><script src="civil3d.js"></script><script src="jaimito-assistant.js"></script><script src="vendor/proj4/proj4.js"></script><script src="geolocation.js"></script><script src="civil-topography.js"></script><script src="civil-road.js"></script><script src="civil-road-ui.js"></script><script src="mep-thermal.js"></script><script src="mep.js"></script><script src="mep-thermal-ui.js"></script><script src="kelvin-assistant.js"></script><script src="arqui-planner.js"></script><script src="arqui-knowledge.js"></script><script src="arqui-house-layout.js"></script><script src="arqui-references.js"></script><script src="arqui-professional.js"></script><script src="arqui-assistant.js"></script><script>
 (()=>{
  const media=window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 950px) and (pointer: coarse)');
+ const ribbonMedia=window.matchMedia('(max-width: 1400px) and (pointer: coarse)');
  const button=document.getElementById('ribbonToggle');
  const groups=document.getElementById('groups');
  const bottomToggle=document.getElementById('mobileBottomToggle');
@@ -311,16 +312,17 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
  });
  document.addEventListener('keydown',event=>{if(event.key==='Escape')setBottomOpen(false)});
  function setCollapsed(value){
-  const collapsed=media.matches && value;
+  const collapsed=ribbonMedia.matches && value;
   document.body.classList.toggle('cad-ribbon-collapsed',collapsed);
   button.setAttribute('aria-expanded',String(!collapsed));
   button.textContent=collapsed?'☰ Herramientas':'⌃ Ocultar';
   button.setAttribute('aria-label',collapsed?'Mostrar herramientas CAD':'Ocultar herramientas CAD');
  }
  button.addEventListener('click',()=>setCollapsed(!document.body.classList.contains('cad-ribbon-collapsed')));
- groups.addEventListener('click',event=>{if(media.matches && event.target.closest('button')) setCollapsed(true)});
- function onModeChange(){setCollapsed(media.matches);setBottomOpen(false)}
+ groups.addEventListener('click',event=>{if(ribbonMedia.matches && event.target.closest('button')) setCollapsed(true)});
+ function onModeChange(){setCollapsed(ribbonMedia.matches);setBottomOpen(false)}
  if(media.addEventListener) media.addEventListener('change',onModeChange); else media.addListener(onModeChange);
+ if(ribbonMedia.addEventListener) ribbonMedia.addEventListener('change',onModeChange); else ribbonMedia.addListener(onModeChange);
  onModeChange();
 })();
-</script><script>if("serviceWorker" in navigator){let hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController){const el=document.getElementById("offlineState");if(el)el.textContent="Actualización disponible · guarda tu dibujo y recarga"}hadController=true});navigator.serviceWorker.register("../sw.js",{updateViaCache:"none"}).then(async r=>{await navigator.serviceWorker.ready;const el=document.getElementById("offlineState");if(el&&!el.textContent.includes("Actualización"))el.textContent="Recursos sin conexión preparados"}).catch(()=>{const el=document.getElementById("offlineState");if(el)el.textContent="Modo sin conexión no disponible"})}</script></body></html>
+</script><script>if("serviceWorker" in navigator){let hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController){const el=document.getElementById("offlineState");if(el)el.textContent="Actualización disponible · guarda tu dibujo y recarga"}hadController=true});navigator.serviceWorker.register("../sw.js",{updateViaCache:"none"}).then(async r=>{await navigator.serviceWorker.ready; r.update().catch(()=>{}); document.addEventListener('visibilitychange',()=>{if(!document.hidden)r.update().catch(()=>{})});const el=document.getElementById("offlineState");if(el&&!el.textContent.includes("Actualización"))el.textContent="Recursos sin conexión preparados"}).catch(()=>{const el=document.getElementById("offlineState");if(el)el.textContent="Modo sin conexión no disponible"})}</script></body></html>
