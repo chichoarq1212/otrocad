@@ -2,7 +2,7 @@
   "name": "otrocad-desktop",
   "version": "0.6.1",
   "private": true,
-  "description": "OtroCAD Windows experimental 0.6.1: editor CAD offline y El Arqui IA online con cuotas protegidas",
+  "description": "OtroCAD Windows 0.6.1: motor arquitectónico local, tipologías, CAD/DWG y bibliotecas sin conexión ni créditos",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
@@ -20,7 +20,6 @@
     },
     "files": [
       "main.cjs",
-      "arqui-proxy.cjs",
       "build/otrocad.ico",
       "dist/**/*"
     ],
