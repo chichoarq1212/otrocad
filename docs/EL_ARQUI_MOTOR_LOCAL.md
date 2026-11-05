@@ -62,3 +62,31 @@ El motor interpreta 10 × 8 m como **huella construida**, no como terreno; propo
 - MIDUVI, Lineamientos Urbanísticos y Habitacionales (2024; ámbito limitado): https://www.habitatyvivienda.gob.ec/wp-content/uploads/2024/08/Lineamientos-urbanos-habitacionales-02-08-2024.pdf
 - NEC-HS-AU, accesibilidad (ámbito determinado por norma): https://www.registroficial.gob.ec/edicion-especial-no-924-6/
 - Plazola y Neufert: referencias bibliográficas indicadas en la biblioteca; **sus textos completos no se distribuyen**.
+
+
+## Neufert, Parte 1 — biblioteca de criterios incorporada (referencia privada)
+
+La copia escaneada de 268 páginas fue facilitada para estudio, **no** para redistribución en el repositorio ni en la app. Se extrajeron **15 fichas propias** de razonamiento y revisión espacial a partir de las siguientes páginas **del PDF** (no de la paginación impresa):
+
+| Páginas PDF | Tema | Aplicación local |
+|---|---|---|
+| 39–40, 219–221 | Ergonomía, vestíbulos y circulaciones | Paso libre, recorridos y acceso a zonas privadas sin atravesar otras habitaciones |
+| 188–191 | Escaleras | Dos tramos, huellas, contrahuellas, descanso, encaje vertical y llegada libre |
+| 225–228 | Cocinas | Mesones, circulación, compatibilidad entre isla, frigorífico y puertas |
+| 230 | Comedores | Mesa, sillas, salida y conexión con cocina |
+| 231–233 | Dormitorios | Cama, armario, apertura y espacio de uso |
+| 234–238 | Baños | Ubicación de sanitario, lavabo, ducha, barrido de puerta y acceso a baño máster/compartido |
+| 241–242 | Lavanderías | Máquina, paso, ventilación y cercanía a áreas de servicio |
+| 173–176, 247–250 | Ventanas y vivienda | Abiertas al exterior real, orientación conocida y relación con uso del espacio |
+
+Las reglas funcionales están implementadas en `editor/arqui-knowledge.js` como `neufertMethod` y `spatialReview`; sus advertencias se muestran en El Arqui. Son interpretaciones técnicas originales, no fotocopias de tablas, láminas ni capítulos. La edición aportada no sustituye la normativa municipal vigente.
+
+## Interpretación literal de lenguaje natural
+
+- **«Casa 10 × 8»**: genera huella edificada de 10 × 8 m; sin predio, linderos, retiros ni estacionamiento inventados.
+- **«Casa 10 × 8, patio de 3 m, lavandería y parqueo para dos carros»**: añade solamente esos espacios exteriores como zonas solicitadas, sin atribuir un lote ficticio.
+- **«Casa 10 × 8 en terreno 15 × 24, retiros frontal 3, posterior 2 y laterales 1»**: distingue el terreno real, comprueba que la casa cabe en la envolvente y dibuja límites y retiros **indicados por el usuario**, sin afirmar aprobación municipal.
+- **«Terreno 15 × 24 con jardín frontal de 2 m»**: interpreta el predio expresamente indicado y muestra el jardín como espacio exterior, separado de cualquier retiro legal.
+- **«Agranda la cocina 50 cm»**: opera sobre la propuesta activa sin inventar un terreno nuevo.
+
+El motor es un **analizador determinista de instrucciones frecuentes en español**, no un modelo de lenguaje generativo: no comprenderá todas las construcciones lingüísticas ni podrá resolver todas las tipologías de edificios sin añadir sus respectivas reglas geométricas.
