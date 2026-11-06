@@ -138,6 +138,16 @@ async function roundTrip(download){
  const rotatedByPoints=await getMoveState();const line2=rotatedByPoints[rotatedByPoints.length-1];
  assert(Math.abs(line2.b.x+5)<0.005&&Math.abs(line2.b.y-(-5+Math.sqrt(2)))<0.005,'Two reference points should align to target direction');
  check('Girar con referencia numérica y dos puntos');
+ // Scale an existing selected line from its base using an exact factor.
+ const beforeScale=await getMoveState();
+ await mcmd('SC');await mclick(-5,-5);
+ const canvasBox=await movePage.locator('#cad').boundingBox(),vscale=await movePage.evaluate(()=>window.OtroCadCivilAPI.getView());
+ await movePage.mouse.move(canvasBox.x+canvasBox.width/2+(-3-vscale.center.x)*vscale.pixelsPerUnit,canvasBox.y+canvasBox.height/2-(-3-vscale.center.y)*vscale.pixelsPerUnit);
+ assert.deepEqual(await getMoveState(),beforeScale,'Scale preview must not mutate objects');
+ await mcmd('2');const scaled=await getMoveState(),beforeLine=beforeScale[beforeScale.length-1],scaledLine=scaled[scaled.length-1];
+ assert(Math.abs(scaledLine.b.y-(-5+2*Math.sqrt(2)))<0.01,'Scale factor 2 must double distance from base');
+ await mcmd('UNDO');assert.deepEqual(await getMoveState(),beforeScale);
+ check('Escalar con vista previa, factor 2 y deshacer');
  await movePage.close();
  check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';

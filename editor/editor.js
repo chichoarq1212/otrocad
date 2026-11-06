@@ -664,7 +664,7 @@ function showDraftSettings(){
  };
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
 }
-function updatePrompt(){if(['move','copy'].includes(tool)&&activeLayout==='Model'){promptEl.textContent=(tool==='move'?'MOVER':'COPIAR')+' · '+(moveBase?'indica punto destino':(modifyTargets.length||selectedItems().length?'indica punto base':'selecciona el objeto por el punto base'));return}if(activeLayout!=='Model'){promptEl.textContent='PRESENTACIÓN · hoja de impresión · vuelve a Modelo para editar';return}if(tool==='rect'&&start){promptEl.textContent='Esquina opuesta · ancho · Tab / ; · alto · Enter';return}if(usesLineCoordinates()){promptEl.textContent=(activeAnchor()?'Extremo':'Primer punto')+' · X/Y junto al cursor · Tab / ;: cambiar campo · Enter: fijar';return}if(tool==='offset'){promptEl.textContent=offsetAwaitingDistance?'OFFSET · distancia · Enter':'OFFSET · objeto · lado · Esc para terminar';return}promptEl.textContent=tool==='matchprop'?(matchState.source?'MA · DESTINO · Esc: finalizar':'MA · ORIGEN · selecciona el objeto que presta su estilo'):tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
+function updatePrompt(){if(tool==='scale'&&activeLayout==='Model'){promptEl.textContent='ESCALAR · '+(moveBase?'mueve el cursor o escribe factor y Enter':(modifyTargets.length||selectedItems().length?'indica punto base':'selecciona objeto(s)'));return}if(['move','copy'].includes(tool)&&activeLayout==='Model'){promptEl.textContent=(tool==='move'?'MOVER':'COPIAR')+' · '+(moveBase?'indica punto destino':(modifyTargets.length||selectedItems().length?'indica punto base':'selecciona el objeto por el punto base'));return}if(activeLayout!=='Model'){promptEl.textContent='PRESENTACIÓN · hoja de impresión · vuelve a Modelo para editar';return}if(tool==='rect'&&start){promptEl.textContent='Esquina opuesta · ancho · Tab / ; · alto · Enter';return}if(usesLineCoordinates()){promptEl.textContent=(activeAnchor()?'Extremo':'Primer punto')+' · X/Y junto al cursor · Tab / ;: cambiar campo · Enter: fijar';return}if(tool==='offset'){promptEl.textContent=offsetAwaitingDistance?'OFFSET · distancia · Enter':'OFFSET · objeto · lado · Esc para terminar';return}promptEl.textContent=tool==='matchprop'?(matchState.source?'MA · DESTINO · Esc: finalizar':'MA · ORIGEN · selecciona el objeto que presta su estilo'):tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
 
 function isVisibleModelEntity(s){
  return (s.cadLayout||'Model')==='Model'&&!hiddenLayers.has(s.layer)&&!(hideModelAnnotations&&s.type==='text');
@@ -1091,6 +1091,14 @@ function render(){
   ctx.save();ctx.globalAlpha=.5;for(const i of modifyTargets.slice(0,300)){if(objects[i]){const preview=clone(objects[i]);translate(preview,dx,dy);drawEntity(preview,false,true)}}ctx.restore();
   const a=screen(moveBase),b=screen(q);ctx.save();ctx.setLineDash([6,4]);ctx.strokeStyle='#ffcf23';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore();
  }
+ if(!printing&&moveBase&&tool==='scale'&&modifyTargets.length){
+  const q=world(cursor),factor=distance(moveBase,q)/scaleReference;
+  if(Number.isFinite(factor)&&factor>1e-6){
+   ctx.save();ctx.globalAlpha=.55;
+   for(const i of modifyTargets){if(!objects[i])continue;const preview=clone(objects[i]),scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});if(preview.a)preview.a=scale(preview.a);if(preview.b)preview.b=scale(preview.b);if(preview.pts)preview.pts=preview.pts.map(scale);if(preview.hatchLoops)preview.hatchLoops=preview.hatchLoops.map(loop=>loop.map(scale));if(preview.textAlignmentPoint)preview.textAlignmentPoint=scale(preview.textAlignmentPoint);if(preview.type==='text')preview.textHeightWorld=Number(preview.textHeightWorld||.4)*factor;if((preview.type==='dim'||preview.type==='dimaligned')&&Number.isFinite(preview.dimOffset))preview.dimOffset*=factor;preview.linetype='HIDDEN';drawEntity(preview,false,true)}
+   ctx.restore();const a=screen(moveBase),b=screen(q);ctx.save();ctx.setLineDash([6,4]);ctx.strokeStyle='#ffcf23';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);ctx.font='13px system-ui';ctx.fillStyle='#ffcf23';ctx.fillText('Factor '+factor.toFixed(3)+' · escribe valor en CMD',b.x+12,b.y-10);ctx.restore();
+  }
+ }
  if(!printing&&temp)drawEntity(temp,false,true);
  if(!printing)for(const item of window.OtroCadMep?.getPreview()||[])drawEntity(item,false,true);
  if(!printing&&tool==='poly'&&poly.length)drawEntity({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)},false);
@@ -1136,6 +1144,7 @@ function matchPropertiesAt(q){
  save();render();matchState.applied++;
  status.textContent='MA · '+matchState.applied+' objeto(s) igualados · selecciona otro destino · Esc para terminar';
 }
+let scaleReference=1;
 let rotateRef={phase:'off',first:null,angle:0};
 let trimState={phase:'quick',boundaries:new Set()};
 function setTool(t,options={}){rotateRef={phase:'off',first:null,angle:0};if(t==='trim')trimState={phase:'quick',boundaries:new Set()};updateTrimPanel(t);if(t!=='matchprop'){matchState.source=null;matchState.sourceIndex=-1}if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;resetRectangleDimensions();resetLineCoordinates();window.OtroCadMep?.onToolChanged(t);offsetAwaitingDistance=t==='offset'&&!options.offsetDistanceProvided;if(t==='offset'){clearSelection();offsetDistancePreset=!!options.offsetDistanceProvided;if(offsetAwaitingDistance)$('#dynLen').value=String(offsetDistance)}selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render();if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});$('#dynLen').select();status.textContent='OFFSET: escribe distancia y pulsa Enter'}}
@@ -1487,7 +1496,7 @@ function handleTap(p){
    if(!modifyTargets.length){const hit=selectAt(world(p));if(hit>=0){applySelection([hit]);modifyTargets=selectedItems();if(tool==='move'||tool==='copy'){moveBase=clone(q);status.textContent=(tool==='move'?'MOVER':'COPIAR')+' · punto base fijado en la selección · indica el punto destino';}else status.textContent='Objeto seleccionado · indica punto base';updatePrompt();render();return}}
    if(!modifyTargets.length){status.textContent='Selecciona uno o varios objetos';return}
   }
-  if(!moveBase){moveBase=clone(q);status.textContent=tool==='mirror'?'Indica el segundo punto del eje':tool==='rotate'?'Indica el ángulo de giro':tool==='scale'?'Indica el factor de escala con la distancia':'Punto base fijado · indica punto destino';updatePrompt();render();return}
+  if(!moveBase){moveBase=clone(q);if(tool==='scale'){const pts=modifyTargets.flatMap(i=>objects[i]?boundsPoints(objects[i]):[]);scaleReference=Math.max(...pts.map(v=>distance(moveBase,v)),1e-6);if(!Number.isFinite(scaleReference))scaleReference=1}status.textContent=tool==='mirror'?'Indica el segundo punto del eje':tool==='rotate'?'Indica el ángulo de giro':tool==='scale'?'Indica el factor de escala con la distancia':'Punto base fijado · indica punto destino';updatePrompt();render();return}
   if(tool==='rotate'&&rotateRef.phase==='first'){rotateRef.first=clone(q);rotateRef.phase='second';status.textContent='REFERENCIA · indica el segundo punto de la dirección existente';render();return}
   if(tool==='rotate'&&rotateRef.phase==='second'){if(distance(q,rotateRef.first)<1e-9){status.textContent='Referencia: los puntos deben ser distintos';return}rotateRef.angle=Math.atan2(q.y-rotateRef.first.y,q.x-rotateRef.first.x);rotateRef.phase='target';status.textContent='REFERENCIA · indica el nuevo ángulo o punto destino';render();return}
   let dx=q.x-moveBase.x,dy=q.y-moveBase.y;
@@ -1509,8 +1518,8 @@ function handleTap(p){
     const len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len,mirror=p=>{const x=p.x-moveBase.x,y=p.y-moveBase.y,t=x*ux+y*uy,px=moveBase.x+t*ux,py=moveBase.y+t*uy;return{x:2*px-p.x,y:2*py-p.y}};
     transformEntityGeometry(src,mirror,axisAligned);
    }else if(tool==='scale'){
-    const factor=Math.hypot(dx,dy),scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});
-    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);if(src.hatchLoops)src.hatchLoops=src.hatchLoops.map(loop=>loop.map(scale));if(src.type==='text'){src.textHeightWorld=Number(src.textHeightWorld||.4)*factor;if(Number(src.mtextWidthWorld)>0)src.mtextWidthWorld*=factor;if(Number(src.textFitWidthWorld)>0)src.textFitWidthWorld*=factor;if(src.textAlignmentPoint)src.textAlignmentPoint=scale(src.textAlignmentPoint)}
+    const factor=Math.hypot(dx,dy)/scaleReference,scale=p=>({x:moveBase.x+(p.x-moveBase.x)*factor,y:moveBase.y+(p.y-moveBase.y)*factor});
+    if(src.a)src.a=scale(src.a);if(src.b)src.b=scale(src.b);if(src.pts)src.pts=src.pts.map(scale);if(src.hatchLoops)src.hatchLoops=src.hatchLoops.map(loop=>loop.map(scale));if(src.type==='text'){src.textHeightWorld=Number(src.textHeightWorld||.4)*factor;if(Number(src.mtextWidthWorld)>0)src.mtextWidthWorld*=factor;if(Number(src.textFitWidthWorld)>0)src.textFitWidthWorld*=factor;if(src.textAlignmentPoint)src.textAlignmentPoint=scale(src.textAlignmentPoint)}if((src.type==='dim'||src.type==='dimaligned')&&Number.isFinite(src.dimOffset))src.dimOffset*=factor;
    }
   }
   if(tool==='copy')applySelection(created);else applySelection(targets);
@@ -1712,6 +1721,7 @@ function cancelCurrentAction(){
 function performEnterAction(){
  if(tool==='offset'&&offsetAwaitingDistance){acceptOffsetDistance($('#dynLen').value);return}
  if(tool==='trim'&&trimState.phase==='boundaries'&&!$('#cmd').value.trim()){finishTrimBoundaries();return}
+ if(tool==='scale'&&!$('#cmd').value.trim()){status.textContent=moveBase?'ESCALAR: escribe factor o indica punto destino':(selectedItems().length?'ESCALAR: indica punto base':'ESCALAR: selecciona los objetos');return}
  if(['move','copy'].includes(tool)&&!$('#cmd').value.trim()){status.textContent=moveBase?'Indica el punto destino con un clic o coordenadas':(selectedItems().length?'Indica el punto base con un clic o coordenadas':'Selecciona el objeto por el punto base');updatePrompt();return}
  if(tool==='rect'&&start&&dynamicInputOn){const point=pointFromInputs();if(point)commitEntity(point);else status.textContent='Rectángulo: indica ancho y alto válidos';return}
  if(selectionClickAnchor){selectionClickAnchor=null;selectionStart=null;selectionBox=null;render();status.textContent='Ventana de selección terminada';return}
@@ -1955,6 +1965,10 @@ function showSmartPurge(){
 function runCommand(raw){
  const textValue=raw.trim(),upper=textValue.toUpperCase(),parts=upper.split(/\s+/),c=parts[0];if(!c)return;
  if(!/^[+-]?(?:\d|[.,])/.test(textValue)&&!textValue.startsWith('@')&&!['DS','HP','DSETTINGS','DRAFTINGSETTINGS','SETTINGS','F3','F7','F8','F9','F10','GRID','ORTHO','SNAP','OSNAP','POLAR'].includes(c)){lastCommand=textValue;try{localStorage.setItem('otrocad-last-command',lastCommand)}catch(e){}}
+ if(tool==='scale'&&moveBase&&/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(textValue)){
+  const factor=Number(textValue.replace(',','.'));if(!(factor>0)||!Number.isFinite(factor)){status.textContent='ESCALAR: introduce un factor mayor que cero';return}
+  const point={x:moveBase.x+factor*scaleReference,y:moveBase.y};handleTap(screen(point),point);return
+ }
  if(tool==='rotate'&&moveBase&&(c==='R'||c==='REFERENCE'||c==='REFERENCIA')){rotateRef={phase:'first',first:null,angle:0};status.textContent='REFERENCIA · indica dos puntos de la dirección existente o escribe su ángulo';render();return}
  if(tool==='rotate'&&moveBase&&/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(textValue)){
   const degrees=Number(textValue.replace(',','.'));if(!Number.isFinite(degrees))return;
