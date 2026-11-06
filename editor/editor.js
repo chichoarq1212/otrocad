@@ -1087,7 +1087,43 @@ function showCadPaperSettings(){
  };
  dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
 }
+// Contextual properties for new and selected hatch objects.
+let hatchPanel, hatchPanelTarget=null;
+function updateHatchPanel(){
+ if(!hatchPanel){
+  hatchPanel=document.createElement('section');hatchPanel.id='hatchEditorPanel';hatchPanel.setAttribute('aria-label','Editor de Hatch');
+  hatchPanel.style.cssText='position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:30;display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:9px;background:#273344;color:white;border:1px solid #53667f;border-radius:6px;box-shadow:0 3px 12px #0006;font:12px system-ui;max-width:95%';
+  hatchPanel.innerHTML='<strong style="align-self:center">Editor Hatch</strong><label>Patrón<br><select id="hePattern"><option value="SOLID">SOLID</option><option value="ANSI31">ANSI31</option><option value="CROSS">CROSS</option><option value="GRID">GRID</option></select></label><label>Paso<br><input id="heSpacing" type="number" min="0.001" step="0.1" style="width:65px"></label><label>Ángulo °<br><input id="heAngle" type="number" step="1" style="width:60px"></label><label>Transparencia %<br><input id="heTransparency" type="number" min="0" max="100" step="1" style="width:55px"></label><label>Color<br><input id="heColor" type="color" style="width:45px;height:26px"></label><button id="heClose" type="button">Cerrar</button>';
+  stage.appendChild(hatchPanel);
+  hatchPanel.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',()=>{
+   const pattern=$('#hePattern').value,step=Math.max(.001,Number($('#heSpacing').value)||10),angle=Number($('#heAngle').value)||0,opacity=1-Math.max(0,Math.min(100,Number($('#heTransparency').value)||0))/100,color=$('#heColor').value;
+   $('#hatchPattern').value=pattern;$('#hatchSpacing').value=step;
+   hatchSettings={angle,opacity,color};
+   const index=hatchPanelTarget,shape=index===null?null:objects[index];
+   if(shape){checkpoint();shape.hatchPattern=pattern;shape.solidFill=pattern==='SOLID';shape.hatchSpacingWorld=step/50;shape.hatchSpacing=step;shape.hatchAngle=angle;shape.hatchOpacity=opacity;shape.color=color;delete shape.colorDark;delete shape.hatchPatternLines;delete shape.hatchGradientColors;save()}
+   render();
+  }));
+  $('#heClose').addEventListener('click',()=>{if(tool==='hatch')setTool('select');clearSelection();render()});
+ }
+ const indices=selectedItems(), index=indices.length===1?indices[0]:null, shape=index===null?null:objects[index];
+ const editable=shape&&(shape.type==='hatch'||(shape.type==='polygon'&&(shape.hatchPattern||shape.solidFill)));
+ const target=editable?index:null,visible=tool==='hatch'||!!editable;
+ hatchPanel.hidden=!visible;hatchPanel.style.display=visible?'flex':'none';
+ if(!visible)return;
+ // Do not replace an in-progress edit while the drawing is being redrawn.
+ if(hatchPanelTarget!==target||hatchPanel.dataset.mode!==(editable?'edit':'create')){
+  hatchPanelTarget=target;hatchPanel.dataset.mode=editable?'edit':'create';
+  const pattern=editable?(shape.solidFill?'SOLID':shape.hatchPattern):$('#hatchPattern').value;
+  $('#hePattern').value=['SOLID','ANSI31','CROSS','GRID'].includes(pattern)?pattern:'ANSI31';
+  $('#heSpacing').value=editable?Math.max(.001,Number(shape.hatchSpacingWorld||.2)*50):$('#hatchSpacing').value;
+  $('#heAngle').value=editable?(shape.hatchAngle??45):hatchSettings.angle;
+  $('#heTransparency').value=Math.round((1-(editable?(shape.hatchOpacity??1):hatchSettings.opacity))*100);
+  const color=editable?shape.color:hatchSettings.color;$('#heColor').value=/^#[0-9a-f]{6}$/i.test(color||'')?color:'#7a7a7a';
+ }
+}
+let hatchSettings={angle:45,opacity:1,color:'#7a7a7a'};
 function render(){
+ updateHatchPanel();
  const refButton=document.getElementById('rotateRefBtn');if(refButton)refButton.hidden=!(tool==='rotate'&&moveBase&&activeLayout==='Model');
  if(activeLayout!=='Model'){cursorMeasureEl.hidden=true;$('#dynamic').style.display='none';if(cursorCommandEl)cursorCommandEl.hidden=true;const credit=$('#cadMapAttribution');if(credit)credit.hidden=true;renderPaperLayout();return}
  const oldPaperNotice=document.getElementById('cadLayoutNotice');if(oldPaperNotice)oldPaperNotice.hidden=true;
@@ -1097,7 +1133,7 @@ function render(){
  // Imported CAD hatches are background fills; keep dimensions, walls and labels visible on top.
  objects.forEach((s,i)=>{if(s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
  objects.forEach((s,i)=>{if(!s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
- if(!printing&&tool==='hatch'&&hatchPreview){const pattern=$('#hatchPattern')?.value||'ANSI31';ctx.save();ctx.globalAlpha=.7;drawEntity({type:'polygon',pts:hatchPreview[0],hatchLoops:hatchPreview,hatchPattern:pattern,solidFill:pattern.toUpperCase()==='SOLID',hatchSpacingWorld:Math.max(.001,Number($('#hatchSpacing')?.value||10))/50,...currentStyle($('#layer').value)},false,false);ctx.restore()}
+ if(!printing&&tool==='hatch'&&hatchPreview){const pattern=$('#hatchPattern')?.value||'ANSI31';ctx.save();ctx.globalAlpha=.7;drawEntity({type:'polygon',pts:hatchPreview[0],hatchLoops:hatchPreview,hatchPattern:pattern,solidFill:pattern.toUpperCase()==='SOLID',hatchSpacingWorld:Math.max(.001,Number($('#hatchSpacing')?.value||10))/50,hatchAngle:hatchSettings.angle,hatchOpacity:hatchSettings.opacity,...currentStyle($('#layer').value),color:hatchSettings.color},false,false);ctx.restore()}
  drawSelectionGrips();if(!printing&&activeSnap?.type==='EXTENSIÓN'&&activeSnap.origin){const a=screen(activeSnap.origin),b=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#f7cf56';ctx.lineWidth=1.3;ctx.setLineDash([6,5]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}
  if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
@@ -1501,7 +1537,7 @@ function hatchAtPoint(point){
  const result=detectHatchRegion(point);
  if(result.error){status.textContent='HATCH · '+result.error;hatchNotice(status.textContent,true);return}
  const pattern=$('#hatchPattern')?.value||'ANSI31',spacing=Math.max(.001,Number($('#hatchSpacing')?.value||10));
- checkpoint();objects.push({type:'polygon',pts:clone(result.loops[0]),hatchLoops:clone(result.loops),hatchPattern:pattern,solidFill:pattern.toUpperCase()==='SOLID',hatchSpacingWorld:spacing/50,importedHatch:true,...currentStyle($('#layer').value)});
+ checkpoint();objects.push({type:'polygon',pts:clone(result.loops[0]),hatchLoops:clone(result.loops),hatchPattern:pattern,solidFill:pattern.toUpperCase()==='SOLID',hatchSpacingWorld:spacing/50,hatchAngle:hatchSettings.angle,hatchOpacity:hatchSettings.opacity,importedHatch:true,...currentStyle($('#layer').value),color:hatchSettings.color});
  save();setTool('select');applySelection([objects.length-1]);render();status.textContent='HATCH creado y seleccionado · Supr para eliminar · Ctrl+Z para deshacer';hatchNotice(status.textContent);
 }
 function handleTap(p){
