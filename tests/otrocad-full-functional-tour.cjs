@@ -79,6 +79,14 @@ async function roundTrip(download){
  // Move a preselected group with a picked base and relative typed destination.
  await mcmd('M');await mclick(8,7);await mcmd('@2,0');
  moved=await getMoveState();assert.equal(moved[0].a.x,10);assert.equal(moved[0].a.y,7);
+ // Same preselected group, this time starting with the visible Mover button.
+ await movePage.locator('[data-tab="modify"]').click();
+ await movePage.locator('[data-tool="move"]').first().click();
+ await mclick(10,7);await mclick(11,8);
+ moved=await getMoveState();assert.equal(moved[0].a.x,11);assert.equal(moved[0].a.y,8);
+ // Escape during the next move must leave the objects unchanged.
+ await mcmd('M');await mclick(11,8);await movePage.keyboard.press('Escape');
+ assert.deepEqual(await getMoveState(),moved,'Escape must cancel MOVE without changing geometry');
  // Toolbar REGEN and paper layout must preserve objects.
  await movePage.locator('[data-tab="view"]').click();
  const unchanged=await getMoveState();await movePage.locator('#regenView').click();
