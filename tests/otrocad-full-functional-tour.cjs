@@ -41,6 +41,53 @@ async function roundTrip(download){
  const initial=await page.evaluate(()=>({units:window.OtroCadCivilAPI.getUnits(),objects:window.OtroCadCivilAPI.getObjects().length,canvas:document.querySelector('#cad').getBoundingClientRect().width}));
  assert(initial.canvas>200);
  check('Carga del editor y módulos CAD/Civil/MEP/Arqui',initial);
+ checkpoint='move-and-regen';
+ // Exercise real pointer, keyboard and toolbar interactions in an isolated drawing.
+ const movePage=await browser.newPage({viewport:{width:1440,height:900},serviceWorkers:'block'});
+ await movePage.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
+ await movePage.waitForFunction(()=>!!window.OtroCadCivilAPI,null,{timeout:20000});
+ await movePage.evaluate(()=>{
+  const api=window.OtroCadCivilAPI;
+  api.addObjects([
+   {type:'line',a:{x:5,y:5},b:{x:9,y:5},layer:'General',groupId:'fixture-group'},
+   {type:'line',a:{x:5,y:6},b:{x:9,y:6},layer:'General',groupId:'fixture-group'}
+  ],'Fixture');
+  if(document.querySelector('#osnapToggle').classList.contains('active'))document.querySelector('#osnapToggle').click();
+  if(document.querySelector('#orthoToggle').classList.contains('active'))document.querySelector('#orthoToggle').click();
+ });
+ async function mcmd(value){await movePage.locator('#cmd').fill(value);await movePage.locator('#cmd').press('Enter')}
+ async function mclick(x,y){
+  const box=await movePage.locator('#cad').boundingBox();
+  const v=await movePage.evaluate(()=>window.OtroCadCivilAPI.getView());
+  await movePage.mouse.click(box.x+box.width/2+(x-v.center.x)*v.pixelsPerUnit,box.y+box.height/2-(y-v.center.y)*v.pixelsPerUnit);
+ }
+ const getMoveState=()=>movePage.evaluate(()=>JSON.parse(JSON.stringify(window.OtroCadCivilAPI.getObjects())));
+ await mcmd('M');await mclick(5,5);
+ assert.equal(await movePage.evaluate(()=>window.OtroCadCivilAPI.getSelectedObjects().length),2,'MOVE must include grouped entities');
+ assert.match(await movePage.locator('#prompt').textContent(),/destino/i);
+ const beforeRegen=await getMoveState();
+ await movePage.evaluate(()=>{document.querySelector('#cad').width=10});
+ await mcmd('RE');
+ assert.deepEqual(await getMoveState(),beforeRegen,'RE must not change drawing geometry');
+ assert(await movePage.evaluate(()=>document.querySelector('#cad').width>10),'RE should rebuild canvas resolution');
+ await mclick(8,7);
+ let moved=await getMoveState();
+ assert.equal(moved[0].a.x,8);assert.equal(moved[0].a.y,7);
+ assert.equal(moved[1].a.x,8);assert.equal(moved[1].a.y,8);
+ await mcmd('UNDO');assert.deepEqual(await getMoveState(),beforeRegen,'Undo must restore moved group');
+ await mcmd('REDO');moved=await getMoveState();assert.equal(moved[0].a.x,8);
+ // Move a preselected group with a picked base and relative typed destination.
+ await mcmd('M');await mclick(8,7);await mcmd('@2,0');
+ moved=await getMoveState();assert.equal(moved[0].a.x,10);assert.equal(moved[0].a.y,7);
+ // Toolbar REGEN and paper layout must preserve objects.
+ await movePage.locator('[data-tab="view"]').click();
+ const unchanged=await getMoveState();await movePage.locator('#regenView').click();
+ assert.deepEqual(await getMoveState(),unchanged);
+ await movePage.locator('#paperCreate').click();
+ await mcmd('REGEN');assert.deepEqual(await getMoveState(),unchanged);
+ assert.match(await movePage.locator('#status').textContent(),/REGEN/);
+ await movePage.close();
+ check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';
  await command('L');await command('1,1');await command('6,1');
  let objs=await page.evaluate(()=>window.OtroCadCivilAPI.getObjects());

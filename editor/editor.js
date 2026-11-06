@@ -203,7 +203,7 @@ function snapPoint(p,excludedIndex=-1){
 }
 
 function constrain(p){
- const base=tool==='poly'&&poly.length?poly[poly.length-1]:start;
+ const base=tool==='poly'&&poly.length?poly[poly.length-1]:(['move','copy'].includes(tool)&&moveBase?moveBase:start);
  if(!base)return p;
  let dx=p.x-base.x,dy=p.y-base.y;
  if(orthoOn){if(Math.abs(dx)>=Math.abs(dy))dy=0;else dx=0}
@@ -661,7 +661,7 @@ function showDraftSettings(){
  };
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
 }
-function updatePrompt(){if(activeLayout!=='Model'){promptEl.textContent='PRESENTACIÓN · hoja de impresión · vuelve a Modelo para editar';return}if(tool==='rect'&&start){promptEl.textContent='Esquina opuesta · ancho · Tab / ; · alto · Enter';return}if(usesLineCoordinates()){promptEl.textContent=(activeAnchor()?'Extremo':'Primer punto')+' · X/Y junto al cursor · Tab / ;: cambiar campo · Enter: fijar';return}if(tool==='offset'){promptEl.textContent=offsetAwaitingDistance?'OFFSET · distancia · Enter':'OFFSET · objeto · lado · Esc para terminar';return}promptEl.textContent=tool==='matchprop'?(matchState.source?'MA · DESTINO · Esc: finalizar':'MA · ORIGEN · selecciona el objeto que presta su estilo'):tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
+function updatePrompt(){if(['move','copy'].includes(tool)&&activeLayout==='Model'){promptEl.textContent=(tool==='move'?'MOVER':'COPIAR')+' · '+(moveBase?'indica punto destino':(modifyTargets.length||selectedItems().length?'indica punto base':'selecciona el objeto por el punto base'));return}if(activeLayout!=='Model'){promptEl.textContent='PRESENTACIÓN · hoja de impresión · vuelve a Modelo para editar';return}if(tool==='rect'&&start){promptEl.textContent='Esquina opuesta · ancho · Tab / ; · alto · Enter';return}if(usesLineCoordinates()){promptEl.textContent=(activeAnchor()?'Extremo':'Primer punto')+' · X/Y junto al cursor · Tab / ;: cambiar campo · Enter: fijar';return}if(tool==='offset'){promptEl.textContent=offsetAwaitingDistance?'OFFSET · distancia · Enter':'OFFSET · objeto · lado · Esc para terminar';return}promptEl.textContent=tool==='matchprop'?(matchState.source?'MA · DESTINO · Esc: finalizar':'MA · ORIGEN · selecciona el objeto que presta su estilo'):tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
 
 function isVisibleModelEntity(s){
  return (s.cadLayout||'Model')==='Model'&&!hiddenLayers.has(s.layer)&&!(hideModelAnnotations&&s.type==='text');
@@ -1082,6 +1082,11 @@ function render(){
  objects.forEach((s,i)=>{if(!s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
  drawSelectionGrips();if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
+ if(!printing&&moveBase&&['move','copy'].includes(tool)&&modifyTargets.length){
+  const q=constrain(snapPoint(world(cursor))),dx=q.x-moveBase.x,dy=q.y-moveBase.y;
+  ctx.save();ctx.globalAlpha=.5;for(const i of modifyTargets.slice(0,300)){if(objects[i]){const preview=clone(objects[i]);translate(preview,dx,dy);drawEntity(preview,false,true)}}ctx.restore();
+  const a=screen(moveBase),b=screen(q);ctx.save();ctx.setLineDash([6,4]);ctx.strokeStyle='#ffcf23';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore();
+ }
  if(!printing&&temp)drawEntity(temp,false,true);
  if(!printing)for(const item of window.OtroCadMep?.getPreview()||[])drawEntity(item,false,true);
  if(!printing&&tool==='poly'&&poly.length)drawEntity({type:'poly',pts:clone(poly),...currentStyle($('#layer').value)},false);
@@ -1399,9 +1404,9 @@ function doOffset(q){
  }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
  if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([]);render();status.textContent='OFFSET creado · selecciona otro objeto o Esc para terminar';
 }
-function handleTap(p){
+function handleTap(p,exactPoint=null){
  if(tool==='matchprop'){matchPropertiesAt(world(p));return}
- let q=snapPoint(world(p));q=constrain(q);if(usesLineCoordinates())q=coordinateCorner(q);
+ let q=exactPoint?clone(exactPoint):constrain(snapPoint(world(p)));if(usesLineCoordinates())q=coordinateCorner(q);
  if(window.OtroCadMep?.placeAt(q))return;
  if(!['select','pan','move','copy','offset','trim','extend','explode','measure'].includes(tool)&&lockedLayers.has($('#layer').value)){status.textContent='La capa '+$('#layer').value+' está bloqueada';return}
  if(tool==='arc'){
@@ -1473,10 +1478,10 @@ function handleTap(p){
  if(['move','copy','rotate','mirror','scale'].includes(tool)){
   if(modifyTargets.length===0){
    modifyTargets=selectedItems();
-   if(!modifyTargets.length){const hit=selectAt(q);if(hit>=0){applySelection([hit]);modifyTargets=[hit];status.textContent='Objeto seleccionado. Indica punto base';return}}
+   if(!modifyTargets.length){const hit=selectAt(world(p));if(hit>=0){applySelection([hit]);modifyTargets=selectedItems();if(tool==='move'||tool==='copy'){moveBase=clone(q);status.textContent=(tool==='move'?'MOVER':'COPIAR')+' · punto base fijado en la selección · indica el punto destino';}else status.textContent='Objeto seleccionado · indica punto base';updatePrompt();render();return}}
    if(!modifyTargets.length){status.textContent='Selecciona uno o varios objetos';return}
   }
-  if(!moveBase){moveBase=q;status.textContent=tool==='mirror'?'Indica el segundo punto del eje':tool==='rotate'?'Indica el ángulo de giro':tool==='scale'?'Indica el factor de escala con la distancia':'Indica punto destino';return}
+  if(!moveBase){moveBase=clone(q);status.textContent=tool==='mirror'?'Indica el segundo punto del eje':tool==='rotate'?'Indica el ángulo de giro':tool==='scale'?'Indica el factor de escala con la distancia':'Punto base fijado · indica punto destino';updatePrompt();render();return}
   const dx=q.x-moveBase.x,dy=q.y-moveBase.y,targets=modifyTargets.filter(i=>i>=0&&i<objects.length);
   if(tool==='mirror'&&Math.hypot(dx,dy)<1e-9){status.textContent='Eje de simetría demasiado corto';return}
   if(tool==='scale'&&Math.hypot(dx,dy)<1e-6){status.textContent='Factor de escala no válido';return}
@@ -1499,7 +1504,7 @@ function handleTap(p){
    }
   }
   if(tool==='copy')applySelection(created);else applySelection(targets);
-  save();modifyTarget=-1;modifyTargets=[];moveBase=null;render();status.textContent=tool.toUpperCase()+' aplicado a '+targets.length+' objeto(s)';return;
+  save();modifyTarget=-1;modifyTargets=[];moveBase=null;render();updatePrompt();status.textContent=tool.toUpperCase()+' aplicado a '+targets.length+' objeto(s)';return;
  }
  if(!start){if(tool==='rect')resetRectangleDimensions();if(usesLineCoordinates())resetLineCoordinates();start=q;temp={type:tool,a:clone(q),b:clone(q),layer:$('#layer').value};$('#dynLen').value='';$('#dynAngle').value='';updatePrompt();render();return}
  let end=tool==='rect'?rectangleCorner(q):usesLineCoordinates()?coordinateCorner(q):pointFromInputs();if(!end)end=q;else if(tool!=='rect'&&document.activeElement!==$('#dynLen')&&document.activeElement!==$('#dynAngle'))end=q;
@@ -1697,6 +1702,7 @@ function cancelCurrentAction(){
 function performEnterAction(){
  if(tool==='offset'&&offsetAwaitingDistance){acceptOffsetDistance($('#dynLen').value);return}
  if(tool==='trim'&&trimState.phase==='boundaries'&&!$('#cmd').value.trim()){finishTrimBoundaries();return}
+ if(['move','copy'].includes(tool)&&!$('#cmd').value.trim()){status.textContent=moveBase?'Indica el punto destino con un clic o coordenadas':(selectedItems().length?'Indica el punto base con un clic o coordenadas':'Selecciona el objeto por el punto base');updatePrompt();return}
  if(tool==='rect'&&start&&dynamicInputOn){const point=pointFromInputs();if(point)commitEntity(point);else status.textContent='Rectángulo: indica ancho y alto válidos';return}
  if(selectionClickAnchor){selectionClickAnchor=null;selectionStart=null;selectionBox=null;render();status.textContent='Ventana de selección terminada';return}
  const raw=$('#cmd').value.trim();
@@ -1731,7 +1737,7 @@ function showCadKeyboardHelp(){
    '<div class="cad-help-grid">'+
    '<div><b>Dibujo</b><span>L, PL, C, A, REC, H, T</span></div>'+
    '<div><b>Modificar</b><span>M, CO / CP, O, TR, EX, RO, MI, SC, F, CHA, X, E</span></div>'+
-   '<div><b>Vista y precisión</b><span>Z E, PAN, DS / HP, F3, F7, F8, F9, F10, F12</span></div>'+
+   '<div><b>Vista y precisión</b><span>RE / REGEN, Z E, PAN, DS / HP, F3, F7, F8, F9, F10, F12</span></div>'+
    '<div><b>Archivo</b><span>Ctrl+S DWG · Ctrl+O abrir · Ctrl+N nuevo · Ctrl+P imprimir · Ctrl+Shift+E DXF</span></div>'+
    '<div><b>Edición</b><span>Ctrl+Z deshacer · Ctrl+Y rehacer · Ctrl+1 propiedades · Esc cancelar</span></div>'+
    '<div><b>Entrada numérica</b><span>L, primer punto, mover cursor, 5 ↵ · @3,4 ↵ · @5&lt;30 ↵</span></div>'+
@@ -1781,6 +1787,7 @@ $('#cmd').addEventListener('keydown',e=>{
 });
 $('#cmdRun').addEventListener('click',()=>{submitCommand();$('#cmd').blur()});
 $('#keyboardHelpBtn').addEventListener('click',showCadKeyboardHelp);
+$('#regenView').addEventListener('click',()=>{resize();status.textContent='REGEN · vista regenerada sin modificar el dibujo'});
 document.addEventListener('pointerdown',e=>{if(contextMenuEl&&!contextMenuEl.contains(e.target))hideCadContextMenu()});
 contextMenuEl.addEventListener('contextmenu',e=>e.preventDefault());
 
@@ -1912,6 +1919,7 @@ function parseCoordinate(raw,base){
 function runCommand(raw){
  const textValue=raw.trim(),upper=textValue.toUpperCase(),parts=upper.split(/\s+/),c=parts[0];if(!c)return;
  if(!/^[+-]?(?:\d|[.,])/.test(textValue)&&!textValue.startsWith('@')&&!['DS','HP','DSETTINGS','DRAFTINGSETTINGS','SETTINGS','F3','F7','F8','F9','F10','GRID','ORTHO','SNAP','OSNAP','POLAR'].includes(c)){lastCommand=textValue;try{localStorage.setItem('otrocad-last-command',lastCommand)}catch(e){}}
+ if(c==='RE'||c==='REGEN'||c==='REGENERATE'){resize();status.textContent='REGEN · vista regenerada sin modificar el dibujo';return}
  if(c==='F12'||c==='DYNMODE'||c==='DYN'){toggleDynamicInput();return}
  if(c==='F1'||c==='HELP'||c==='ATAJOS'){showCadKeyboardHelp();return}
  if(window.OtroCadCivilCommands&&typeof window.OtroCadCivilCommands[c]==='function'){
@@ -1937,10 +1945,11 @@ function runCommand(raw){
   commitEntity(point);status.textContent='Línea de '+len+' '+units+' creada con ángulo del cursor';return;
  }
  if(c==='O'||c==='OFFSET'){const d=cursorNumber(parts[1]||'');if(parts[1]&&(!Number.isFinite(d)||d<=0)){status.textContent='OFFSET: ingresa una distancia positiva';return}if(parts[1])offsetDistance=d;setTool('offset',{offsetDistanceProvided:!!parts[1]});return}
- const coordinateBase=tool==='arc'&&arcPoints.length?arcPoints[arcPoints.length-1]:(activeAnchor()||{x:0,y:0});
+ const coordinateBase=tool==='arc'&&arcPoints.length?arcPoints[arcPoints.length-1]:((['move','copy'].includes(tool)&&moveBase)||activeAnchor()||{x:0,y:0});
  const coordinate=parseCoordinate(textValue,coordinateBase);
  if(coordinate&&(/^[+-]?(?:\d|\.)/.test(textValue)||textValue.startsWith('@'))){
   const point=round(coordinate);
+  if(['move','copy'].includes(tool)){handleTap(screen(point),point);return}
   if(tool==='poly'){poly.push(point);resetLineCoordinates();temp=null;render();status.textContent='Polilínea: vértice añadido · Enter para terminar';return}
   if(tool==='measure'){handleTap(screen(point));return}
   if(tool==='arc'){arcPoints.push(point);if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);arcPoints=[];status.textContent='Arco creado'}else status.textContent='Arco: introduce el siguiente punto';render();return}
