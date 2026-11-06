@@ -1093,7 +1093,7 @@ function updateHatchPanel(){
  if(!hatchPanel){
   hatchPanel=document.createElement('section');hatchPanel.id='hatchEditorPanel';hatchPanel.setAttribute('aria-label','Editor de Hatch');
   hatchPanel.style.cssText='position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:30;display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:9px;background:#273344;color:white;border:1px solid #53667f;border-radius:6px;box-shadow:0 3px 12px #0006;font:12px system-ui;max-width:95%';
-  hatchPanel.innerHTML='<strong style="align-self:center">Editor Hatch</strong><label>Patrón<br><select id="hePattern"><option value="SOLID">SOLID</option><option value="ANSI31">ANSI31</option><option value="CROSS">CROSS</option><option value="GRID">GRID</option></select></label><label>Paso<br><input id="heSpacing" type="number" min="0.001" step="0.1" style="width:65px"></label><label>Ángulo °<br><input id="heAngle" type="number" step="1" style="width:60px"></label><label>Transparencia %<br><input id="heTransparency" type="number" min="0" max="100" step="1" style="width:55px"></label><label>Color<br><input id="heColor" type="color" style="width:45px;height:26px"></label><label>Origen X<br><input id="heOriginX" type="number" step="any" style="width:65px"></label><label>Origen Y<br><input id="heOriginY" type="number" step="any" style="width:65px"></label><button id="heRecreate" type="button" title="Crear polilíneas cerradas a partir de los límites">Recrear contorno</button><button id="heClose" type="button">Cerrar</button>';
+  hatchPanel.innerHTML='<strong style="align-self:center">Editor Hatch</strong><label>Patrón<br><select id="hePattern"><option value="SOLID">SOLID</option><option value="ANSI31">ANSI31</option><option value="CROSS">CROSS</option><option value="GRID">GRID</option></select></label><label>Paso<br><input id="heSpacing" type="number" min="0.001" step="0.1" style="width:65px"></label><label>Ángulo °<br><input id="heAngle" type="number" step="1" style="width:60px"></label><label>Transparencia %<br><input id="heTransparency" type="number" min="0" max="100" step="1" style="width:55px"></label><label>Color<br><input id="heColor" type="color" style="width:45px;height:26px"></label><label>Origen X<br><input id="heOriginX" type="number" step="any" style="width:65px"></label><label>Origen Y<br><input id="heOriginY" type="number" step="any" style="width:65px"></label><button id="heFromObject" type="button" title="Selecciona primero un objeto cerrado">Usar objeto cerrado</button><button id="heRecreate" type="button" title="Crear polilíneas cerradas a partir de los límites">Recrear contorno</button><button id="heClose" type="button">Cerrar</button>';
   stage.appendChild(hatchPanel);
   hatchPanel.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',()=>{
    const pattern=$('#hePattern').value,step=Math.max(.001,Number($('#heSpacing').value)||10),angle=Number($('#heAngle').value)||0,opacity=1-Math.max(0,Math.min(100,Number($('#heTransparency').value)||0))/100,color=$('#heColor').value;
@@ -1114,12 +1114,13 @@ function updateHatchPanel(){
    }
    render();
   }));
+  $('#heFromObject').addEventListener('click',hatchSelectedBoundary);
   $('#heRecreate').addEventListener('click',recreateHatchBoundaries);
   $('#heClose').addEventListener('click',()=>{if(tool==='hatch')setTool('select');clearSelection();render()});
  }
  const indices=selectedItems(), index=indices.length===1?indices[0]:null, shape=index===null?null:objects[index];
  const editable=shape&&(shape.type==='hatch'||(shape.type==='polygon'&&(shape.hatchPattern||shape.solidFill)));
- const target=editable?index:null,visible=tool==='hatch'||!!editable;$('#heRecreate').disabled=!editable;
+ const target=editable?index:null,visible=tool==='hatch'||!!editable;$('#heRecreate').disabled=!editable;$('#heFromObject').disabled=tool!=='hatch'||!shape||!!editable;
  hatchPanel.hidden=!visible;hatchPanel.style.display=visible?'flex':'none';
  if(!visible){hatchPanelTarget=null;hatchPanel.dataset.mode='';return}
  // Do not replace an in-progress edit while the drawing is being redrawn.
@@ -1133,6 +1134,14 @@ function updateHatchPanel(){
   $('#heTransparency').value=Math.round((1-(editable?((shape.hatchOpacity??1)*(shape.cadOpacity??1)):hatchSettings.opacity))*100);
   const color=editable?shape.color:hatchSettings.color;$('#heColor').value=/^#[0-9a-f]{6}$/i.test(color||'')?color:'#7a7a7a';
  }
+}
+function hatchSelectedBoundary(){
+ const ids=selectedItems(),source=ids.length===1?objects[ids[0]]:null;
+ if(!source||!['rect','circle','ellipse','polygon','poly'].includes(source.type)||source.hatchPattern||source.solidFill){status.textContent='Selecciona un objeto cerrado antes de activar Hatch';return}
+ const segs=entitySegments(source);if(segs.length<3||distance(segs[0][0],segs[segs.length-1][1])>1e-7||segs.some((seg,i)=>i>0&&distance(segs[i-1][1],seg[0])>1e-7)){status.textContent='El objeto no está cerrado';return}
+ const loop=segs.map(seg=>clone(seg[0])),pattern=$('#hatchPattern').value,spacing=Math.max(.001,Number($('#hatchSpacing').value)||10);
+ checkpoint();objects.push({type:'polygon',pts:clone(loop),hatchLoops:[loop],hatchPattern:pattern,solidFill:pattern==='SOLID',hatchSpacingWorld:spacing/50,hatchAngle:hatchSettings.angle,hatchOpacity:hatchSettings.opacity,hatchOrigin:clone(hatchSettings.origin),importedHatch:true,...currentStyle($('#layer').value),color:hatchSettings.color});
+ save();setTool('select');applySelection([objects.length-1]);render();status.textContent='Hatch creado desde objeto cerrado · Supr para eliminar';
 }
 function recreateHatchBoundaries(){
  const shape=hatchPanelTarget===null?null:objects[hatchPanelTarget];if(!shape)return;
