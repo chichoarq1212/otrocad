@@ -1,6 +1,7 @@
 (()=>{
 const $=s=>document.querySelector(s), canvas=$('#cad'),ctx=canvas.getContext('2d'),stage=$('#stage'),status=$('#status'),promptEl=$('#prompt');
 let objects=[],undo=[],redo=[],tool='line',start=null,temp=null,selected=-1,selectedSet=new Set(),modifyTargets=[],poly=[],arcPoints=[],cursor={x:0,y:0},zoom=35,offset={x:0,y:0},drag=null;
+const MAX_MODEL_ZOOM=1e7;
 let lastCommand='',cursorCommandEl=null,contextMenuEl=null,activeFurniture=null;
 let activeLayout='Model',layouts=[],layoutViewportRecords=[],hideModelAnnotations=false,layoutRenderTransform=null,lastModelCamera=null,activePaperPlotStyle=null;
 function newGroupId(){return 'bloque-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}
@@ -146,7 +147,7 @@ function save(){
 function world(p){return{x:(p.x-canvas.clientWidth/2-offset.x)/zoom,y:(canvas.clientHeight/2+offset.y-p.y)/zoom}}
 function screen(p){if(layoutRenderTransform)return{x:layoutRenderTransform.tx+p.x*layoutRenderTransform.scale,y:layoutRenderTransform.ty-p.y*layoutRenderTransform.scale};return{x:canvas.clientWidth/2+offset.x+p.x*zoom,y:canvas.clientHeight/2+offset.y-p.y*zoom}}
 function pointer(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
-function round(p){return{x:Math.round(p.x*1000)/1000,y:Math.round(p.y*1000)/1000}}
+function round(p){const precision=typeof zoom==='number'&&zoom>500?1e9:1000;return{x:Math.round(p.x*precision)/precision,y:Math.round(p.y*precision)/precision}}
 function distance(a,b){return Math.hypot(b.x-a.x,b.y-a.y)}
 function angle(a,b){return Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI}
 function normalize(a){return (a%360+360)%360}
@@ -1875,7 +1876,7 @@ canvas.addEventListener('pointerdown',e=>{
  // Keep canvas gestures working even when capture cannot be established.
  if(typeof canvas.setPointerCapture==='function')try{canvas.setPointerCapture(e.pointerId)}catch(error){console.warn('Pointer capture unavailable; using canvas pointer events',error)}
  const p=pointer(e);cursor=p;pointers.set(e.pointerId,p);
- if(pointers.size===2){if(gripDrag)cancelGripDrag();const v=[...pointers.values()];pinch={dist:distance(v[0],v[1]),zoom};start=null;temp=null;selectionStart=null;selectionBox=null;return}
+ if(pointers.size===2){if(gripDrag)cancelGripDrag();const v=[...pointers.values()];pinch={dist:distance(v[0],v[1]),zoom,anchor:world({x:(v[0].x+v[1].x)/2,y:(v[0].y+v[1].y)/2})};start=null;temp=null;selectionStart=null;selectionBox=null;return}
  if(tool==='pan'){drag={point:p,offset:clone(offset)};return}
  if(tool==='select'){
   if(selectionClickAnchor){selectionStart=null;selectionBox={a:selectionClickAnchor,b:p};selectionAdditive=multiSelectOn||!!(e.shiftKey||e.ctrlKey||e.metaKey);finishSelectionWindow(selectionBox);selectionClickAnchor=null;selectionBox=null;render();return}
@@ -1886,9 +1887,9 @@ canvas.addEventListener('pointermove',e=>{
  if(activeLayout!=='Model')return;
  if(e.pointerType==='touch'&&pointers.has(e.pointerId))e.preventDefault();
  const p=pointer(e);
- if(middlePan&&middlePan.pointerId===e.pointerId){offset.x=middlePan.offset.x+p.x-middlePan.point.x;offset.y=middlePan.offset.y+p.y-middlePan.point.y;render();return}cursor=p;updateCursorCommand();$('#crossinfo').textContent='X '+world(p).x.toFixed(3)+' '+units+' · Y '+world(p).y.toFixed(3)+' '+units+' · Z 0.000'+(window.OtroCadGeolocation?.formatCoordinate(world(p),units)||'');
+ if(middlePan&&middlePan.pointerId===e.pointerId){offset.x=middlePan.offset.x+p.x-middlePan.point.x;offset.y=middlePan.offset.y+p.y-middlePan.point.y;render();return}cursor=p;updateCursorCommand();$('#crossinfo').textContent='X '+world(p).x.toFixed(zoom>500?6:3)+' '+units+' · Y '+world(p).y.toFixed(zoom>500?6:3)+' '+units+' · Z 0.000'+(window.OtroCadGeolocation?.formatCoordinate(world(p),units)||'');
  if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);activeSnap=snapCandidate(world(p));if(activeSnap)status.textContent='OSNAP · '+activeSnap.type+' · clic para conectar';
- if(pointers.size===2&&pinch){const v=[...pointers.values()];zoom=Math.max(.000001,Math.min(500,pinch.zoom*distance(v[0],v[1])/(pinch.dist||1)));render();return}
+ if(pointers.size===2&&pinch){const v=[...pointers.values()];zoom=Math.max(.000001,Math.min(MAX_MODEL_ZOOM,pinch.zoom*distance(v[0],v[1])/(pinch.dist||1)));const mid={x:(v[0].x+v[1].x)/2,y:(v[0].y+v[1].y)/2};offset.x=mid.x-canvas.clientWidth/2-pinch.anchor.x*zoom;offset.y=mid.y-canvas.clientHeight/2+pinch.anchor.y*zoom;render();return}
  if(drag&&tool==='pan'){offset.x=drag.offset.x+p.x-drag.point.x;offset.y=drag.offset.y+p.y-drag.point.y;render();return}
  if(gripDrag){
   if(e.pointerId!==gripDrag.pointerId)return;
@@ -1940,7 +1941,7 @@ canvas.addEventListener('contextmenu',e=>{
  if(!hasActiveCommand&&rightClickMode==='repeat'){hideCadContextMenu();repeatLastCommand();return}
  showCadContextMenu(e);
 });
-canvas.addEventListener('wheel',e=>{e.preventDefault();if(activeLayout!=='Model')return;const p=pointer(e),before=world(p);zoom=Math.max(.000001,Math.min(500,zoom*(e.deltaY<0?1.12:.89)));const after=screen(before);offset.x+=p.x-after.x;offset.y+=p.y-after.y;render()},{passive:false});
+canvas.addEventListener('wheel',e=>{e.preventDefault();if(activeLayout!=='Model')return;const p=pointer(e),before=world(p);zoom=Math.max(.000001,Math.min(MAX_MODEL_ZOOM,zoom*(e.deltaY<0?1.12:.89)));const after=screen(before);offset.x+=p.x-after.x;offset.y+=p.y-after.y;render()},{passive:false});
 function updateToggle(id,on){$(id).classList.toggle('active',on);if(id==='#crossToggle')canvas.style.cursor=on?'none':'crosshair'}
 function toggle(id){const map={gridToggle:'gridOn',orthoToggle:'orthoOn',snapToggle:'snapOn',polarToggle:'polarOn',osnapToggle:'osnapOn',crossToggle:'crossOn'};const k=map[id];if(k==='gridOn')gridOn=!gridOn;if(k==='orthoOn')orthoOn=!orthoOn;if(k==='snapOn')snapOn=!snapOn;if(k==='polarOn')polarOn=!polarOn;if(k==='osnapOn')osnapOn=!osnapOn;if(k==='crossOn')crossOn=!crossOn;const values={gridOn,orthoOn,snapOn,polarOn,osnapOn,crossOn};updateToggle('#'+id,values[k]);saveDraftPreferences();render()}
 [['gridToggle',gridOn],['orthoToggle',orthoOn],['snapToggle',snapOn],['polarToggle',polarOn],['osnapToggle',osnapOn],['crossToggle',crossOn]].forEach(([id,on])=>updateToggle('#'+id,on));
@@ -2087,7 +2088,7 @@ function runCommand(raw){
  if(['ED','TEXTEDIT','DDEDIT','EDITTEXT','STYLE','TEXTSTYLE'].includes(c)){editSelectedText();return}
  if(c==='SELECTTEXT'||c==='QSELECTTEXT'){const ids=objects.map((o,i)=>o.type==='text'&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer)?i:-1).filter(i=>i>=0);applySelection(ids);showProperties();status.textContent=ids.length+' textos seleccionados · ejecuta ED para cambiar formato en conjunto';return}
  if(c==='E'||c==='ERASE'||c==='DELETE'){deleteSelection();return}
- if(c==='Z'||c==='ZOOM'){if(['E','EXTENTS','ALL','A'].includes(parts[1])){$('#fit').click();return}zoom=Math.min(500,zoom*1.25);render();return}
+ if(c==='Z'||c==='ZOOM'){if(['E','EXTENTS','ALL','A'].includes(parts[1])){$('#fit').click();return}zoom=Math.min(MAX_MODEL_ZOOM,zoom*1.25);render();return}
  if(c==='RE'||c==='REGEN'){render();return}
  if(c==='ARRAY'||c==='ARRAYRECT'){showArrayDialog();return}
  if(c==='AREA'){selectedArea();return}
@@ -2871,7 +2872,7 @@ function boundsPoints(o){
  if(o.type==='arc'&&o.pts?.length>=3){const g=arcParams(o.pts);if(g){const span=v=>(v+2*Math.PI)%(2*Math.PI);for(const t of [0,Math.PI/2,Math.PI,3*Math.PI/2]){const onArc=g.anticlockwise?span(g.a1-t)<=span(g.a1-g.a3):span(t-g.a1)<=span(g.a3-g.a1);if(onArc)pts.push(world({x:g.x+g.r*Math.cos(t),y:g.y+g.r*Math.sin(t)}))}}}
  return pts.filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));
 }
-$('#fit').onclick=()=>{const ps=objects.filter(isVisibleModelEntity).flatMap(boundsPoints);if(!ps.length){offset={x:0,y:0};zoom=35;render();return}const xs=ps.map(p=>p.x),ys=ps.map(p=>p.y),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);const availableWidth=Math.max(20,canvas.clientWidth-80),availableHeight=Math.max(20,canvas.clientHeight-80);zoom=Math.min(10000,Math.max(.001,Math.min(availableWidth/(maxx-minx||1),availableHeight/(maxy-miny||1))));offset.x=-(minx+maxx)/2*zoom;offset.y=(miny+maxy)/2*zoom;render()};
+$('#fit').onclick=()=>{const ps=objects.filter(isVisibleModelEntity).flatMap(boundsPoints);if(!ps.length){offset={x:0,y:0};zoom=35;render();return}const xs=ps.map(p=>p.x),ys=ps.map(p=>p.y),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);const availableWidth=Math.max(20,canvas.clientWidth-80),availableHeight=Math.max(20,canvas.clientHeight-80);zoom=Math.min(MAX_MODEL_ZOOM,Math.max(.001,Math.min(availableWidth/(maxx-minx||1),availableHeight/(maxy-miny||1))));offset.x=-(minx+maxx)/2*zoom;offset.y=(miny+maxy)/2*zoom;render()};
 $('#settingsBtn').onclick=showDraftSettings;$('#draftQuick').onclick=showDraftSettings;$('#snapBtn').onclick=showDraftSettings;$('#unitsBtn').onclick=showDraftSettings;
 $('#layer').onchange=()=>{$('#drawColor').value=colors[$('#layer').value]||colors.General};
 $('#newLayer').onclick=()=>{const name=prompt('Nombre de la nueva capa');if(name){const op=document.createElement('option');op.textContent=name;$('#layer').append(op);$('#layer').value=name;colors[name]='#62b8e8'}};
@@ -2907,7 +2908,7 @@ window.OtroCadCivilAPI={
  setView:(center,pixelsPerUnit=zoom)=>{
   if(!Number.isFinite(center?.x)||!Number.isFinite(center?.y)||!Number.isFinite(pixelsPerUnit)||pixelsPerUnit<=0)return false;
   if(activeLayout!=='Model')switchCadLayout('Model');
-  zoom=Math.max(.000001,Math.min(500,pixelsPerUnit));offset.x=-center.x*zoom;offset.y=center.y*zoom;render();return true;
+  zoom=Math.max(.000001,Math.min(MAX_MODEL_ZOOM,pixelsPerUnit));offset.x=-center.x*zoom;offset.y=center.y*zoom;render();return true;
  },
  setStatus:value=>{status.textContent=String(value||'')},
  ensureLayer:(name,color)=>{

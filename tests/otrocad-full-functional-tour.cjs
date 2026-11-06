@@ -170,6 +170,19 @@ async function roundTrip(download){
  assert.ok(afterHatch[afterHatch.length-1].hatchLoops?.length,'Hatch must retain its true boundary');
  await mcmd('UNDO');assert.deepEqual(await getMoveState(),beforeHatch);
  check('HATCH con un clic y deshacer');
+
+ // Zoom far beyond the former 500 px/unit limit while keeping the cursor anchored.
+ await movePage.evaluate(()=>window.OtroCadCivilAPI.setView({x:0,y:0},1000000));
+ let z=await movePage.evaluate(()=>window.OtroCadCivilAPI.getView());assert.equal(z.pixelsPerUnit,1000000);
+ const zoomBox=await movePage.locator('#cad').boundingBox();
+ await movePage.mouse.move(zoomBox.x+zoomBox.width/2+30,zoomBox.y+zoomBox.height/2+20);
+ const beforeZoom=z;
+ await movePage.mouse.wheel(0,-100);
+ z=await movePage.evaluate(()=>window.OtroCadCivilAPI.getView());
+ assert.ok(z.pixelsPerUnit>beforeZoom.pixelsPerUnit,'Wheel zoom must exceed former limit');
+ assert.ok(Math.abs((z.center.x+30/z.pixelsPerUnit)-(beforeZoom.center.x+30/beforeZoom.pixelsPerUnit))<1e-9,'Wheel zoom should preserve the point under the cursor');
+ await movePage.evaluate(()=>window.OtroCadCivilAPI.setView({x:0,y:0},35));
+ check('Zoom de gran ampliación centrado en el cursor');
  await movePage.close();
  check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';
