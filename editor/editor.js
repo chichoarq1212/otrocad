@@ -665,7 +665,7 @@ function showDraftSettings(){
  };
  dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
 }
-function updatePrompt(){if(tool==='scale'&&activeLayout==='Model'){promptEl.textContent='ESCALAR · '+(moveBase?'mueve el cursor o escribe factor y Enter':(modifyTargets.length||selectedItems().length?'indica punto base':'selecciona objeto(s)'));return}if(['move','copy'].includes(tool)&&activeLayout==='Model'){promptEl.textContent=(tool==='move'?'MOVER':'COPIAR')+' · '+(moveBase?'indica punto destino':(modifyTargets.length||selectedItems().length?'indica punto base':'selecciona el objeto por el punto base'));return}if(activeLayout!=='Model'){promptEl.textContent='PRESENTACIÓN · hoja de impresión · vuelve a Modelo para editar';return}if(tool==='rect'&&start){promptEl.textContent='Esquina opuesta · ancho · Tab / ; · alto · Enter';return}if(usesLineCoordinates()){promptEl.textContent=(activeAnchor()?'Extremo':'Primer punto')+' · X/Y junto al cursor · Tab / ;: cambiar campo · Enter: fijar';return}if(tool==='offset'){promptEl.textContent=offsetAwaitingDistance?'OFFSET · distancia · Enter':'OFFSET · objeto · lado · Esc para terminar';return}promptEl.textContent=tool==='matchprop'?(matchState.source?'MA · DESTINO · Esc: finalizar':'MA · ORIGEN · selecciona el objeto que presta su estilo'):tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
+function updatePrompt(){if(tool==='hatch'){promptEl.textContent='HATCH · haz clic dentro de un recinto cerrado · Esc para terminar';return}if(tool==='scale'&&activeLayout==='Model'){promptEl.textContent='ESCALAR · '+(moveBase?'mueve el cursor o escribe factor y Enter':(modifyTargets.length||selectedItems().length?'indica punto base':'selecciona objeto(s)'));return}if(['move','copy'].includes(tool)&&activeLayout==='Model'){promptEl.textContent=(tool==='move'?'MOVER':'COPIAR')+' · '+(moveBase?'indica punto destino':(modifyTargets.length||selectedItems().length?'indica punto base':'selecciona el objeto por el punto base'));return}if(activeLayout!=='Model'){promptEl.textContent='PRESENTACIÓN · hoja de impresión · vuelve a Modelo para editar';return}if(tool==='rect'&&start){promptEl.textContent='Esquina opuesta · ancho · Tab / ; · alto · Enter';return}if(usesLineCoordinates()){promptEl.textContent=(activeAnchor()?'Extremo':'Primer punto')+' · X/Y junto al cursor · Tab / ;: cambiar campo · Enter: fijar';return}if(tool==='offset'){promptEl.textContent=offsetAwaitingDistance?'OFFSET · distancia · Enter':'OFFSET · objeto · lado · Esc para terminar';return}promptEl.textContent=tool==='matchprop'?(matchState.source?'MA · DESTINO · Esc: finalizar':'MA · ORIGEN · selecciona el objeto que presta su estilo'):tool==='select'?'SELECCIÓN · dos clics o arrastra · izquierda→derecha: VENTANA · derecha→izquierda: CRUCE':((start||poly.length)?'Siguiente punto · longitud y ángulo editables':('Comando: '+tool.toUpperCase()))}
 
 function isVisibleModelEntity(s){
  return (s.cadLayout||'Model')==='Model'&&!hiddenLayers.has(s.layer)&&!(hideModelAnnotations&&s.type==='text');
@@ -1420,12 +1420,52 @@ function doOffset(q){
  }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
  if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([]);render();status.textContent='OFFSET creado · selecciona otro objeto o Esc para terminar';
 }
+// Find bounded planar faces from actual visible drawing edges; never invent a boundary.
+function findHatchFaces(shapes,point,tolerance=1e-7){
+ const segs=[];
+ for(const shape of shapes){
+  if(!['line','poly','polygon','rect','circle','ellipse','arc'].includes(shape.type)||shape.hatchPattern||shape.solidFill||shape.importedHatch)continue;
+  for(const [a,b] of entitySegments(shape))if(a&&b&&distance(a,b)>tolerance)segs.push({a,b,ts:[0,1]});
+ }
+ if(segs.length>1200)return {error:'El dibujo contiene demasiados bordes para detectar el recinto; aísla las capas necesarias.'};
+ const cross=(x,y,u,v)=>x*v-y*u;
+ for(let i=0;i<segs.length;i++)for(let j=i+1;j<segs.length;j++){
+  const A=segs[i],B=segs[j],rx=A.b.x-A.a.x,ry=A.b.y-A.a.y,sx=B.b.x-B.a.x,sy=B.b.y-B.a.y;
+  if(Math.max(A.a.x,A.b.x)+tolerance<Math.min(B.a.x,B.b.x)||Math.max(B.a.x,B.b.x)+tolerance<Math.min(A.a.x,A.b.x)||Math.max(A.a.y,A.b.y)+tolerance<Math.min(B.a.y,B.b.y)||Math.max(B.a.y,B.b.y)+tolerance<Math.min(A.a.y,A.b.y))continue;
+  const den=cross(rx,ry,sx,sy),qx=B.a.x-A.a.x,qy=B.a.y-A.a.y;
+  if(Math.abs(den)<1e-14)continue;
+  const t=cross(qx,qy,sx,sy)/den,u=cross(qx,qy,rx,ry)/den;
+  if(t>=-1e-9&&t<=1+1e-9&&u>=-1e-9&&u<=1+1e-9){A.ts.push(Math.max(0,Math.min(1,t)));B.ts.push(Math.max(0,Math.min(1,u)))}
+ }
+ const vertices=[],grid=new Map(),edges=new Set();
+ function vertex(p){const x=Math.round(p.x/tolerance),y=Math.round(p.y/tolerance);for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const key=(x+dx)+','+(y+dy);for(const id of grid.get(key)||[])if(distance(vertices[id].p,p)<=tolerance)return id}const id=vertices.length,key=x+','+y;vertices.push({p,links:[]});if(!grid.has(key))grid.set(key,[]);grid.get(key).push(id);return id}
+ for(const e of segs){e.ts.sort((a,b)=>a-b);for(let k=1;k<e.ts.length;k++){const t=e.ts[k-1],u=e.ts[k];if(u-t<1e-10)continue;const at=v=>({x:e.a.x+(e.b.x-e.a.x)*v,y:e.a.y+(e.b.y-e.a.y)*v}),a=vertex(at(t)),b=vertex(at(u));if(a===b)continue;const key=Math.min(a,b)+':'+Math.max(a,b);if(edges.has(key))continue;edges.add(key);vertices[a].links.push(b);vertices[b].links.push(a)}}
+ vertices.forEach(v=>v.links.sort((a,b)=>Math.atan2(vertices[a].p.y-v.p.y,vertices[a].p.x-v.p.x)-Math.atan2(vertices[b].p.y-v.p.y,vertices[b].p.x-v.p.x)));
+ const visited=new Set(),faces=[];
+ for(let a=0;a<vertices.length;a++)for(const b of vertices[a].links){
+  if(visited.has(a+':'+b))continue;let u=a,v=b,loop=[],closed=false;
+  for(let n=0;n<=edges.size*2+1;n++){const key=u+':'+v;if(visited.has(key))break;visited.add(key);loop.push(vertices[u].p);const links=vertices[v].links,index=links.indexOf(u);if(index<0||!links.length)break;const w=links[(index-1+links.length)%links.length];u=v;v=w;if(u===a&&v===b){closed=true;break}}
+  if(!closed||loop.length<3)continue;const area=loop.reduce((sum,p,i)=>{const q=loop[(i+1)%loop.length];return sum+p.x*q.y-q.x*p.y},0)/2;if(area>tolerance*tolerance)faces.push({loop,area})
+ }
+ const containers=faces.filter(f=>pointInPolygon(point,f.loop)).sort((a,b)=>a.area-b.area);
+ if(!containers.length)return {error:'No se encontró un contorno cerrado. Revisa uniones, huecos y capas visibles.'};
+ const outer=containers[0],holes=faces.filter(f=>f!==outer&&f.area<outer.area&&f.loop.every(p=>pointInPolygon(p,outer.loop)&&outer.loop.every((q,i)=>pointLineDistance(p,q,outer.loop[(i+1)%outer.loop.length])>tolerance)));
+ return {loops:[outer.loop,...holes.map(f=>f.loop)]}
+}
+function hatchAtPoint(point){
+ const result=findHatchFaces(objects.filter(isVisibleModelEntity),point);
+ if(result.error){status.textContent='HATCH · '+result.error;return}
+ const pattern=$('#hatchPattern')?.value||'ANSI31',spacing=Math.max(.001,Number($('#hatchSpacing')?.value||10));
+ checkpoint();objects.push({type:'polygon',pts:clone(result.loops[0]),hatchLoops:clone(result.loops),hatchPattern:pattern,solidFill:pattern.toUpperCase()==='SOLID',hatchSpacingWorld:spacing/50,importedHatch:true,...currentStyle($('#layer').value)});
+ save();clearSelection();render();status.textContent='HATCH creado · '+(result.loops.length-1)+' isla(s) detectadas · clic en otra zona o Esc para terminar';
+}
 function handleTap(p){
  const exactPoint=arguments[1]||null;
  if(tool==='matchprop'){matchPropertiesAt(world(p));return}
  let q=exactPoint?clone(exactPoint):constrain(snapPoint(world(p)));if(usesLineCoordinates())q=coordinateCorner(q);
  if(window.OtroCadMep?.placeAt(q))return;
  if(!['select','pan','move','copy','offset','trim','extend','explode','measure'].includes(tool)&&lockedLayers.has($('#layer').value)){status.textContent='La capa '+$('#layer').value+' está bloqueada';return}
+ if(tool==='hatch'){hatchAtPoint(exactPoint||world(p));return}
  if(tool==='arc'){
   arcPoints.push(q);
   if(arcPoints.length===3){checkpoint();objects.push({type:'arc',pts:clone(arcPoints),...currentStyle($('#layer').value)});save();applySelection([objects.length-1]);arcPoints=[];status.textContent='Arco creado';}
