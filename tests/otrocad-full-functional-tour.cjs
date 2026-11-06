@@ -199,6 +199,20 @@ async function roundTrip(download){
  assert.ok(Math.abs(srcLine.b.x-22)<1e-8&&Math.abs(srcLine.b.y-21)<1e-8,'Moving endpoint must snap to target endpoint');
  await movePage.evaluate(()=>window.OtroCadCivilAPI.setView({x:0,y:0},35));
  check('MOVE con referencias a punto medio y final');
+
+ // Dense plans should hatch the local rectangle even when distant edges exceed the global limit.
+ await movePage.keyboard.press('Escape');await movePage.evaluate(()=>{
+  window.OtroCadCivilAPI.setView({x:30,y:30},35);
+  const many=Array.from({length:1400},(_,i)=>({type:'line',a:{x:35+(i%40)*.1,y:25+Math.floor(i/40)*.1},b:{x:35.04+(i%40)*.1,y:25+Math.floor(i/40)*.1},layer:'General'}));
+  many.push({type:'rect',a:{x:29,y:29},b:{x:31,y:31},layer:'General'});
+  window.OtroCadCivilAPI.addObjects(many,'Plano con muchos bordes');
+ });
+ const hatchDenseBefore=await getMoveState();await mcmd('H');await mclick(30,30);
+ const hatchDenseAfter=await getMoveState();
+ assert.equal(hatchDenseAfter.length,hatchDenseBefore.length+1,'Hatch should detect a local closed area on a dense plan');
+ assert.match(await movePage.locator('#hatchNotice').textContent(),/HATCH creado/);
+ await mcmd('UNDO');assert.equal((await getMoveState()).length,hatchDenseBefore.length);
+ check('HATCH local en plano con más de mil bordes');
  await movePage.close();
  check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';

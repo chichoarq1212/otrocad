@@ -59,7 +59,7 @@ assert.equal(vm.runInContext('filletGeometry(l1,l2,{x:4,y:0},{x:0,y:4},10)',fill
 assert.equal(vm.runInContext('filletGeometry(l1,l2,{x:4,y:0},{x:0,y:4},0).arc',fillet),null);
 console.log('Empalme: tangencia, radio cero y radio excesivo verificados');
 
-const ui={usesLineCoordinates:()=>false,window:{},objects:[{type:'line',a:{x:0,y:0},b:{x:5,y:0},layer:'General'},{type:'line',a:{x:0,y:0},b:{x:0,y:5},layer:'General'}], tool:'fillet',modifyTarget:-1,moveBase:null,status:{textContent:''}, lockedLayers:new Set(),snapPoint:p=>p,world:p=>p,constrain:p=>p,clone:x=>JSON.parse(JSON.stringify(x)),selectAt:p=>p.x>p.y?0:1,applySelection:()=>{},checkpoint:()=>{},save:()=>{},render:()=>{},prompt:()=> '1',$:()=>({value:'General'}),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
+const ui={moveSnapExclusions:()=>null,usesLineCoordinates:()=>false,window:{},objects:[{type:'line',a:{x:0,y:0},b:{x:5,y:0},layer:'General'},{type:'line',a:{x:0,y:0},b:{x:0,y:5},layer:'General'}], tool:'fillet',modifyTarget:-1,moveBase:null,status:{textContent:''}, lockedLayers:new Set(),snapPoint:p=>p,world:p=>p,constrain:p=>p,clone:x=>JSON.parse(JSON.stringify(x)),selectAt:p=>p.x>p.y?0:1,applySelection:()=>{},checkpoint:()=>{},save:()=>{},render:()=>{},prompt:()=> '1',$:()=>({value:'General'}),distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
 vm.createContext(ui);
 vm.runInContext(src.slice(src.indexOf('function lineIntersection('),src.indexOf('function trimOrExtend(')),ui);
 vm.runInContext(src.slice(src.indexOf('function handleTap(p){'),src.indexOf('function transformEntityGeometry(')),ui);
