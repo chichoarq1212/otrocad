@@ -35,9 +35,9 @@ console.log('Offset rectangular y orientación de polígonos: OK');
 
 const ex = { objects:[], status:{textContent:''}, selectAt:()=>0,
  entitySegments:()=>[[{x:0,y:0},{x:1,y:0}],[{x:1,y:0},{x:1,y:1}]],
- clone:x=>JSON.parse(JSON.stringify(x)), checkpoint:()=>{}, applySelection:()=>{},save:()=>{},render:()=>{} };
+ clone:x=>JSON.parse(JSON.stringify(x)), checkpoint:()=>{}, applySelection:()=>{},clearSelection:()=>{},isVisibleModelEntity:()=>true,lockedLayers:new Set(),save:()=>{},render:()=>{} };
 vm.createContext(ex);
-vm.runInContext(src.slice(src.indexOf('function explodeAt(q)'),src.indexOf('let pointers=new Map()')),ex);
+vm.runInContext(src.slice(src.indexOf('function explodeSelection(indices)'),src.indexOf('let pointers=new Map()')),ex);
 ex.objects=[{type:'circle',a:{x:0,y:0},b:{x:2,y:0}}];
 vm.runInContext('explodeAt({x:0,y:0})',ex);
 assert.equal(ex.objects.length,1); assert.equal(ex.objects[0].type,'circle');
