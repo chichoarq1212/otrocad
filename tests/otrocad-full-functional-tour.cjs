@@ -148,6 +148,19 @@ async function roundTrip(download){
  assert(Math.abs(scaledLine.b.y-(-5+2*Math.sqrt(2)))<0.01,'Scale factor 2 must double distance from base');
  await mcmd('UNDO');assert.deepEqual(await getMoveState(),beforeScale);
  check('Escalar con vista previa, factor 2 y deshacer');
+
+ // X accepts a preselected rectangle, decomposes it and can be undone.
+ await movePage.evaluate(()=>window.OtroCadCivilAPI.addObjects([{type:'rect',a:{x:-2,y:-2},b:{x:-1,y:-1},layer:'General'}],'Prueba explode'));
+ await movePage.keyboard.press('Escape');await mcmd('V');await mclick(-1.5,-2);
+ const preX=await getMoveState();await mcmd('X');let afterX=await getMoveState();
+ assert.equal(afterX.length,preX.length+3,'X should turn a selected rectangle into four lines');
+ await mcmd('UNDO');assert.deepEqual(await getMoveState(),preX);
+ // Existing grouped components can be edited individually and remain grouped.
+ await movePage.evaluate(()=>window.OtroCadCivilAPI.addObjects([{type:'line',a:{x:0,y:-3},b:{x:1,y:-3},groupId:'test-bedit',layer:'General'},{type:'line',a:{x:1,y:-3},b:{x:1,y:-2},groupId:'test-bedit',layer:'General'}],'Prueba bloque'));
+ await movePage.keyboard.press('Escape');await mcmd('V');await mclick(.5,-3);await mcmd('BEDIT');
+ assert.equal(await movePage.getByRole('button',{name:'✓ Finalizar bloque'}).isVisible(),true);
+ await mcmd('BCLOSE');assert.equal(await movePage.getByRole('button',{name:'✓ Finalizar bloque'}).isVisible(),false);
+ check('EXPLODE con selección previa y edición de bloque');
  await movePage.close();
  check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';

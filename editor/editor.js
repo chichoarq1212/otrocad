@@ -6,11 +6,11 @@ let activeLayout='Model',layouts=[],layoutViewportRecords=[],hideModelAnnotation
 function newGroupId(){return 'bloque-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}
 let rightClickMode='context',rightClickDuringCommand='enter';
 try{const prefs=JSON.parse(localStorage.getItem('otrocad-mouse-preferences')||'{}');if(['context','repeat'].includes(prefs.mode))rightClickMode=prefs.mode;if(['enter','context'].includes(prefs.active))rightClickDuringCommand=prefs.active}catch(e){}
-let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,osEnd=true,osMid=true,osCenter=true,osQuadrant=false,osIntersection=false,osNearest=false,osParallel=false,osGeom=false,osInsertion=false,osTangent=false,osExtension=false,osApparent=false,osPerpendicular=false,parallelDirection=null,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,offsetDistancePreset=false,printing=false,units='m',gridStep=1,polarStep=15,snapRadius=12,hiddenLayers=new Set(),lockedLayers=new Set();
+let gridOn=true,orthoOn=false,snapOn=false,osnapOn=true,osEnd=true,osMid=true,osCenter=true,osQuadrant=false,osIntersection=false,osNearest=false,osParallel=false,osGeom=false,osInsertion=false,osTangent=false,osExtension=true,osApparent=false,osPerpendicular=false,parallelDirection=null,polarOn=false,crossOn=true,moveBase=null,modifyTarget=-1,polySides=6,offsetDistance=1,offsetDistancePreset=false,printing=false,units='m',gridStep=1,polarStep=15,snapRadius=12,hiddenLayers=new Set(),lockedLayers=new Set();
 try{const savedUnits=localStorage.getItem('otrocad-units');if(['m','cm','mm'].includes(savedUnits))units=savedUnits}catch(e){}
 try{const p=JSON.parse(localStorage.getItem('otrocad-drafting')||'{}');if(typeof p.gridOn==='boolean')gridOn=p.gridOn;if(typeof p.orthoOn==='boolean')orthoOn=p.orthoOn;if(typeof p.snapOn==='boolean')snapOn=p.snapOn;if(typeof p.osnapOn==='boolean')osnapOn=p.osnapOn;if(typeof p.osEnd==='boolean')osEnd=p.osEnd;if(typeof p.osMid==='boolean')osMid=p.osMid;if(typeof p.osCenter==='boolean')osCenter=p.osCenter;if(typeof p.osQuadrant==='boolean')osQuadrant=p.osQuadrant;if(typeof p.osIntersection==='boolean')osIntersection=p.osIntersection;if(typeof p.osNearest==='boolean')osNearest=p.osNearest;if(typeof p.osParallel==='boolean')osParallel=p.osParallel;if(typeof p.osGeom==='boolean')osGeom=p.osGeom;if(typeof p.osInsertion==='boolean')osInsertion=p.osInsertion;if(typeof p.osTangent==='boolean')osTangent=p.osTangent;if(typeof p.osExtension==='boolean')osExtension=p.osExtension;if(typeof p.osApparent==='boolean')osApparent=p.osApparent;if(typeof p.osPerpendicular==='boolean')osPerpendicular=p.osPerpendicular;if(typeof p.polarOn==='boolean')polarOn=p.polarOn;if(typeof p.crossOn==='boolean')crossOn=p.crossOn;if(Number.isFinite(p.gridStep)&&p.gridStep>0)gridStep=p.gridStep;if(Number.isFinite(p.polarStep)&&p.polarStep>=1&&p.polarStep<=90)polarStep=p.polarStep;if(Number.isFinite(p.snapRadius)&&p.snapRadius>=2&&p.snapRadius<=40)snapRadius=p.snapRadius}catch(e){}
 let crossPrefs={size:12,pickbox:10,mode:'auto',color:'#ffffff'};try{const p=JSON.parse(localStorage.getItem('otrocad-crosshair')||'{}');if(Number.isFinite(p.size))crossPrefs.size=Math.max(1,Math.min(100,p.size));if(Number.isFinite(p.pickbox))crossPrefs.pickbox=Math.max(4,Math.min(30,p.pickbox));if(['auto','custom'].includes(p.mode))crossPrefs.mode=p.mode;if(/^#[0-9a-f]{6}$/i.test(p.color||''))crossPrefs.color=p.color}catch(e){}
-function saveDraftPreferences(){try{localStorage.setItem('otrocad-drafting',JSON.stringify({gridOn,orthoOn,snapOn,osnapOn,osEnd,osMid,osCenter,osQuadrant,osIntersection,osNearest,osParallel,osGeom,osPerpendicular,polarOn,crossOn,gridStep,polarStep,snapRadius}))}catch(e){}}
+function saveDraftPreferences(){try{localStorage.setItem('otrocad-drafting',JSON.stringify({gridOn,orthoOn,snapOn,osnapOn,osEnd,osMid,osCenter,osQuadrant,osIntersection,osNearest,osParallel,osGeom,osInsertion,osTangent,osExtension,osApparent,osPerpendicular,polarOn,crossOn,gridStep,polarStep,snapRadius}))}catch(e){}}
 const colors={General:'#dce8f5',Muros:'#56b7e8',Cotas:'#f3c83e',Detalles:'#c69cff',Topografía:'#70d6a3',Vialidad:'#ff9b6b'};
 function resolveCadColor(s,lightBackground=false){
  const base=String((!lightBackground&&s.colorDark)||s.color||colors[s.layer]||colors.General).toLowerCase();
@@ -106,7 +106,8 @@ async function cadReadLastBackup(){
 }
 
 function selectedItems(){const out=new Set(selectedSet);if(selected>=0)out.add(selected);return [...out].filter(i=>i>=0&&i<objects.length).sort((a,b)=>a-b)}
-function applySelection(indices,additive=false){const next=additive?new Set(selectedItems()):new Set(),groups=new Set();for(const i of indices)if(i>=0&&i<objects.length){next.add(i);if(objects[i]?.groupId)groups.add(objects[i].groupId)}if(groups.size)objects.forEach((o,j)=>{if(groups.has(o.groupId)&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer))next.add(j)});selectedSet=next;selected=next.size?[...next].sort((a,b)=>a-b).at(-1):-1}
+let editingBlockId=null;
+function applySelection(indices,additive=false){const next=additive?new Set(selectedItems()):new Set(),groups=new Set();for(const i of indices)if(i>=0&&i<objects.length){next.add(i);if(objects[i]?.groupId&&objects[i].groupId!==editingBlockId)groups.add(objects[i].groupId)}if(groups.size)objects.forEach((o,j)=>{if(groups.has(o.groupId)&&!hiddenLayers.has(o.layer)&&!lockedLayers.has(o.layer))next.add(j)});selectedSet=next;selected=next.size?[...next].sort((a,b)=>a-b).at(-1):-1}
 function clearSelection(){selected=-1;selectedSet.clear()}
 function deleteSelection(){const ids=selectedItems();if(!ids.length)return;checkpoint();ids.sort((a,b)=>b-a).forEach(i=>objects.splice(i,1));clearSelection();save();render();status.textContent=ids.length===1?'Objeto eliminado':ids.length+' objetos eliminados'}
 let cadAutosaveDirty=0,cadAutosaveTimer=null,cadAutosaveRunning=false,cadLastIndexedSave=0,cadLastCheckpointAt=0;
@@ -181,7 +182,7 @@ function snapCandidate(p,excludedIndex=-1){
  if(typeof osGeom!=='undefined'&&osGeom){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer))continue;let point=null;if(shape.type==='rect'&&shape.a&&shape.b)point={x:(shape.a.x+shape.b.x)/2,y:(shape.a.y+shape.b.y)/2};else if(shape.type==='polygon'&&shape.pts?.length>=3){let area=0,x=0,y=0;for(let i=0;i<shape.pts.length;i++){const a=shape.pts[i],b=shape.pts[(i+1)%shape.pts.length],v=a.x*b.y-b.x*a.y;area+=v;x+=(a.x+b.x)*v;y+=(a.y+b.y)*v}if(Math.abs(area)>1e-12)point={x:x/(3*area),y:y/(3*area)}}if(point){const d=distance(p,point);if(d<limit){limit=d;best={point,type:'CENTRO GEOMÉTRICO'}}}}}
  if(typeof osInsertion!=='undefined'&&osInsertion){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='text'||!shape.a)continue;const d=distance(p,shape.a);if(d<limit){limit=d;best={point:shape.a,type:'INSERCIÓN'}}}}
  if(typeof osTangent!=='undefined'&&osTangent&&typeof start!=='undefined'&&start){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='circle'||!shape.a||!shape.b)continue;const dx=start.x-shape.a.x,dy=start.y-shape.a.y,r=distance(shape.a,shape.b),d2=dx*dx+dy*dy;if(d2<r*r||d2<1e-18)continue;const k=r*r/d2,h=r*Math.sqrt(Math.max(0,d2-r*r))/d2;for(const sign of [-1,1]){const point={x:shape.a.x+k*dx-sign*h*dy,y:shape.a.y+k*dy+sign*h*dx},d=distance(p,point);if(d<limit){limit=d;best={point,type:'TANGENTE'}}}}}
- if(typeof osExtension!=='undefined'&&osExtension){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='line'||!shape.a||!shape.b)continue;const a=shape.a,b=shape.b,dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((p.x-a.x)*dx+(p.y-a.y)*dy)/den;if(t>=0&&t<=1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'EXTENSIÓN'}}}}
+ if(typeof osExtension!=='undefined'&&osExtension){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='line'||!shape.a||!shape.b)continue;const a=shape.a,b=shape.b,dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((p.x-a.x)*dx+(p.y-a.y)*dy)/den;if(t>=0&&t<=1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'EXTENSIÓN',origin:t<0?a:b}}}}
  if(typeof osApparent!=='undefined'&&osApparent){const lines=snapObjects.filter(s=>s.type==='line'&&s.a&&s.b&&!hiddenLayers.has(s.layer)).slice(0,128);for(let i=0;i<lines.length;i++)for(let j=i+1;j<lines.length;j++){const hit=lineIntersection(lines[i].a,lines[i].b,lines[j].a,lines[j].b,false);if(!hit)continue;const d=distance(p,hit);if(d<limit){limit=d;best={point:{x:hit.x,y:hit.y},type:'INTERSECCIÓN APARENTE'}}}}
  if(typeof osPerpendicular!=='undefined'&&osPerpendicular&&typeof start!=='undefined'&&start){
   for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||!['line','poly','polygon','rect'].includes(shape.type))continue;for(const [a,b] of entitySegments(shape)){const dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((start.x-a.x)*dx+(start.y-a.y)*dy)/den;if(t<0||t>1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'PERPENDICULAR'}}}}
@@ -1084,7 +1085,8 @@ function render(){
  // Imported CAD hatches are background fills; keep dimensions, walls and labels visible on top.
  objects.forEach((s,i)=>{if(s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
  objects.forEach((s,i)=>{if(!s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
- drawSelectionGrips();if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
+ drawSelectionGrips();if(!printing&&activeSnap?.type==='EXTENSIÓN'&&activeSnap.origin){const a=screen(activeSnap.origin),b=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#f7cf56';ctx.lineWidth=1.3;ctx.setLineDash([6,5]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}
+ if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
  if(!printing&&moveBase&&['move','copy'].includes(tool)&&modifyTargets.length){
   const q=constrain(snapPoint(world(cursor))),dx=q.x-moveBase.x,dy=q.y-moveBase.y;
@@ -1650,15 +1652,24 @@ function trimOrExtend(index,q,mode){
  hits.sort((x,y)=>distance(x,endpoint==='a'?a:b)-distance(y,endpoint==='a'?a:b));
  checkpoint();s[endpoint]={x:hits[0].x,y:hits[0].y};save();applySelection([index]);modifyTarget=-1;render();status.textContent=mode.toUpperCase()+' aplicado';
 }
-function explodeAt(q){
- const i=selectAt(q);if(i<0){status.textContent='Selecciona una polilínea o rectángulo';return}
- const s=objects[i];if(s.groupId){const id=s.groupId,ids=objects.map((o,j)=>o.groupId===id?j:-1).filter(j=>j>=0);checkpoint();ids.forEach(j=>delete objects[j].groupId);applySelection(ids);save();render();status.textContent='Bloque desagrupado · '+ids.length+' elementos editables';return}
- if(!['poly','polygon','rect'].includes(s.type)){status.textContent='EXPLODE disponible para bloques, polilíneas, polígonos y rectángulos';return}
- const segments=entitySegments(s);if(!segments.length){status.textContent='Esta entidad no requiere EXPLODE';return}
- checkpoint();const style={layer:s.layer,color:s.color,lineweight:s.lineweight,linetype:s.linetype};
- const parts=segments.map(([a,b])=>({type:'line',a:clone(a),b:clone(b),...style}));
- objects.splice(i,1,...parts);applySelection(parts.map((_,k)=>i+k));save();render();status.textContent='Entidad descompuesta en '+parts.length+' segmentos';
+function explodeSelection(indices){
+ const ids=[...new Set(indices)].filter(i=>objects[i]&&isVisibleModelEntity(objects[i])&&!lockedLayers.has(objects[i].layer));
+ const groups=new Set(ids.map(i=>objects[i].groupId).filter(Boolean));
+ // A block spanning a locked layer cannot be partially broken apart.
+ for(const id of [...groups])if(objects.some(o=>o.groupId===id&&lockedLayers.has(o.layer)))groups.delete(id);
+ const groupMembers=objects.map((o,i)=>groups.has(o.groupId)?i:-1).filter(i=>i>=0);
+ const simple=ids.filter(i=>!objects[i].groupId&&['poly','polygon','rect'].includes(objects[i].type)&&entitySegments(objects[i]).length);
+ if(!groupMembers.length&&!simple.length){status.textContent='EXPLODE: selecciona bloques, polilíneas, polígonos o rectángulos desbloqueados';return false}
+ checkpoint();groupMembers.forEach(i=>delete objects[i].groupId);
+ let count=groupMembers.length;
+ for(const i of simple.sort((a,b)=>b-a)){const item=objects[i],parts=entitySegments(item).map(([a,b])=>({type:'line',a:clone(a),b:clone(b),layer:item.layer,color:item.color,lineweight:item.lineweight,linetype:item.linetype,cadLayout:item.cadLayout}));objects.splice(i,1,...parts);count+=parts.length}
+ clearSelection();save();render();status.textContent='EXPLODE · '+count+' elementos editables';return true
 }
+function explodeAt(q){const i=selectAt(q);if(i<0){status.textContent='EXPLODE · selecciona un bloque o polilínea';return}explodeSelection([i])}
+function closeBlockEditing(){if(!editingBlockId)return;editingBlockId=null;blockEditButton.hidden=true;clearSelection();setTool('select');status.textContent='Edición del bloque finalizada';render()}
+function editBlock(index){const id=objects[index]?.groupId;if(!id){status.textContent='Selecciona un bloque para editar';return}if(objects.some(o=>o.groupId===id&&lockedLayers.has(o.layer))){status.textContent='Desbloquea las capas del bloque antes de editarlo';return}editingBlockId=id;clearSelection();setTool('select');blockEditButton.hidden=false;status.textContent='Edición de bloque: selecciona sus elementos individualmente · pulsa Finalizar bloque';render()}
+const blockEditButton=document.createElement('button');blockEditButton.type='button';blockEditButton.textContent='✓ Finalizar bloque';blockEditButton.hidden=true;blockEditButton.style.cssText='position:absolute;top:10px;right:10px;z-index:35;padding:8px 12px;background:#175bea;color:white;border:0;border-radius:6px;cursor:pointer';blockEditButton.onclick=closeBlockEditing;stage.appendChild(blockEditButton);
+
 let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false,multiSelectOn=false,gripDrag=null,middlePan=null,selectionClickAnchor=null;
 
 stage.setAttribute('tabindex','-1');
@@ -1875,7 +1886,7 @@ function pointerEnd(e){
  render();
 }
 canvas.addEventListener('pointerup',pointerEnd);canvas.addEventListener('pointercancel',pointerEnd);
-canvas.addEventListener('dblclick',e=>{if(activeLayout!=='Model')return;const p=pointer(e),hit=selectAt(world(p));if(hit>=0&&objects[hit]?.type==='text'){e.preventDefault();applySelection([hit]);showProperties();openTextEditor(hit)}});
+canvas.addEventListener('dblclick',e=>{if(activeLayout!=='Model')return;const p=pointer(e),hit=selectAt(world(p));if(hit>=0&&objects[hit]?.groupId&&objects[hit].groupId!==editingBlockId){e.preventDefault();editBlock(hit);return}if(hit>=0&&objects[hit]?.type==='text'){e.preventDefault();applySelection([hit]);showProperties();openTextEditor(hit)}});
 canvas.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 canvas.addEventListener('contextmenu',e=>{
@@ -2048,6 +2059,9 @@ function runCommand(raw){
  if(c==='DLI'||c==='DIMLINEAR'){setTool('dim');return}
  if(c==='DAL'||c==='DIMALIGNED'){setTool('dimaligned');return}
  const aliases={MA:'matchprop',MATCHPROP:'matchprop',IGUALAR:'matchprop',DI:'measure',DIST:'measure',DISTANCE:'measure',CP:'copy',X:'explode',CH:'chamfer',BH:'hatch',BHATCH:'hatch',T:'text',TEXT:'text',MTEXT:'text',L:'line',LINE:'line',PL:'poly',PLINE:'poly',POLYLINE:'poly',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',REC:'rect',RECT:'rect',RECTANG:'rect',RECTANGLE:'rect',H:'hatch',HATCH:'hatch',D:'dim',DIM:'dim',EL:'ellipse',ELLIPSE:'ellipse',POL:'polygon',POLYGON:'polygon',M:'move',MOVE:'move',CO:'copy',COPY:'copy',P:'pan',PAN:'pan',V:'select',SELECT:'select',RO:'rotate',ROTATE:'rotate',MI:'mirror',MIRROR:'mirror',SC:'scale',SCALE:'scale',TR:'trim',TRIM:'trim',EX:'extend',EXT:'extend',EXTEND:'extend',EXP:'explode',EXPLODE:'explode',LEADER:'leader',QLEADER:'leader'};
+ if(['X','EXP','EXPLODE'].includes(c)&&selectedItems().length){explodeSelection(selectedItems());setTool('select');status.textContent='EXPLODE aplicado · usa Deshacer para recuperar';return}
+ if(['BEDIT','EDITBLOCK','EDITARBLOQUE'].includes(c)){const i=selectedItems().find(i=>objects[i]?.groupId);if(i===undefined)status.textContent='Selecciona un bloque y escribe BEDIT, o haz doble clic sobre él';else editBlock(i);return}
+ if(c==='BCLOSE'||c==='CERRARBLOQUE'){closeBlockEditing();return}
  if(aliases[c]){setTool(aliases[c]);return}
  status.textContent='Comando no reconocido: '+c;
 }
