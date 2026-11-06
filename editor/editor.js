@@ -199,7 +199,6 @@ function snapCandidate(p,excludedIndex=-1){
  }
  return best;
 }
-function moveSnapExclusions(){return ['move','copy'].includes(tool)&&moveBase&&modifyTargets.length?new Set(modifyTargets):null}
 function snapPoint(p,excludedIndex=-1){
  const candidate=snapCandidate(p,excludedIndex);activeSnap=candidate;
  if(candidate)return {...candidate.point};
@@ -1602,6 +1601,7 @@ function handleTap(p){
  if(!usesLineCoordinates())end=constrain(end);
  if(tool==='line'||tool==='dim'||tool==='dimaligned'||tool==='rect'||tool==='hatch'||tool==='circle'||tool==='ellipse'||tool==='polygon'){commitEntity(end)}
 }
+function moveSnapExclusions(){return ['move','copy'].includes(tool)&&moveBase&&modifyTargets.length?new Set(modifyTargets):null}
 function transformEntityGeometry(s,transform,axisAligned){
  if(s.type==='rect'&&!axisAligned&&s.a&&s.b){const a=s.a,b=s.b;s.pts=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y}].map(transform);s.type='polygon';delete s.a;delete s.b;return}
  const oldAnchor=s.a?clone(s.a):null,oldRotation=Number(s.textRotation||0);if(s.a)s.a=transform(s.a);if(s.b)s.b=transform(s.b);if(s.pts)s.pts=s.pts.map(transform);if(s.hatchLoops)s.hatchLoops=s.hatchLoops.map(loop=>loop.map(transform));if(s.textAlignmentPoint)s.textAlignmentPoint=transform(s.textAlignmentPoint);if(s.type==='text'&&oldAnchor){const rad=oldRotation*Math.PI/180,baseEnd=transform({x:oldAnchor.x+Math.cos(rad),y:oldAnchor.y+Math.sin(rad)}),newAnchor=s.a||transform(oldAnchor);s.textRotation=Math.atan2(baseEnd.y-newAnchor.y,baseEnd.x-newAnchor.x)*180/Math.PI}
