@@ -1433,11 +1433,11 @@ function doOffset(q){
  if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([]);render();status.textContent='OFFSET creado · selecciona otro objeto o Esc para terminar';
 }
 // Find bounded planar faces from actual visible drawing edges; never invent a boundary.
-function findHatchFaces(shapes,point,tolerance=1e-7){
+function findHatchFaces(shapes,point,tolerance=1e-7,windowBox=null){
  const segs=[];
  for(const shape of shapes){
   if(!['line','poly','polygon','rect','circle','ellipse','arc'].includes(shape.type)||shape.hatchPattern||shape.solidFill||shape.importedHatch)continue;
-  for(const [a,b] of entitySegments(shape))if(a&&b&&distance(a,b)>tolerance)segs.push({a,b,ts:[0,1]});
+  for(const [a,b] of entitySegments(shape)){if(!a||!b||distance(a,b)<=tolerance)continue;if(windowBox&&(Math.max(a.x,b.x)<windowBox.left-tolerance||Math.min(a.x,b.x)>windowBox.right+tolerance||Math.max(a.y,b.y)<windowBox.bottom-tolerance||Math.min(a.y,b.y)>windowBox.top+tolerance))continue;segs.push({a,b,ts:[0,1]})}
  }
  if(segs.length>1200)return {error:'El dibujo contiene demasiados bordes para detectar el recinto; aísla las capas necesarias.'};
  const cross=(x,y,u,v)=>x*v-y*u;
@@ -1466,12 +1466,21 @@ function findHatchFaces(shapes,point,tolerance=1e-7){
 }
 function hatchNotice(message,error=false){let box=document.getElementById('hatchNotice');if(!box){box=document.createElement('div');box.id='hatchNotice';box.setAttribute('role','status');box.style.cssText='position:absolute;top:50px;left:12px;z-index:35;max-width:min(440px,85%);padding:9px 12px;border-radius:6px;font:13px system-ui;pointer-events:none;box-shadow:0 2px 10px #0005';stage.appendChild(box)}box.hidden=false;box.style.background=error?'#7c2d12':'#163d77';box.style.color='#fff';box.textContent=message}
 function hatchAtPoint(point){
- let result;try{const visible=objects.filter(isVisibleModelEntity);result=findHatchFaces(visible,point);
-  if(result.error?.includes('demasiados bordes')){
-   const radius=2*Math.hypot(canvas.clientWidth,canvas.clientHeight)/zoom;
-   const local=visible.filter(shape=>{const pts=boundsPoints(shape);if(!pts.length)return false;let minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity;for(const p of pts){minx=Math.min(minx,p.x);maxx=Math.max(maxx,p.x);miny=Math.min(miny,p.y);maxy=Math.max(maxy,p.y)}return maxx>=point.x-radius&&minx<=point.x+radius&&maxy>=point.y-radius&&miny<=point.y+radius});
-   result=findHatchFaces(local,point);if(result.error)result.error+=' Acerca la vista o aísla las capas necesarias.';
+ let result;try{
+  const visible=objects.filter(isVisibleModelEntity),maxRadius=Math.max(32,4*Math.hypot(canvas.clientWidth,canvas.clientHeight))/zoom;
+  let radius=32/zoom,candidate=null;
+  for(let attempt=0;attempt<18&&radius<=maxRadius*2;attempt++,radius*=2){
+   const box={left:point.x-radius,right:point.x+radius,bottom:point.y-radius,top:point.y+radius};
+   const trial=findHatchFaces(visible,point,1e-7,box);
+   if(trial.loops){candidate=trial;break}
+   if(trial.error?.includes('demasiados bordes')){result=trial;break}
   }
+  if(candidate){
+   // Recheck the complete extent of the face, including interior islands and crossings.
+   const pts=candidate.loops[0],xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),pad=1e-7;
+   const bounds={left:Math.min(...xs)-pad,right:Math.max(...xs)+pad,bottom:Math.min(...ys)-pad,top:Math.max(...ys)+pad};
+   result=findHatchFaces(visible,point,1e-7,bounds);
+  }else if(!result)result=findHatchFaces(visible,point);
  }catch(error){console.error('HATCH',error);result={error:'No se pudo calcular el contorno. Revisa las uniones y vuelve a intentarlo.'}}
  if(result.error){status.textContent='HATCH · '+result.error;hatchNotice(status.textContent,true);return}
  const pattern=$('#hatchPattern')?.value||'ANSI31',spacing=Math.max(.001,Number($('#hatchSpacing')?.value||10));
