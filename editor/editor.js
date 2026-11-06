@@ -1666,11 +1666,12 @@ function explodeSelection(indices){
  clearSelection();save();render();status.textContent='EXPLODE · '+count+' elementos editables';return true
 }
 function explodeAt(q){const i=selectAt(q);if(i<0){status.textContent='EXPLODE · selecciona un bloque o polilínea';return}explodeSelection([i])}
+
+let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false,multiSelectOn=false,gripDrag=null,middlePan=null,selectionClickAnchor=null;
 function closeBlockEditing(){if(!editingBlockId)return;editingBlockId=null;blockEditButton.hidden=true;clearSelection();setTool('select');status.textContent='Edición del bloque finalizada';render()}
 function editBlock(index){const id=objects[index]?.groupId;if(!id){status.textContent='Selecciona un bloque para editar';return}if(objects.some(o=>o.groupId===id&&lockedLayers.has(o.layer))){status.textContent='Desbloquea las capas del bloque antes de editarlo';return}editingBlockId=id;clearSelection();setTool('select');blockEditButton.hidden=false;status.textContent='Edición de bloque: selecciona sus elementos individualmente · pulsa Finalizar bloque';render()}
 const blockEditButton=document.createElement('button');blockEditButton.type='button';blockEditButton.textContent='✓ Finalizar bloque';blockEditButton.hidden=true;blockEditButton.style.cssText='position:absolute;top:10px;right:10px;z-index:35;padding:8px 12px;background:#175bea;color:white;border:0;border-radius:6px;cursor:pointer';blockEditButton.onclick=closeBlockEditing;stage.appendChild(blockEditButton);
 
-let pointers=new Map(),pinch=null,selectionStart=null,selectionBox=null,selectionAdditive=false,multiSelectOn=false,gripDrag=null,middlePan=null,selectionClickAnchor=null;
 
 stage.setAttribute('tabindex','-1');
 const commandUiStyle=document.createElement('style');
