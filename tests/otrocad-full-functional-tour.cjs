@@ -94,6 +94,20 @@ async function roundTrip(download){
  await movePage.locator('#paperCreate').click();
  await mcmd('REGEN');assert.deepEqual(await getMoveState(),unchanged);
  assert.match(await movePage.locator('#status').textContent(),/REGEN/);
+ await mcmd('MODEL');
+ await movePage.evaluate(()=>window.OtroCadCivilAPI.addObjects([
+  {type:'line',a:{x:1,y:1},b:{x:4,y:1},layer:'General'},
+  {type:'line',a:{x:4,y:1},b:{x:1,y:1},layer:'General'},
+  {type:'line',a:{x:2,y:2},b:{x:2,y:2},layer:'General'}
+ ],'Prueba limpieza'));
+ const beforePurge=await getMoveState();
+ await mcmd('PURG');
+ assert.match(await movePage.locator('dialog[open]').innerText(),/Duplicados exactos: 1/);
+ assert.match(await movePage.locator('dialog[open]').innerText(),/Líneas de longitud cero: 1/);
+ await movePage.locator('#purgeDup').check();await movePage.locator('#purgeZero').check();await movePage.locator('#purgeApply').click();
+ assert.equal((await getMoveState()).length,beforePurge.length-2);
+ await mcmd('UNDO');assert.deepEqual(await getMoveState(),beforePurge);
+ check('PURG con vista previa, duplicados, líneas nulas y deshacer');
  await movePage.close();
  check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';

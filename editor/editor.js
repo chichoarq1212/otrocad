@@ -1788,6 +1788,7 @@ $('#cmd').addEventListener('keydown',e=>{
 });
 $('#cmdRun').addEventListener('click',()=>{submitCommand();$('#cmd').blur()});
 $('#keyboardHelpBtn').addEventListener('click',showCadKeyboardHelp);
+$('#smartPurge').addEventListener('click',showSmartPurge);
 $('#regenView').addEventListener('click',()=>{resize();status.textContent='REGEN · vista regenerada sin modificar el dibujo'});
 document.addEventListener('pointerdown',e=>{if(contextMenuEl&&!contextMenuEl.contains(e.target))hideCadContextMenu()});
 contextMenuEl.addEventListener('contextmenu',e=>e.preventDefault());
@@ -1917,9 +1918,34 @@ function parseCoordinate(raw,base){
  if((m=s.match(/^@?(-?\d+(?:[.,]\d+)?)<(-?\d+(?:[.,]\d+)?)$/))){const len=Number(m[1].replace(',','.')),ang=Number(m[2].replace(',','.'))*Math.PI/180;return {x:base.x+len*Math.cos(ang),y:base.y+len*Math.sin(ang)}}
  return null;
 }
+function showSmartPurge(){
+ const scan=()=>{
+  const seen=new Map(),duplicates=[],zero=[];
+  objects.forEach((o,i)=>{
+   if(!o||!isVisibleModelEntity(o)||lockedLayers.has(o.layer)||o.groupId)return;
+   if(o.type==='line'&&o.a&&o.b&&[o.a.x,o.a.y,o.b.x,o.b.y].every(Number.isFinite)&&Math.hypot(o.a.x-o.b.x,o.a.y-o.b.y)<1e-9){zero.push(i);return}
+   if(!['line','circle','rect','poly'].includes(o.type))return;
+   const copy=clone(o);
+   if(o.type==='line'&&copy.a&&copy.b&&JSON.stringify(copy.a)>JSON.stringify(copy.b)){const swap=copy.a;copy.a=copy.b;copy.b=swap}
+   const sortValue=v=>Array.isArray(v)?v.map(sortValue):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sortValue(v[k])])):v;
+   const key=JSON.stringify(sortValue(copy));
+   if(seen.has(key))duplicates.push(i);else seen.set(key,i);
+  });return {duplicates,zero};
+ };
+ const report=scan(),dlg=document.createElement('dialog');dlg.className='cad-utility-dialog';
+ dlg.innerHTML='<h3>✦ Limpieza inteligente</h3><p>Analiza objetos visibles y desbloqueados en Modelo. Solo elimina duplicados exactos con las mismas propiedades y líneas de longitud cero.</p><label style="display:block;margin:12px 0"><input id="purgeDup" type="checkbox"> Duplicados exactos: '+report.duplicates.length+'</label><label style="display:block;margin:12px 0"><input id="purgeZero" type="checkbox"> Líneas de longitud cero: '+report.zero.length+'</label><p>Los bloques agrupados, hachurados, capas ocultas o bloqueadas y líneas parcialmente superpuestas no se modifican. Guarda una copia antes de limpiar.</p><p id="purgeResult" role="status"></p><div class="cad-utility-actions"><button id="purgeClose" type="button">Cerrar</button><button id="purgeApply" type="button">Limpiar seleccionados</button></div>';
+ document.body.append(dlg);dlg.querySelector('#purgeClose').onclick=()=>dlg.close();dlg.addEventListener('close',()=>dlg.remove());
+ dlg.querySelector('#purgeApply').onclick=()=>{
+  const current=scan(),ids=new Set([...(dlg.querySelector('#purgeDup').checked?current.duplicates:[]),...(dlg.querySelector('#purgeZero').checked?current.zero:[])]);
+  if(!ids.size){dlg.querySelector('#purgeResult').textContent='Selecciona una categoría que contenga elementos.';return}
+  checkpoint();objects=objects.filter((_,i)=>!ids.has(i));clearSelection();save();render();showProperties();status.textContent='Limpieza: '+ids.size+' objeto(s) eliminados · Ctrl+Z para deshacer';dlg.close();
+ };
+ dlg.showModal();
+}
 function runCommand(raw){
  const textValue=raw.trim(),upper=textValue.toUpperCase(),parts=upper.split(/\s+/),c=parts[0];if(!c)return;
  if(!/^[+-]?(?:\d|[.,])/.test(textValue)&&!textValue.startsWith('@')&&!['DS','HP','DSETTINGS','DRAFTINGSETTINGS','SETTINGS','F3','F7','F8','F9','F10','GRID','ORTHO','SNAP','OSNAP','POLAR'].includes(c)){lastCommand=textValue;try{localStorage.setItem('otrocad-last-command',lastCommand)}catch(e){}}
+ if(c==='PURG'||c==='PURGE'||c==='PURGAR'||c==='LIMPIAR'){showSmartPurge();return}
  if(c==='RE'||c==='REGEN'||c==='REGENERATE'){resize();status.textContent='REGEN · vista regenerada sin modificar el dibujo';return}
  if(c==='F12'||c==='DYNMODE'||c==='DYN'){toggleDynamicInput();return}
  if(c==='F1'||c==='HELP'||c==='ATAJOS'){showCadKeyboardHelp();return}
