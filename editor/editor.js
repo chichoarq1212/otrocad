@@ -409,10 +409,18 @@ function drawEntity(s,sel=false,preview=false){
    ctx.save();ctx.clip('evenodd');ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??.65)));
    if(!strokeCadHatchPattern(s,allPoints)){
     const xs=allPoints.map(p=>p.x),ys=allPoints.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
-    const radius=Math.min(30000,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))+20);
+    // Cover the visible canvas, including very large or partly off-screen boundaries.
+    const viewWidth=canvas.clientWidth||canvas.width,viewHeight=canvas.clientHeight||canvas.height;
+    const radius=Math.hypot(viewWidth,viewHeight)+40,center={x:viewWidth/2,y:viewHeight/2},origin=screen({x:0,y:0});
     const spacing=Math.max(5,Math.min(100,Math.abs(Number(s.hatchSpacingWorld)||.2)*drawZoom));
-    ctx.translate(cx,cy);ctx.rotate(-Number(s.hatchAngle||45)*Math.PI/180);ctx.lineWidth=.8;
-    let lines=0;for(let x=-radius;x<=radius&&lines<800;x+=spacing,lines++){ctx.beginPath();ctx.moveTo(x,-radius);ctx.lineTo(x,radius);ctx.stroke()}
+    const kind=String(s.hatchPattern||'').toUpperCase(),baseAngle=Number(s.hatchAngle??45)*Math.PI/180;
+    for(const extra of (kind==='CROSS'||kind==='GRID'?[0,Math.PI/2]:[0])){
+     const angle=-(baseAngle+extra),co=Math.cos(angle),si=Math.sin(angle),phase=(origin.x-center.x)*co+(origin.y-center.y)*si;
+     const first=phase+Math.ceil((-radius-phase)/spacing)*spacing,step=spacing*Math.max(1,Math.ceil((2*radius/spacing)/800));
+     ctx.save();ctx.translate(center.x,center.y);ctx.rotate(angle);ctx.lineWidth=.9;
+     for(let x=first;x<=radius;x+=step){ctx.beginPath();ctx.moveTo(x,-radius);ctx.lineTo(x,radius);ctx.stroke()}
+     ctx.restore();
+    }
    }
    ctx.restore();
   }
@@ -1150,7 +1158,7 @@ function matchPropertiesAt(q){
 let scaleReference=1;
 let rotateRef={phase:'off',first:null,angle:0};
 let trimState={phase:'quick',boundaries:new Set()};
-function setTool(t,options={}){rotateRef={phase:'off',first:null,angle:0};if(t==='trim')trimState={phase:'quick',boundaries:new Set()};updateTrimPanel(t);if(t!=='matchprop'){matchState.source=null;matchState.sourceIndex=-1}if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;resetRectangleDimensions();resetLineCoordinates();window.OtroCadMep?.onToolChanged(t);offsetAwaitingDistance=t==='offset'&&!options.offsetDistanceProvided;if(t==='offset'){clearSelection();offsetDistancePreset=!!options.offsetDistanceProvided;if(offsetAwaitingDistance)$('#dynLen').value=String(offsetDistance)}selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render();if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});$('#dynLen').select();status.textContent='OFFSET: escribe distancia y pulsa Enter'}}
+function setTool(t,options={}){const hatchMessage=document.getElementById('hatchNotice');if(hatchMessage)hatchMessage.hidden=t!=='hatch';rotateRef={phase:'off',first:null,angle:0};if(t==='trim')trimState={phase:'quick',boundaries:new Set()};updateTrimPanel(t);if(t!=='matchprop'){matchState.source=null;matchState.sourceIndex=-1}if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;resetRectangleDimensions();resetLineCoordinates();window.OtroCadMep?.onToolChanged(t);offsetAwaitingDistance=t==='offset'&&!options.offsetDistanceProvided;if(t==='offset'){clearSelection();offsetDistancePreset=!!options.offsetDistanceProvided;if(offsetAwaitingDistance)$('#dynLen').value=String(offsetDistance)}selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render();if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});$('#dynLen').select();status.textContent='OFFSET: escribe distancia y pulsa Enter'}}
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(!isVisibleModelEntity(s)||lockedLayers.has(s.layer))continue;let d=1e9;
@@ -1453,12 +1461,19 @@ function findHatchFaces(shapes,point,tolerance=1e-7){
  const outer=containers[0],holes=faces.filter(f=>f!==outer&&f.area<outer.area&&f.loop.every(p=>pointInPolygon(p,outer.loop)&&outer.loop.every((q,i)=>pointLineDistance(p,q,outer.loop[(i+1)%outer.loop.length])>tolerance)));
  return {loops:[outer.loop,...holes.map(f=>f.loop)]}
 }
+function hatchNotice(message,error=false){let box=document.getElementById('hatchNotice');if(!box){box=document.createElement('div');box.id='hatchNotice';box.setAttribute('role','status');box.style.cssText='position:absolute;top:50px;left:12px;z-index:35;max-width:min(440px,85%);padding:9px 12px;border-radius:6px;font:13px system-ui;pointer-events:none;box-shadow:0 2px 10px #0005';stage.appendChild(box)}box.hidden=false;box.style.background=error?'#7c2d12':'#163d77';box.style.color='#fff';box.textContent=message}
 function hatchAtPoint(point){
- const result=findHatchFaces(objects.filter(isVisibleModelEntity),point);
- if(result.error){status.textContent='HATCH · '+result.error;return}
+ let result;try{const visible=objects.filter(isVisibleModelEntity);result=findHatchFaces(visible,point);
+  if(result.error?.includes('demasiados bordes')){
+   const radius=2*Math.hypot(canvas.clientWidth,canvas.clientHeight)/zoom;
+   const local=visible.filter(shape=>{const pts=boundsPoints(shape);if(!pts.length)return false;let minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity;for(const p of pts){minx=Math.min(minx,p.x);maxx=Math.max(maxx,p.x);miny=Math.min(miny,p.y);maxy=Math.max(maxy,p.y)}return maxx>=point.x-radius&&minx<=point.x+radius&&maxy>=point.y-radius&&miny<=point.y+radius});
+   result=findHatchFaces(local,point);if(result.error)result.error+=' Acerca la vista o aísla las capas necesarias.';
+  }
+ }catch(error){console.error('HATCH',error);result={error:'No se pudo calcular el contorno. Revisa las uniones y vuelve a intentarlo.'}}
+ if(result.error){status.textContent='HATCH · '+result.error;hatchNotice(status.textContent,true);return}
  const pattern=$('#hatchPattern')?.value||'ANSI31',spacing=Math.max(.001,Number($('#hatchSpacing')?.value||10));
  checkpoint();objects.push({type:'polygon',pts:clone(result.loops[0]),hatchLoops:clone(result.loops),hatchPattern:pattern,solidFill:pattern.toUpperCase()==='SOLID',hatchSpacingWorld:spacing/50,importedHatch:true,...currentStyle($('#layer').value)});
- save();clearSelection();render();status.textContent='HATCH creado · '+(result.loops.length-1)+' isla(s) detectadas · clic en otra zona o Esc para terminar';
+ save();clearSelection();render();status.textContent='HATCH creado · '+(result.loops.length-1)+' isla(s) detectadas · clic en otra zona o Esc para terminar';hatchNotice(status.textContent);
 }
 function handleTap(p){
  const exactPoint=arguments[1]||null;
