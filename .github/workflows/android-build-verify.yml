@@ -45,7 +45,7 @@ jobs:
           # HVAC loads, cold-room design, official mascots, DWG tools and CSS.
           cp -a editor/. android/app/src/main/assets/editor/
           node scripts/verify-android-offline.cjs android/app/src/main/assets/editor
-          printf '{"version":"0.6.2-test-alpha","source":"%s","mode":"offline-hybrid"}\n' "$GITHUB_SHA" > android/app/src/main/assets/editor/android-bundle-info.json
+          printf '{"version":"0.6.3-test-alpha","source":"%s","mode":"offline-hybrid"}\n' "$GITHUB_SHA" > android/app/src/main/assets/editor/android-bundle-info.json
           test -s android/app/src/main/assets/editor/android-bundle-info.json
       - name: Build Android debug APK
         run: gradle -p android clean assembleDebug --no-daemon --stacktrace
@@ -79,30 +79,30 @@ jobs:
             adb shell am start -W -n com.otrocad.app/.HybridActivity
             for attempt in $(seq 1 12); do if adb shell pidof com.otrocad.app >/dev/null 2>&1; then echo "OtroCAD inició en Android (intento $attempt)"; exit 0; fi; echo "Esperando inicio de OtroCAD ($attempt/12)"; sleep 2; done; adb logcat -d -s AndroidRuntime:E ActivityManager:W WebViewFactory:E; exit 1
       - name: Prepare named test APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.6.2-alpha.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OtroCAD-Android-0.6.3-alpha.apk
       # Always preserve the tested APK even if release permissions are restricted.
       - uses: actions/upload-artifact@v4
         with:
-          name: OtroCAD-Android-0.6.2-verified
-          path: OtroCAD-Android-0.6.2-alpha.apk
+          name: OtroCAD-Android-0.6.3-verified
+          path: OtroCAD-Android-0.6.3-alpha.apk
           if-no-files-found: error
           retention-days: 90
-      - name: Publish Android 0.6.2 in GitHub Releases
+      - name: Publish Android 0.6.3 in GitHub Releases
         if: github.event_name != 'pull_request'
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-0.6.2-test
+          tag_name: android-0.6.3-test
           overwrite_files: true
           make_latest: false
           target_commitish: ${{ github.sha }}
-          name: OtroCAD Android 0.6.2 alfa · El Arqui IA · simulación local
+          name: OtroCAD Android 0.6.3 alfa · El Arqui IA · simulación local
           prerelease: true
           body: |
-            OtroCAD Android 0.6.2-test-alpha (versionCode 27).
+            OtroCAD Android 0.6.3-test-alpha (versionCode 28).
             APK híbrido de prueba con editor CAD local sin conexión.
-            Vista previa provisional en El Arqui mientras escribes. Cotas nuevas con grip central para desplazar la línea; TRIM rápido o con bordes seleccionados para líneas; hachurados arquitectónicos corregidos.
+            Incluye RE / REGEN para refrescar la vista y MOVER con guía visual y coordenadas. Vista previa provisional en El Arqui mientras escribes. Cotas nuevas con grip central para desplazar la línea; TRIM rápido o con bordes seleccionados para líneas; hachurados arquitectónicos corregidos.
             Incluye El Arqui, MATCHPROP, guardado DWG/DXF, Civil 3D y MEP.
             Sin IA generativa ni consumo de créditos: nuevo repositorio estático de criterios de vivienda, circulación, ventanas, puertas, mobiliario y escaleras en U con descanso. Distribución completa sigue en desarrollo.
             APK debug experimental: la firma puede diferir de versiones anteriores. Guarda tus planos antes de actualizar.
-          files: OtroCAD-Android-0.6.2-alpha.apk
+          files: OtroCAD-Android-0.6.3-alpha.apk

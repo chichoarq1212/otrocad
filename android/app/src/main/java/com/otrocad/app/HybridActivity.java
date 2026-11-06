@@ -94,7 +94,7 @@ public class HybridActivity extends Activity {
         // keep DOM storage and project drawings intact.
         android.content.SharedPreferences p=getSharedPreferences("otrocad-updates",MODE_PRIVATE);
         String installed=p.getString("editor-version","");
-        String current="0.6.2-tablet-retratos-20261104";
+        String current="0.6.3-regen-mover-20261106";
         if(!current.equals(installed)){
             web.clearCache(true);
             p.edit().putString("editor-version",current).apply();
