@@ -121,6 +121,19 @@ async function roundTrip(download){
  assert.equal(await movePage.locator('#setCrossColor').inputValue(),'#ffcc00');
  await movePage.locator('#cancelSettings').click();
  check('Cruceta configurable y persistente');
+ // ROTATE Reference: existing direction 45°, align it to 90°.
+ await mcmd('MODEL');
+ await movePage.evaluate(()=>window.OtroCadCivilAPI.addObjects([{type:'line',a:{x:-5,y:-5},b:{x:-4,y:-4},layer:'General'}],'Prueba referencia'));
+ await movePage.keyboard.press('Escape');
+ await mcmd('V');await mclick(-4.5,-4.5);
+ await mcmd('RO');await mclick(-5,-5);
+ assert.equal(await movePage.locator('#rotateRefBtn').isVisible(),true);
+ await movePage.locator('#rotateRefBtn').click();
+ await mcmd('45');await mcmd('90');
+ const rot=await getMoveState();const line=rot[rot.length-1];
+ assert(Math.abs(line.a.x+5)<0.002&&Math.abs(line.b.x+5)<0.002&&Math.abs(line.b.y-(-5+Math.sqrt(2)))<0.005,'Reference rotation must align line to 90 degrees');
+ await mcmd('UNDO');const restored=await getMoveState();assert.equal(restored[restored.length-1].b.x,-4);
+ check('Girar con referencia numérica y deshacer');
  await movePage.close();
  check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';
