@@ -1404,7 +1404,8 @@ function doOffset(q){
  }else{status.textContent='OFFSET disponible para líneas, círculos y rectángulos';return}
  if(objects.length===before){status.textContent='No se pudo crear el OFFSET';return}save();applySelection([]);render();status.textContent='OFFSET creado · selecciona otro objeto o Esc para terminar';
 }
-function handleTap(p,exactPoint=null){
+function handleTap(p){
+ const exactPoint=arguments[1]||null;
  if(tool==='matchprop'){matchPropertiesAt(world(p));return}
  let q=exactPoint?clone(exactPoint):constrain(snapPoint(world(p)));if(usesLineCoordinates())q=coordinateCorner(q);
  if(window.OtroCadMep?.placeAt(q))return;
