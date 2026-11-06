@@ -156,7 +156,8 @@ function snapCandidate(p,excludedIndex=-1){
  if(!osnapOn)return null;
  let best=null,limit=snapRadius/zoom;
  // Do not magnetize a grip to its own geometry in any OSNAP mode.
- const snapObjects=excludedIndex>=0?objects.filter((_,i)=>i!==excludedIndex):objects;
+ const excluded=excludedIndex instanceof Set?excludedIndex:(excludedIndex>=0?new Set([excludedIndex]):null);
+ const snapObjects=excluded?objects.filter((_,i)=>!excluded.has(i)):objects;
  for(const s of snapObjects){
   if(!isVisibleModelEntity(s))continue;
   const pts=[];
@@ -168,6 +169,7 @@ function snapCandidate(p,excludedIndex=-1){
   }
   if(osMid){
    if(s.a&&s.b&&['line','leader','dim','dimaligned'].includes(s.type))pts.push({point:{x:(s.a.x+s.b.x)/2,y:(s.a.y+s.b.y)/2},type:'PUNTO MEDIO'});
+   if(s.type==='rect'&&s.a&&s.b){const a=s.a,b=s.b;for(const point of [{x:(a.x+b.x)/2,y:a.y},{x:(a.x+b.x)/2,y:b.y},{x:a.x,y:(a.y+b.y)/2},{x:b.x,y:(a.y+b.y)/2}])pts.push({point,type:'PUNTO MEDIO'})}
    if(['poly','polygon'].includes(s.type)&&s.pts?.length>1){const n=s.pts.length-1+(s.type==='polygon'?1:0);for(let i=0;i<n;i++){const a=s.pts[i],b=s.pts[(i+1)%s.pts.length];pts.push({point:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},type:'PUNTO MEDIO'})}}
   }
   if(osCenter&&s.a&&['circle','ellipse'].includes(s.type))pts.push({point:s.a,type:'CENTRO'});
@@ -183,7 +185,7 @@ function snapCandidate(p,excludedIndex=-1){
  if(typeof osGeom!=='undefined'&&osGeom){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer))continue;let point=null;if(shape.type==='rect'&&shape.a&&shape.b)point={x:(shape.a.x+shape.b.x)/2,y:(shape.a.y+shape.b.y)/2};else if(shape.type==='polygon'&&shape.pts?.length>=3){let area=0,x=0,y=0;for(let i=0;i<shape.pts.length;i++){const a=shape.pts[i],b=shape.pts[(i+1)%shape.pts.length],v=a.x*b.y-b.x*a.y;area+=v;x+=(a.x+b.x)*v;y+=(a.y+b.y)*v}if(Math.abs(area)>1e-12)point={x:x/(3*area),y:y/(3*area)}}if(point){const d=distance(p,point);if(d<limit){limit=d;best={point,type:'CENTRO GEOMÉTRICO'}}}}}
  if(typeof osInsertion!=='undefined'&&osInsertion){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='text'||!shape.a)continue;const d=distance(p,shape.a);if(d<limit){limit=d;best={point:shape.a,type:'INSERCIÓN'}}}}
  if(typeof osTangent!=='undefined'&&osTangent&&typeof start!=='undefined'&&start){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='circle'||!shape.a||!shape.b)continue;const dx=start.x-shape.a.x,dy=start.y-shape.a.y,r=distance(shape.a,shape.b),d2=dx*dx+dy*dy;if(d2<r*r||d2<1e-18)continue;const k=r*r/d2,h=r*Math.sqrt(Math.max(0,d2-r*r))/d2;for(const sign of [-1,1]){const point={x:shape.a.x+k*dx-sign*h*dy,y:shape.a.y+k*dy+sign*h*dx},d=distance(p,point);if(d<limit){limit=d;best={point,type:'TANGENTE'}}}}}
- if(typeof osExtension!=='undefined'&&osExtension){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='line'||!shape.a||!shape.b)continue;const a=shape.a,b=shape.b,dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((p.x-a.x)*dx+(p.y-a.y)*dy)/den;if(t>=0&&t<=1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'EXTENSIÓN',origin:t<0?a:b}}}}
+ if(typeof osExtension!=='undefined'&&osExtension&&!best){for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||shape.type!=='line'||!shape.a||!shape.b)continue;const a=shape.a,b=shape.b,dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((p.x-a.x)*dx+(p.y-a.y)*dy)/den;if(t>=0&&t<=1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'EXTENSIÓN',origin:t<0?a:b}}}}
  if(typeof osApparent!=='undefined'&&osApparent){const lines=snapObjects.filter(s=>s.type==='line'&&s.a&&s.b&&!hiddenLayers.has(s.layer)).slice(0,128);for(let i=0;i<lines.length;i++)for(let j=i+1;j<lines.length;j++){const hit=lineIntersection(lines[i].a,lines[i].b,lines[j].a,lines[j].b,false);if(!hit)continue;const d=distance(p,hit);if(d<limit){limit=d;best={point:{x:hit.x,y:hit.y},type:'INTERSECCIÓN APARENTE'}}}}
  if(typeof osPerpendicular!=='undefined'&&osPerpendicular&&typeof start!=='undefined'&&start){
   for(const shape of snapObjects){if(hiddenLayers.has(shape.layer)||!['line','poly','polygon','rect'].includes(shape.type))continue;for(const [a,b] of entitySegments(shape)){const dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;if(den<1e-18)continue;const t=((start.x-a.x)*dx+(start.y-a.y)*dy)/den;if(t<0||t>1)continue;const point={x:a.x+t*dx,y:a.y+t*dy},d=distance(p,point);if(d<limit){limit=d;best={point,type:'PERPENDICULAR'}}}}
@@ -197,6 +199,7 @@ function snapCandidate(p,excludedIndex=-1){
  }
  return best;
 }
+function moveSnapExclusions(){return ['move','copy'].includes(tool)&&moveBase&&modifyTargets.length?new Set(modifyTargets):null}
 function snapPoint(p,excludedIndex=-1){
  const candidate=snapCandidate(p,excludedIndex);activeSnap=candidate;
  if(candidate)return {...candidate.point};
@@ -1098,7 +1101,7 @@ function render(){
  if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
  if(!printing&&moveBase&&['move','copy'].includes(tool)&&modifyTargets.length){
-  const q=constrain(snapPoint(world(cursor))),dx=q.x-moveBase.x,dy=q.y-moveBase.y;
+  let q=snapPoint(world(cursor),moveSnapExclusions()||-1);if(!activeSnap)q=constrain(q);const dx=q.x-moveBase.x,dy=q.y-moveBase.y;
   ctx.save();ctx.globalAlpha=.5;for(const i of modifyTargets.slice(0,300)){if(objects[i]){const preview=clone(objects[i]);translate(preview,dx,dy);drawEntity(preview,false,true)}}ctx.restore();
   const a=screen(moveBase),b=screen(q);ctx.save();ctx.setLineDash([6,4]);ctx.strokeStyle='#ffcf23';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore();
  }
@@ -1478,7 +1481,9 @@ function hatchAtPoint(point){
 function handleTap(p){
  const exactPoint=arguments[1]||null;
  if(tool==='matchprop'){matchPropertiesAt(world(p));return}
- let q=exactPoint?clone(exactPoint):constrain(snapPoint(world(p)));if(usesLineCoordinates())q=coordinateCorner(q);
+ const moveExclusions=moveSnapExclusions();let q;
+ if(exactPoint)q=clone(exactPoint);else {q=snapPoint(world(p),moveExclusions||-1);if(!(moveExclusions&&activeSnap))q=constrain(q)}
+ if(usesLineCoordinates())q=coordinateCorner(q);
  if(window.OtroCadMep?.placeAt(q))return;
  if(!['select','pan','move','copy','offset','trim','extend','explode','measure'].includes(tool)&&lockedLayers.has($('#layer').value)){status.textContent='La capa '+$('#layer').value+' está bloqueada';return}
  if(tool==='hatch'){hatchAtPoint(exactPoint||world(p));return}
@@ -1903,7 +1908,7 @@ canvas.addEventListener('pointermove',e=>{
  if(e.pointerType==='touch'&&pointers.has(e.pointerId))e.preventDefault();
  const p=pointer(e);
  if(middlePan&&middlePan.pointerId===e.pointerId){offset.x=middlePan.offset.x+p.x-middlePan.point.x;offset.y=middlePan.offset.y+p.y-middlePan.point.y;render();return}cursor=p;updateCursorCommand();$('#crossinfo').textContent='X '+world(p).x.toFixed(zoom>500?6:3)+' '+units+' · Y '+world(p).y.toFixed(zoom>500?6:3)+' '+units+' · Z 0.000'+(window.OtroCadGeolocation?.formatCoordinate(world(p),units)||'');
- if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);activeSnap=snapCandidate(world(p));if(activeSnap)status.textContent='OSNAP · '+activeSnap.type+' · clic para conectar';
+ if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);activeSnap=snapCandidate(world(p),gripDrag?gripDrag.index:(moveSnapExclusions()||-1));if(activeSnap)status.textContent='OSNAP · '+activeSnap.type+' · clic para conectar';
  if(pointers.size===2&&pinch){const v=[...pointers.values()];zoom=Math.max(.000001,Math.min(MAX_MODEL_ZOOM,pinch.zoom*distance(v[0],v[1])/(pinch.dist||1)));const mid={x:(v[0].x+v[1].x)/2,y:(v[0].y+v[1].y)/2};offset.x=mid.x-canvas.clientWidth/2-pinch.anchor.x*zoom;offset.y=mid.y-canvas.clientHeight/2+pinch.anchor.y*zoom;render();return}
  if(drag&&tool==='pan'){offset.x=drag.offset.x+p.x-drag.point.x;offset.y=drag.offset.y+p.y-drag.point.y;render();return}
  if(gripDrag){
