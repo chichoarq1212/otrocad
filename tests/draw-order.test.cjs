@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const src=fs.readFileSync('editor/editor.js','utf8');
+let snapshots=[],selected=[0],saves=0;
+const ctx={objects:[{name:'lineA'},{name:'hatch',importedHatch:true},{name:'lineB'},{name:'sheet',cadLayout:'P1'}],activeLayout:'Model',selectionForUtility:()=>selected,checkpoint(){snapshots.push(JSON.parse(JSON.stringify(ctx.objects)))},save(){saves++},render(){},status:{textContent:''}};
+vm.createContext(ctx);vm.runInContext(src.slice(src.indexOf('function drawOrderIndices('),src.indexOf('function renderPaperLayout(')),ctx);
+const order=()=>Array.from(vm.runInContext("drawOrderIndices('Model')",ctx),i=>ctx.objects[i].name);
+assert.deepEqual(order(),['hatch','lineA','lineB']);
+selected=[1];assert.equal(vm.runInContext("modifyDrawOrder('front')",ctx),true);assert.deepEqual(order(),['lineA','lineB','hatch']);assert.equal(ctx.objects[3].cadDrawOrder,undefined);
+selected=[1];vm.runInContext("modifyDrawOrder('backward')",ctx);assert.deepEqual(order(),['lineA','hatch','lineB']);
+selected=[0,1];vm.runInContext("modifyDrawOrder('forward')",ctx);assert.deepEqual(order(),['lineB','lineA','hatch']);
+vm.runInContext("modifyDrawOrder('back')",ctx);assert.deepEqual(order(),['lineA','hatch','lineB']);
+ctx.objects=JSON.parse(JSON.stringify(snapshots[0]));assert.deepEqual(order(),['hatch','lineA','lineB']);assert.equal(saves,4);
+selected=[];assert.equal(vm.runInContext("modifyDrawOrder('front')",ctx),false);
+console.log('Draw order: hatch, line, front/back, step, multiple objects, layout isolation and undo snapshot');
