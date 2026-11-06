@@ -390,6 +390,7 @@ function drawEntity(s,sel=false,preview=false){
   if(match){const n=parseInt(match[1],16),gray=Math.round(.2126*((n>>16)&255)+.7152*((n>>8)&255)+.0722*(n&255));
    color='#'+[gray,gray,gray].map(v=>Math.min(215,Math.max(40,v)).toString(16).padStart(2,'0')).join('');}
  }
+ if(sel&&!printing&&(s.type==='hatch'||(s.type==='polygon'&&(s.hatchPattern||s.solidFill))))color='#338bfa';
  ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=preview?1.5:(sel?2.2:Math.max(.8,Math.min(8,Number(s.lineweight||.25)*2.4)));ctx.setLineDash(preview?[8,6]:cadLineDash(s.linetype));ctx.lineDashOffset=0;ctx.globalAlpha=preview?.95:Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
  const a=s.a&&screen(s.a),b=s.b&&screen(s.b);
  if(s.type==='point'){ctx.beginPath();ctx.moveTo(a.x-4,a.y);ctx.lineTo(a.x+4,a.y);ctx.moveTo(a.x,a.y-4);ctx.lineTo(a.x,a.y+4);ctx.stroke()}
@@ -406,7 +407,7 @@ function drawEntity(s,sel=false,preview=false){
   for(const loop of loops){loop.forEach((p,i)=>{const v=screen(p);allPoints.push(v);i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)});ctx.closePath()}
   if(s.solidFill&&!preview){
    ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??1)))*Math.max(0,Math.min(1,Number(s.cadOpacity??1)));
-   ctx.fillStyle=cadHatchGradient(s,allPoints)||color;ctx.fill('evenodd');ctx.restore();
+   ctx.fillStyle=sel&&!printing?color:(cadHatchGradient(s,allPoints)||color);ctx.fill('evenodd');ctx.restore();
   }else if(s.hatchPattern&&!preview&&allPoints.length){
    ctx.save();ctx.clip('evenodd');ctx.globalAlpha=Math.max(0,Math.min(1,Number(s.hatchOpacity??.65)));
    if(!strokeCadHatchPattern(s,allPoints)){
@@ -1195,6 +1196,7 @@ function gripDescriptors(s){
  }else if(s.type==='ellipse'&&s.a&&s.b){
   add('a',s.a);add('rx+',{x:s.a.x+Math.abs(s.b.x-s.a.x),y:s.a.y});add('rx-',{x:s.a.x-Math.abs(s.b.x-s.a.x),y:s.a.y});add('ry+',{x:s.a.x,y:s.a.y+Math.abs(s.b.y-s.a.y)});add('ry-',{x:s.a.x,y:s.a.y-Math.abs(s.b.y-s.a.y)});
  }else if(s.type==='point'||s.type==='text'){add('a',s.a||(s.pts&&s.pts[0]))}
+ else if(s.type==='polygon'&&s.hatchLoops?.length){s.hatchLoops.forEach((loop,j)=>loop.forEach((p,i)=>add('loop:'+j+':'+i,p)))}
  else if(s.type==='poly'||s.type==='polygon'||s.type==='arc'){(s.pts||[]).forEach((p,i)=>add('pt:'+i,p))}
  return out;
 }
@@ -1206,7 +1208,7 @@ function drawSelectionGrips(){
  for(const idx of selectedItems()){
   const s=objects[idx];if(!s||!isVisibleModelEntity(s))continue;
   for(const g of gripDescriptors(s)){
-   const p=screen(g.p);ctx.fillStyle='#f7fbff';ctx.strokeStyle='#1675c9';ctx.lineWidth=1.4;ctx.fillRect(p.x-r,p.y-r,r*2,r*2);ctx.strokeRect(p.x-r,p.y-r,r*2,r*2);
+   const p=screen(g.p);ctx.fillStyle=(s.type==='hatch'||(s.type==='polygon'&&(s.hatchPattern||s.solidFill)))?'#1688f5':'#f7fbff';ctx.strokeStyle='#07549f';ctx.lineWidth=1.4;ctx.fillRect(p.x-r,p.y-r,r*2,r*2);ctx.strokeRect(p.x-r,p.y-r,r*2,r*2);
   }
  }
  ctx.restore();
@@ -1236,6 +1238,7 @@ function applyGrip(s,key,q){
   else if(k===3){s.a.x=p.x;s.b.y=p.y}
   return;
  }
+ if(key.startsWith('loop:')&&s.hatchLoops){const [,loopIndex,pointIndex]=key.split(':').map((v,i)=>i?Number(v):v);if(s.hatchLoops[loopIndex]?.[pointIndex]){s.hatchLoops[loopIndex][pointIndex]=p;if(loopIndex===0&&s.pts?.[pointIndex])s.pts[pointIndex]={...p}}return}
  if(key.startsWith('pt:')&&s.pts){const i=Number(key.slice(3));if(s.pts[i])s.pts[i]=p}
 }
 function cancelGripDrag(){
