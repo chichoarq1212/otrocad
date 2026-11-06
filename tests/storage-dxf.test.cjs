@@ -69,6 +69,7 @@ selectionScope.isVisibleModelEntity=s=>(s.cadLayout||'Model')==='Model'&&!select
 vm.createContext(selectionScope);
 vm.runInContext(source.slice(source.indexOf('const CAD_TEXT_FONT_CATALOG='),source.indexOf('\nfunction drawEntity(')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function arcParams('),source.indexOf('\nconst CAD_THEMES=')),selectionScope);
+vm.runInContext(source.slice(source.indexOf('function drawOrderIndices('),source.indexOf('function modifyDrawOrder(')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function selectAt('),source.indexOf('function gripDescriptors(')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function entitySegments(s){'),source.indexOf('function lineIntersection(')),selectionScope);
 vm.runInContext(source.slice(source.indexOf('function inSelectionRect('),source.indexOf('function lineIntersection(')),selectionScope);
