@@ -169,6 +169,10 @@ async function roundTrip(download){
  const afterHatch=await getMoveState();assert.equal(afterHatch.length,beforeHatch.length+1,'One click should hatch a closed region');
  assert.ok(afterHatch[afterHatch.length-1].hatchLoops?.length,'Hatch must retain its true boundary');
  assert.match(await movePage.locator('#hatchNotice').textContent(),/HATCH creado/);
+ assert.equal((await movePage.evaluate(()=>window.OtroCadCivilAPI.getSelectedObjects())).length,1,'New hatch should be selected');
+ await movePage.keyboard.press('Delete');assert.deepEqual(await getMoveState(),beforeHatch,'Delete should remove selected hatch');
+ await movePage.keyboard.press('Control+z');assert.equal((await getMoveState()).length,beforeHatch.length+1,'Undo should restore deleted hatch');
+ 
  await movePage.locator('#cmd').focus();await movePage.keyboard.press('Control+z');assert.deepEqual(await getMoveState(),beforeHatch,'Ctrl+Z in the empty command field must undo the hatch');
  check('HATCH con un clic y deshacer');
 
