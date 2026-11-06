@@ -1164,7 +1164,7 @@ function setTool(t,options={}){const hatchMessage=document.getElementById('hatch
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(!isVisibleModelEntity(s)||lockedLayers.has(s.layer))continue;let d=1e9;
-  if(s.type==='poly'||s.type==='polygon'){const loops=s.hatchLoops?.length?s.hatchLoops:[s.pts];for(const loop of loops){const count=loop.length-1+(s.type==='polygon'?1:0);for(let j=0;j<count;j++)d=Math.min(d,pointLineDistance(q,loop[j],loop[(j+1)%loop.length]))}}
+  if(s.type==='poly'||s.type==='polygon'){const loops=s.hatchLoops?.length?s.hatchLoops:[s.pts];if(s.type==='polygon'&&(s.hatchPattern||s.solidFill)&&loops.reduce((inside,loop)=>inside!==pointInPolygon(q,loop),false))d=0;for(const loop of loops){const count=loop.length-1+(s.type==='polygon'?1:0);for(let j=0;j<count;j++)d=Math.min(d,pointLineDistance(q,loop[j],loop[(j+1)%loop.length]))}}
   else if(s.type==='rect'||s.type==='hatch'){if(q.x>=Math.min(s.a.x,s.b.x)-best&&q.x<=Math.max(s.a.x,s.b.x)+best&&q.y>=Math.min(s.a.y,s.b.y)-best&&q.y<=Math.max(s.a.y,s.b.y)+best)d=0}
   else if(s.type==='ellipse'){const rx=Math.abs(s.b.x-s.a.x),ry=Math.abs(s.b.y-s.a.y);if(rx&&ry){const normalized=Math.hypot((q.x-s.a.x)/rx,(q.y-s.a.y)/ry);d=Math.abs(normalized-1)*Math.min(rx,ry)}}
   else if(s.type==='arc'&&s.pts?.length>=3){const g=arcParams(s.pts);if(g){const p=screen(q),theta=Math.atan2(p.y-g.y,p.x-g.x),span=v=>(v+2*Math.PI)%(2*Math.PI),onArc=g.anticlockwise?span(g.a1-theta)<=span(g.a1-g.a3):span(theta-g.a1)<=span(g.a3-g.a1);d=onArc?Math.abs(Math.hypot(p.x-g.x,p.y-g.y)-g.r)/zoom:Math.min(distance(q,s.pts[0]),distance(q,s.pts[2]))}else for(let j=0;j<s.pts.length-1;j++)d=Math.min(d,pointLineDistance(q,s.pts[j],s.pts[j+1]))}
@@ -1446,7 +1446,14 @@ function findHatchFaces(shapes,point,tolerance=1e-7,windowBox=null){
   const rx=A.b.x-A.a.x,ry=A.b.y-A.a.y,sx=B.b.x-B.a.x,sy=B.b.y-B.a.y;
   if(Math.max(A.a.x,A.b.x)+tolerance<Math.min(B.a.x,B.b.x)||Math.max(B.a.x,B.b.x)+tolerance<Math.min(A.a.x,A.b.x)||Math.max(A.a.y,A.b.y)+tolerance<Math.min(B.a.y,B.b.y)||Math.max(B.a.y,B.b.y)+tolerance<Math.min(A.a.y,A.b.y))continue;
   const den=cross(rx,ry,sx,sy),qx=B.a.x-A.a.x,qy=B.a.y-A.a.y;
-  if(Math.abs(den)<1e-14)continue;
+  if(Math.abs(den)<1e-14){
+   const rr=rx*rx+ry*ry,ss=sx*sx+sy*sy;
+   if(rr>0&&ss>0&&Math.abs(cross(qx,qy,rx,ry))<=tolerance*Math.sqrt(rr)){
+    for(const p of [B.a,B.b]){const t=((p.x-A.a.x)*rx+(p.y-A.a.y)*ry)/rr;if(t>0&&t<1)A.ts.push(t)}
+    for(const p of [A.a,A.b]){const u=((p.x-B.a.x)*sx+(p.y-B.a.y)*sy)/ss;if(u>0&&u<1)B.ts.push(u)}
+   }
+   continue
+  }
   const t=cross(qx,qy,sx,sy)/den,u=cross(qx,qy,rx,ry)/den;
   if(t>=-1e-9&&t<=1+1e-9&&u>=-1e-9&&u<=1+1e-9){A.ts.push(Math.max(0,Math.min(1,t)));B.ts.push(Math.max(0,Math.min(1,u)))}
  }
@@ -1486,7 +1493,7 @@ function hatchAtPoint(point){
  if(result.error){status.textContent='HATCH · '+result.error;hatchNotice(status.textContent,true);return}
  const pattern=$('#hatchPattern')?.value||'ANSI31',spacing=Math.max(.001,Number($('#hatchSpacing')?.value||10));
  checkpoint();objects.push({type:'polygon',pts:clone(result.loops[0]),hatchLoops:clone(result.loops),hatchPattern:pattern,solidFill:pattern.toUpperCase()==='SOLID',hatchSpacingWorld:spacing/50,importedHatch:true,...currentStyle($('#layer').value)});
- save();clearSelection();render();status.textContent='HATCH creado · '+(result.loops.length-1)+' isla(s) detectadas · clic en otra zona o Esc para terminar';hatchNotice(status.textContent);
+ save();setTool('select');applySelection([objects.length-1]);render();status.textContent='HATCH creado y seleccionado · Supr para eliminar · Ctrl+Z para deshacer';hatchNotice(status.textContent);
 }
 function handleTap(p){
  const exactPoint=arguments[1]||null;
@@ -1982,6 +1989,7 @@ document.addEventListener('keydown',e=>{
  if(!contextMenuEl.hidden&&e.key==='Escape'){e.preventDefault();hideCadContextMenu();return}
  const active=document.activeElement;
  if(document.querySelector('dialog[open]'))return;
+ if((e.ctrlKey||e.metaKey)&&!e.altKey&&['z','y'].includes(e.key.toLowerCase())&&(!['INPUT','TEXTAREA'].includes(active?.tagName)||(['cmd','dynLen','dynAngle'].includes(active.id)&&!active.value.trim()))){e.preventDefault();$(e.key.toLowerCase()==='y'||e.shiftKey?'#redo':'#undo').click();return}
  if((e.ctrlKey||e.metaKey)&&!e.altKey){
   const k=e.key.toLowerCase();
   const shortcut={s:e.shiftKey?'#saveAs':'#save',o:'#open',n:'#newDrawing',p:'#pdf'}[k];

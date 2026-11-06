@@ -115,3 +115,8 @@ const denseInside=Array.from({length:1600},(_,i)=>({type:'line',a:{x:1+(i%40)*.2
 const denseResult=hatchScope.findHatchFaces([outer,...denseInside],{x:.5,y:.5},1e-7,{left:0,right:10,bottom:0,top:10});
 assert.ok(denseResult.loops?.length,'HATCH must find a closed face with more than 1200 nearby edges');
 console.log('HATCH con 1600 bordes dentro del área de búsqueda: OK');
+
+const wallEdges=[{type:'line',a:{x:0,y:-4},b:{x:0,y:14}},{type:'line',a:{x:0,y:0},b:{x:5,y:0}},{type:'line',a:{x:5,y:0},b:{x:5,y:4}},{type:'line',a:{x:5,y:4},b:{x:0,y:4}}];
+const bounded=hatchScope.findHatchFaces(wallEdges,{x:2,y:2});assert.ok(bounded.loops?.length,'Hatch must close when a boundary touches an extended wall');
+assert.ok(bounded.loops[0].every(p=>p.x>=-1e-7&&p.x<=5.0000001&&p.y>=-1e-7&&p.y<=4.0000001),'Hatch must remain inside rectangle');
+console.log('HATCH con borde sobre muro prolongado: OK');
