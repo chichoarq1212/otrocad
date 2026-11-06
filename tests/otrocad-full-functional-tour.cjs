@@ -133,7 +133,11 @@ async function roundTrip(download){
  const rot=await getMoveState();const line=rot[rot.length-1];
  assert(Math.abs(line.a.x+5)<0.002&&Math.abs(line.b.x+5)<0.002&&Math.abs(line.b.y-(-5+Math.sqrt(2)))<0.005,'Reference rotation must align line to 90 degrees');
  await mcmd('UNDO');const restored=await getMoveState();assert.equal(restored[restored.length-1].b.x,-4);
- check('Girar con referencia numérica y deshacer');
+ await mcmd('V');await mclick(-4.5,-4.5);await mcmd('RO');await mclick(-5,-5);await mcmd('R');
+ await mclick(-5,-5);await mclick(-4,-4);await mclick(-5,-3);
+ const rotatedByPoints=await getMoveState();const line2=rotatedByPoints[rotatedByPoints.length-1];
+ assert(Math.abs(line2.b.x+5)<0.005&&Math.abs(line2.b.y-(-5+Math.sqrt(2)))<0.005,'Two reference points should align to target direction');
+ check('Girar con referencia numérica y dos puntos');
  await movePage.close();
  check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';
