@@ -81,3 +81,11 @@ El flujo `Build OtroCAD DWG WebAssembly` ejecuta pruebas de ida y vuelta y publi
 
 - El código propio de OtroCAD todavía requiere una decisión de licencia del proyecto.
 - El puente DWG usa acadrust 0.6.8 bajo MPL-2.0. Ver `THIRD_PARTY_NOTICES.md` y `dwg-wasm/README.md`.
+
+## Desarrollo y control de costos
+
+- ChatGPT se utiliza como asistente externo para analizar y desarrollar el código; no se incorpora una IA remota al producto.
+- No se utilizan GitHub Copilot, créditos de IA, APIs de modelos ni servicios de pago adicionales sin autorización expresa.
+- El desarrollo y las compilaciones habituales se priorizan en el PC local. GitHub se conserva como repositorio, respaldo y control de versiones.
+- La integración continua puede utilizar únicamente runners estándar gratuitos para este repositorio público; no se deben configurar runners más grandes ni infraestructura de CI facturable.
+- Las reglas obligatorias para asistentes y colaboradores están en [AGENTS.md](AGENTS.md).
