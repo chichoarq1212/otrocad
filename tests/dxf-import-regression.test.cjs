@@ -47,3 +47,14 @@ const face=result.find(o=>o.civilTin);
 assert.ok(face&&face.pts.length===3,'3DFACE should import as a 3D surface triangle');
 assert.deepEqual(Array.from(face.pts,p=>p.z),[10,11,12]);
 console.log('DXF import regression checks passed: degenerate HATCH, nested INSERT, XYZ point and 3DFACE elevations');
+
+const decodeSource=editor.slice(editor.indexOf('function decodeDxfFileBytes(bytes)'),editor.indexOf("$('#file').onchange=async e=>"));
+const decoderContext={TextDecoder,Uint8Array};vm.createContext(decoderContext);vm.runInContext(decodeSource+';this.decode=decodeDxfFileBytes;',decoderContext);
+const latin=Buffer.from('0\nSECTION\n9\n$DWGCODEPAGE\n3\nANSI_1252\n1\nMESÓN\n','latin1');
+assert.match(decoderContext.decode(latin),/MESÓN/,'DXF Windows-1252 accents must decode');
+const utf=Buffer.from('MESÓN baño áéíóú ñ','utf8');
+assert.equal(decoderContext.decode(utf),'MESÓN baño áéíóú ñ');
+const accented=['0','SECTION','2','ENTITIES','0','TEXT','8','General','10','0','20','0','40','1','1','MES\\U+00D3N','0','ENDSEC','0','EOF'].join('\n');
+const texts=context.parseDxfEntities(accented);
+assert(texts.some(x=>x.type==='text'&&x.text==='MESÓN'),'DXF Unicode escape must be decoded');
+console.log('DXF UTF-8, ANSI and Unicode escapes preserve Spanish accents');
