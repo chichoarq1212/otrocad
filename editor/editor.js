@@ -1435,13 +1435,15 @@ function doOffset(q){
 function findHatchFaces(shapes,point,tolerance=1e-7,windowBox=null){
  const segs=[];
  for(const shape of shapes){
-  if(!['line','poly','polygon','rect','circle','ellipse','arc'].includes(shape.type)||shape.hatchPattern||shape.solidFill||shape.importedHatch)continue;
+  if(!['line','poly','polygon','rect','circle','ellipse','arc'].includes(shape.type)||((shape.hatchPattern||shape.importedHatch)&&!shape.solidFill))continue;
   for(const [a,b] of entitySegments(shape)){if(!a||!b||distance(a,b)<=tolerance)continue;if(windowBox&&(Math.max(a.x,b.x)<windowBox.left-tolerance||Math.min(a.x,b.x)>windowBox.right+tolerance||Math.max(a.y,b.y)<windowBox.bottom-tolerance||Math.min(a.y,b.y)>windowBox.top+tolerance))continue;segs.push({a,b,ts:[0,1]})}
  }
- if(segs.length>1200)return {error:'El dibujo contiene demasiados bordes para detectar el recinto; aísla las capas necesarias.'};
+ if(segs.length>30000)return {error:'El área contiene demasiados bordes para calcular el contorno. Prueba con un área más pequeña.'};
+ segs.sort((a,b)=>Math.min(a.a.x,a.b.x)-Math.min(b.a.x,b.b.x));
  const cross=(x,y,u,v)=>x*v-y*u;
  for(let i=0;i<segs.length;i++)for(let j=i+1;j<segs.length;j++){
-  const A=segs[i],B=segs[j],rx=A.b.x-A.a.x,ry=A.b.y-A.a.y,sx=B.b.x-B.a.x,sy=B.b.y-B.a.y;
+  const A=segs[i],B=segs[j];if(Math.min(B.a.x,B.b.x)>Math.max(A.a.x,A.b.x)+tolerance)break;
+  const rx=A.b.x-A.a.x,ry=A.b.y-A.a.y,sx=B.b.x-B.a.x,sy=B.b.y-B.a.y;
   if(Math.max(A.a.x,A.b.x)+tolerance<Math.min(B.a.x,B.b.x)||Math.max(B.a.x,B.b.x)+tolerance<Math.min(A.a.x,A.b.x)||Math.max(A.a.y,A.b.y)+tolerance<Math.min(B.a.y,B.b.y)||Math.max(B.a.y,B.b.y)+tolerance<Math.min(A.a.y,A.b.y))continue;
   const den=cross(rx,ry,sx,sy),qx=B.a.x-A.a.x,qy=B.a.y-A.a.y;
   if(Math.abs(den)<1e-14)continue;

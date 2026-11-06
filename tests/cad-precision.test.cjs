@@ -110,3 +110,8 @@ let region=hatchScope.findHatchFaces([outer,inner],{x:1,y:1});assert.equal(regio
 region=hatchScope.findHatchFaces([outer,{type:'line',a:{x:5,y:0},b:{x:5,y:10}}],{x:1,y:1});assert.ok(region.loops[0].every(p=>p.x<=5),'Hatch should stop at intersecting divider');
 assert.ok(hatchScope.findHatchFaces([{type:'line',a:{x:0,y:0},b:{x:2,y:0}}],{x:1,y:1}).error,'Open boundary must be rejected');
 console.log('HATCH: recintos, división, islas y contornos abiertos verificados');
+
+const denseInside=Array.from({length:1600},(_,i)=>({type:'line',a:{x:1+(i%40)*.2,y:1+Math.floor(i/40)*.2},b:{x:1.03+(i%40)*.2,y:1+Math.floor(i/40)*.2}}));
+const denseResult=hatchScope.findHatchFaces([outer,...denseInside],{x:.5,y:.5},1e-7,{left:0,right:10,bottom:0,top:10});
+assert.ok(denseResult.loops?.length,'HATCH must find a closed face with more than 1200 nearby edges');
+console.log('HATCH con 1600 bordes dentro del área de búsqueda: OK');
