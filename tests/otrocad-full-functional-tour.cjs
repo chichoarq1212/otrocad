@@ -165,7 +165,11 @@ async function roundTrip(download){
  // Hatch an enclosed area with one click and undo the result.
  await movePage.keyboard.press('Escape');
  await movePage.evaluate(()=>window.OtroCadCivilAPI.addObjects([{type:'rect',a:{x:-8,y:-8},b:{x:-6,y:-6},layer:'General'}],'Prueba hatch'));
- const beforeHatch=await getMoveState();await mcmd('H');await mclick(-7,-7);
+ const beforeHatch=await getMoveState();await mcmd('H');
+ const hb=await movePage.locator('#cad').boundingBox(),hv=await movePage.evaluate(()=>window.OtroCadCivilAPI.getView());
+ await movePage.mouse.move(hb.x+hb.width/2+(-7-hv.center.x)*hv.pixelsPerUnit,hb.y+hb.height/2-(-7-hv.center.y)*hv.pixelsPerUnit);
+ await movePage.waitForTimeout(350);assert.deepEqual(await getMoveState(),beforeHatch,'Hover preview must not change the drawing');
+ await mclick(-7,-7);
  const afterHatch=await getMoveState();assert.equal(afterHatch.length,beforeHatch.length+1,'One click should hatch a closed region');
  assert.ok(afterHatch[afterHatch.length-1].hatchLoops?.length,'Hatch must retain its true boundary');
  assert.match(await movePage.locator('#hatchNotice').textContent(),/HATCH creado/);
