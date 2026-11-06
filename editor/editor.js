@@ -1097,6 +1097,7 @@ function render(){
  // Imported CAD hatches are background fills; keep dimensions, walls and labels visible on top.
  objects.forEach((s,i)=>{if(s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
  objects.forEach((s,i)=>{if(!s.importedHatch&&isVisibleModelEntity(s))drawEntity(s,i===selected||selectedSet.has(i))});
+ if(!printing&&tool==='hatch'&&hatchPreview){const pattern=$('#hatchPattern')?.value||'ANSI31';ctx.save();ctx.globalAlpha=.7;drawEntity({type:'polygon',pts:hatchPreview[0],hatchLoops:hatchPreview,hatchPattern:pattern,solidFill:pattern.toUpperCase()==='SOLID',hatchSpacingWorld:Math.max(.001,Number($('#hatchSpacing')?.value||10))/50,...currentStyle($('#layer').value)},false,false);ctx.restore()}
  drawSelectionGrips();if(!printing&&activeSnap?.type==='EXTENSIÓN'&&activeSnap.origin){const a=screen(activeSnap.origin),b=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#f7cf56';ctx.lineWidth=1.3;ctx.setLineDash([6,5]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore()}
  if(!printing&&activeSnap&&osnapOn){const sp=screen(activeSnap.point);ctx.save();ctx.strokeStyle='#ffdc45';ctx.fillStyle='#ffdc45';ctx.lineWidth=2;ctx.beginPath();if(activeSnap.type==='CENTRO')ctx.arc(sp.x,sp.y,6,0,Math.PI*2);else if(activeSnap.type==='PUNTO MEDIO'){ctx.moveTo(sp.x,sp.y-7);ctx.lineTo(sp.x-7,sp.y+6);ctx.lineTo(sp.x+7,sp.y+6);ctx.closePath()}else ctx.rect(sp.x-6,sp.y-6,12,12);ctx.stroke();ctx.font='11px system-ui';ctx.fillText(activeSnap.type,sp.x+12,sp.y-10);ctx.restore()}
  if(!printing&&selectionBox){const l=Math.min(selectionBox.a.x,selectionBox.b.x),r=Math.max(selectionBox.a.x,selectionBox.b.x),t=Math.min(selectionBox.a.y,selectionBox.b.y),b=Math.max(selectionBox.a.y,selectionBox.b.y),win=selectionBox.b.x>=selectionBox.a.x;ctx.save();ctx.fillStyle=win?'rgba(55,145,255,.14)':'rgba(48,210,125,.14)';ctx.strokeStyle=win?'#4a9bff':'#35d28a';ctx.lineWidth=1.4;ctx.setLineDash(win?[]:[7,4]);ctx.fillRect(l,t,r-l,b-t);ctx.strokeRect(l,t,r-l,b-t);ctx.setLineDash([]);ctx.font='11px system-ui';ctx.fillStyle=win?'#78b8ff':'#65e6a8';ctx.fillText(win?'VENTANA':'CRUCE',l+5,Math.max(13,t-5));ctx.restore()}
@@ -1161,7 +1162,7 @@ function matchPropertiesAt(q){
 let scaleReference=1;
 let rotateRef={phase:'off',first:null,angle:0};
 let trimState={phase:'quick',boundaries:new Set()};
-function setTool(t,options={}){const hatchMessage=document.getElementById('hatchNotice');if(hatchMessage)hatchMessage.hidden=t!=='hatch';rotateRef={phase:'off',first:null,angle:0};if(t==='trim')trimState={phase:'quick',boundaries:new Set()};updateTrimPanel(t);if(t!=='matchprop'){matchState.source=null;matchState.sourceIndex=-1}if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;resetRectangleDimensions();resetLineCoordinates();window.OtroCadMep?.onToolChanged(t);offsetAwaitingDistance=t==='offset'&&!options.offsetDistanceProvided;if(t==='offset'){clearSelection();offsetDistancePreset=!!options.offsetDistanceProvided;if(offsetAwaitingDistance)$('#dynLen').value=String(offsetDistance)}selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render();if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});$('#dynLen').select();status.textContent='OFFSET: escribe distancia y pulsa Enter'}}
+function setTool(t,options={}){if(t!=='hatch'){hatchPreview=null;if(hatchPreviewTimer)clearTimeout(hatchPreviewTimer)}const hatchMessage=document.getElementById('hatchNotice');if(hatchMessage)hatchMessage.hidden=t!=='hatch';rotateRef={phase:'off',first:null,angle:0};if(t==='trim')trimState={phase:'quick',boundaries:new Set()};updateTrimPanel(t);if(t!=='matchprop'){matchState.source=null;matchState.sourceIndex=-1}if(activeLayout!=='Model'&&t!=='select'){status.textContent='Vista papel: vuelve a Modelo para editar el dibujo';return}parallelDirection=null;resetRectangleDimensions();resetLineCoordinates();window.OtroCadMep?.onToolChanged(t);offsetAwaitingDistance=t==='offset'&&!options.offsetDistanceProvided;if(t==='offset'){clearSelection();offsetDistancePreset=!!options.offsetDistanceProvided;if(offsetAwaitingDistance)$('#dynLen').value=String(offsetDistance)}selectionClickAnchor=null;selectionBox=null;selectionStart=null;tool=t;start=null;temp=null;poly=[];arcPoints=[];moveBase=null;modifyTarget=-1;modifyTargets=[];document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#insertFurniture').classList.toggle('active',t==='furniture');updatePrompt();render();if(offsetAwaitingDistance){$('#dynLen').focus({preventScroll:true});$('#dynLen').select();status.textContent='OFFSET: escribe distancia y pulsa Enter'}}
 function selectAt(q){
  let found=-1,best=14/zoom;
  for(let i=objects.length-1;i>=0;i--){const s=objects[i];if(!isVisibleModelEntity(s)||lockedLayers.has(s.layer))continue;let d=1e9;
@@ -1476,7 +1477,8 @@ function findHatchFaces(shapes,point,tolerance=1e-7,windowBox=null){
  return {loops:[outer.loop,...holes.map(f=>f.loop)]}
 }
 function hatchNotice(message,error=false){let box=document.getElementById('hatchNotice');if(!box){box=document.createElement('div');box.id='hatchNotice';box.setAttribute('role','status');box.style.cssText='position:absolute;top:50px;left:12px;z-index:35;max-width:min(440px,85%);padding:9px 12px;border-radius:6px;font:13px system-ui;pointer-events:none;box-shadow:0 2px 10px #0005';stage.appendChild(box)}box.hidden=false;box.style.background=error?'#7c2d12':'#163d77';box.style.color='#fff';box.textContent=message}
-function hatchAtPoint(point){
+let hatchPreview=null,hatchPreviewTimer=null;
+function detectHatchRegion(point){
  let result;try{
   const visible=objects.filter(isVisibleModelEntity),maxRadius=Math.max(32,4*Math.hypot(canvas.clientWidth,canvas.clientHeight))/zoom;
   let radius=32/zoom,candidate=null;
@@ -1493,6 +1495,10 @@ function hatchAtPoint(point){
    result=findHatchFaces(visible,point,1e-7,bounds);
   }else if(!result)result=findHatchFaces(visible,point);
  }catch(error){console.error('HATCH',error);result={error:'No se pudo calcular el contorno. Revisa las uniones y vuelve a intentarlo.'}}
+ return result;
+}
+function hatchAtPoint(point){
+ const result=detectHatchRegion(point);
  if(result.error){status.textContent='HATCH · '+result.error;hatchNotice(status.textContent,true);return}
  const pattern=$('#hatchPattern')?.value||'ANSI31',spacing=Math.max(.001,Number($('#hatchSpacing')?.value||10));
  checkpoint();objects.push({type:'polygon',pts:clone(result.loops[0]),hatchLoops:clone(result.loops),hatchPattern:pattern,solidFill:pattern.toUpperCase()==='SOLID',hatchSpacingWorld:spacing/50,importedHatch:true,...currentStyle($('#layer').value)});
@@ -1929,6 +1935,7 @@ canvas.addEventListener('pointermove',e=>{
  if(e.pointerType==='touch'&&pointers.has(e.pointerId))e.preventDefault();
  const p=pointer(e);
  if(middlePan&&middlePan.pointerId===e.pointerId){offset.x=middlePan.offset.x+p.x-middlePan.point.x;offset.y=middlePan.offset.y+p.y-middlePan.point.y;render();return}cursor=p;updateCursorCommand();$('#crossinfo').textContent='X '+world(p).x.toFixed(zoom>500?6:3)+' '+units+' · Y '+world(p).y.toFixed(zoom>500?6:3)+' '+units+' · Z 0.000'+(window.OtroCadGeolocation?.formatCoordinate(world(p),units)||'');
+ if(tool==='hatch'&&!pointers.size){if(hatchPreviewTimer)clearTimeout(hatchPreviewTimer);const position=world(p);hatchPreviewTimer=setTimeout(()=>{if(tool!=='hatch')return;const result=detectHatchRegion(position);hatchPreview=result.loops||null;render()},220)}
  if(pointers.has(e.pointerId))pointers.set(e.pointerId,p);activeSnap=snapCandidate(world(p),gripDrag?gripDrag.index:(moveSnapExclusions()||-1));if(activeSnap)status.textContent='OSNAP · '+activeSnap.type+' · clic para conectar';
  if(pointers.size===2&&pinch){const v=[...pointers.values()];zoom=Math.max(.000001,Math.min(MAX_MODEL_ZOOM,pinch.zoom*distance(v[0],v[1])/(pinch.dist||1)));const mid={x:(v[0].x+v[1].x)/2,y:(v[0].y+v[1].y)/2};offset.x=mid.x-canvas.clientWidth/2-pinch.anchor.x*zoom;offset.y=mid.y-canvas.clientHeight/2+pinch.anchor.y*zoom;render();return}
  if(drag&&tool==='pan'){offset.x=drag.offset.x+p.x-drag.point.x;offset.y=drag.offset.y+p.y-drag.point.y;render();return}
