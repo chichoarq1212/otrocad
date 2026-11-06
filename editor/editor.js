@@ -1840,7 +1840,7 @@ function finishSelectionWindow(box){
 }
 function pointerEnd(e){
  if(e.pointerType==='touch')e.preventDefault();
- if(middlePan&&middlePan.pointerId===e.pointerId){middlePan=null;canvas.style.cursor='';status.textContent='PAN finalizado · herramienta anterior conservada';render();return}
+ if(middlePan&&middlePan.pointerId===e.pointerId){middlePan=null;canvas.style.cursor=crossOn?'none':'crosshair';status.textContent='PAN finalizado · herramienta anterior conservada';render();return}
  pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;
  if(e.type==='pointercancel'){if(gripDrag&&e.pointerId===gripDrag.pointerId){cancelGripDrag();return}selectionStart=null;selectionBox=null;render();return}
  if(gripDrag){if(e.pointerId!==gripDrag.pointerId)return;if(gripDrag.moved){save();status.textContent='Grip actualizado · geometría modificada';showProperties()}else if(gripDrag.historyAdded&&undo.length)undo.pop();gripDrag=null;render();return}
@@ -1872,7 +1872,7 @@ canvas.addEventListener('contextmenu',e=>{
  showCadContextMenu(e);
 });
 canvas.addEventListener('wheel',e=>{e.preventDefault();if(activeLayout!=='Model')return;const p=pointer(e),before=world(p);zoom=Math.max(.000001,Math.min(500,zoom*(e.deltaY<0?1.12:.89)));const after=screen(before);offset.x+=p.x-after.x;offset.y+=p.y-after.y;render()},{passive:false});
-function updateToggle(id,on){$(id).classList.toggle('active',on)}
+function updateToggle(id,on){$(id).classList.toggle('active',on);if(id==='#crossToggle')canvas.style.cursor=on?'none':'crosshair'}
 function toggle(id){const map={gridToggle:'gridOn',orthoToggle:'orthoOn',snapToggle:'snapOn',polarToggle:'polarOn',osnapToggle:'osnapOn',crossToggle:'crossOn'};const k=map[id];if(k==='gridOn')gridOn=!gridOn;if(k==='orthoOn')orthoOn=!orthoOn;if(k==='snapOn')snapOn=!snapOn;if(k==='polarOn')polarOn=!polarOn;if(k==='osnapOn')osnapOn=!osnapOn;if(k==='crossOn')crossOn=!crossOn;const values={gridOn,orthoOn,snapOn,polarOn,osnapOn,crossOn};updateToggle('#'+id,values[k]);saveDraftPreferences();render()}
 [['gridToggle',gridOn],['orthoToggle',orthoOn],['snapToggle',snapOn],['polarToggle',polarOn],['osnapToggle',osnapOn],['crossToggle',crossOn]].forEach(([id,on])=>updateToggle('#'+id,on));
 ['gridToggle','orthoToggle','snapToggle','polarToggle','osnapToggle','crossToggle'].forEach(id=>$('#'+id).onclick=()=>toggle(id));
