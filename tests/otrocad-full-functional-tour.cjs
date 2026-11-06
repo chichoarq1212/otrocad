@@ -161,6 +161,15 @@ async function roundTrip(download){
  assert.equal(await movePage.getByRole('button',{name:'✓ Finalizar bloque'}).isVisible(),true);
  await mcmd('BCLOSE');assert.equal(await movePage.getByRole('button',{name:'✓ Finalizar bloque'}).isVisible(),false);
  check('EXPLODE con selección previa y edición de bloque');
+
+ // Hatch an enclosed area with one click and undo the result.
+ await movePage.keyboard.press('Escape');
+ await movePage.evaluate(()=>window.OtroCadCivilAPI.addObjects([{type:'rect',a:{x:-8,y:-8},b:{x:-6,y:-6},layer:'General'}],'Prueba hatch'));
+ const beforeHatch=await getMoveState();await mcmd('H');await mclick(-7,-7);
+ const afterHatch=await getMoveState();assert.equal(afterHatch.length,beforeHatch.length+1,'One click should hatch a closed region');
+ assert.ok(afterHatch[afterHatch.length-1].hatchLoops?.length,'Hatch must retain its true boundary');
+ await mcmd('UNDO');assert.deepEqual(await getMoveState(),beforeHatch);
+ check('HATCH con un clic y deshacer');
  await movePage.close();
  check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';

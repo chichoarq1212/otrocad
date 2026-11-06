@@ -98,3 +98,15 @@ trim.objects=[target,edge1,edge2];trim.trimState={phase:'quick',boundaries:new S
 vm.runInContext('quickTrim(0,{x:5,y:0})',trim);
 assert.equal(trim.objects[0].b.x,3);assert.equal(trim.objects[1].a.x,7);
 console.log('TRIM: recorte rápido y bordes elegidos verificados');
+
+const hatchScope={distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)};
+vm.createContext(hatchScope);
+vm.runInContext(src.slice(src.indexOf('function pointLineDistance('),src.indexOf('function ',src.indexOf('function pointLineDistance(')+10)),hatchScope);
+vm.runInContext(src.slice(src.indexOf('function entitySegments('),src.indexOf('function inSelectionRect(')),hatchScope);
+vm.runInContext(src.slice(src.indexOf('function pointInPolygon('),src.indexOf('function objectContainsPoint(')),hatchScope);
+vm.runInContext(src.slice(src.indexOf('function findHatchFaces('),src.indexOf('function hatchAtPoint(')),hatchScope);
+const outer={type:'rect',a:{x:0,y:0},b:{x:10,y:10}},inner={type:'rect',a:{x:4,y:4},b:{x:6,y:6}};
+let region=hatchScope.findHatchFaces([outer,inner],{x:1,y:1});assert.equal(region.loops.length,2,'Hatch should preserve an internal island');
+region=hatchScope.findHatchFaces([outer,{type:'line',a:{x:5,y:0},b:{x:5,y:10}}],{x:1,y:1});assert.ok(region.loops[0].every(p=>p.x<=5),'Hatch should stop at intersecting divider');
+assert.ok(hatchScope.findHatchFaces([{type:'line',a:{x:0,y:0},b:{x:2,y:0}}],{x:1,y:1}).error,'Open boundary must be rejected');
+console.log('HATCH: recintos, división, islas y contornos abiertos verificados');
