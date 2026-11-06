@@ -184,6 +184,21 @@ async function roundTrip(download){
  assert.ok(Math.abs((z.center.x+30/z.pixelsPerUnit)-(beforeZoom.center.x+30/beforeZoom.pixelsPerUnit))<1e-9,'Wheel zoom should preserve the point under the cursor');
  await movePage.evaluate(()=>window.OtroCadCivilAPI.setView({x:0,y:0},35));
  check('Zoom de gran ampliación centrado en el cursor');
+
+ // MOVE uses precise object snaps on other geometry, rather than the source line's extension.
+ await movePage.keyboard.press('Escape');await movePage.evaluate(()=>{
+  window.OtroCadCivilAPI.setView({x:20,y:20},35);
+  if(!document.querySelector('#osnapToggle').classList.contains('active'))document.querySelector('#osnapToggle').click();
+  window.OtroCadCivilAPI.addObjects([{type:'line',a:{x:19,y:20},b:{x:20,y:20},layer:'General'},{type:'line',a:{x:22,y:19},b:{x:22,y:21},layer:'General'}],'Prueba referencias al mover');
+ });
+ await mcmd('V');await mclick(19.5,20);await mcmd('M');await mclick(20,20);await mclick(22.05,20.03);
+ let moveSnap=await getMoveState(),srcLine=moveSnap[moveSnap.length-2];
+ assert.ok(Math.abs(srcLine.b.x-22)<1e-8&&Math.abs(srcLine.b.y-20)<1e-8,'Moving endpoint must snap to target midpoint');
+ await mcmd('UNDO');await movePage.keyboard.press('Escape');await mcmd('V');await mclick(19.5,20);await mcmd('M');await mclick(20,20);await mclick(22.05,21.04);
+ moveSnap=await getMoveState();srcLine=moveSnap[moveSnap.length-2];
+ assert.ok(Math.abs(srcLine.b.x-22)<1e-8&&Math.abs(srcLine.b.y-21)<1e-8,'Moving endpoint must snap to target endpoint');
+ await movePage.evaluate(()=>window.OtroCadCivilAPI.setView({x:0,y:0},35));
+ check('MOVE con referencias a punto medio y final');
  await movePage.close();
  check('Mover grupo con ratón y coordenadas, REGEN, papel y deshacer');
  checkpoint='commands';
