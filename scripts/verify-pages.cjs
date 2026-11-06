@@ -22,7 +22,7 @@ if(manifest.display!=='standalone')throw Error('PWA must be standalone');
 console.log('Local links, pages, assets, and PWA manifest verified');
 
 // Require directly downloadable offline installers that were validated against their build SHA-256.
-const apk='https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.2-test/OtroCAD-Android-0.6.2-alpha.apk';
+const apk='https://github.com/chichoarq1212/otrocad/releases/download/android-0.6.3-test/OtroCAD-Android-0.6.3-alpha.apk';
 const windows='https://github.com/chichoarq1212/otrocad/releases/download/windows-experimental-41947943166-1/OtroCAD-Windows-0.6.1-experimental-Setup.exe';
 for(const page of ['index.html','descargas/index.html']){
  const html=fs.readFileSync(path.join(root,page),'utf8');
