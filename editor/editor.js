@@ -3026,6 +3026,8 @@ $('#toggleAnnotations').onclick=()=>{hideModelAnnotations=!hideModelAnnotations;
 window.addEventListener('beforeprint',()=>{printing=true;render()});window.addEventListener('afterprint',()=>{printing=false;render()});
 
 window.OtroCadCivilAPI={
+ replaceLinked70:(next,message)=>{if(activeLayout!=='Model')throw Error('Vuelve a Modelo antes de coordinar.');if(!Array.isArray(next))throw Error('Entidades inválidas.');const before=JSON.stringify(objects);for(const o of objects)if(o.link70&&lockedLayers.has(o.layer)&&!next.some(n=>JSON.stringify(n)===JSON.stringify(o)))throw Error('Capa vinculada bloqueada.');checkpoint();objects=clone(next);clearSelection();const saved=save();render();status.textContent=message+(saved?'':' · guardado local pendiente');return {saved};},
+ selectLinked70:ids=>{clearSelection();objects.forEach((o,i)=>{if(ids.includes(o.link70?.elementId)||ids.some(id=>o.link70?.role==='opening:'+id))selectedSet.add(i)});selected=[...selectedSet][0]??-1;render();},
  getObjects:()=>objects,
  getSelectedObjects:()=>selectedItems().map(i=>objects[i]).filter(Boolean),
  getUnits:()=>units,
