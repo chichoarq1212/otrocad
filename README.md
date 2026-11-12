@@ -1,5 +1,9 @@
 # OtroCAD
 
+## Entrega de coordinación con ESQUECHAT 3.9.0
+
+Incluye el panel **Coordinar 3D**, intercambio JSON por elemento y recursos sin conexión. [Alcance, pruebas y limitaciones](docs/COORDINACION_ESQUECHAT_3.9.0.md).
+
 CAD 2D gratuito en desarrollo para arquitectura, dibujo técnico, ingeniería, topografía y vialidad. Proyecto existente: no es un repositorio nuevo.
 
 ## Accesos oficiales
@@ -89,3 +93,4 @@ El flujo `Build OtroCAD DWG WebAssembly` ejecuta pruebas de ida y vuelta y publi
 - El desarrollo y las compilaciones habituales se priorizan en el PC local. GitHub se conserva como repositorio, respaldo y control de versiones.
 - La integración continua puede utilizar únicamente runners estándar gratuitos para este repositorio público; no se deben configurar runners más grandes ni infraestructura de CI facturable.
 - Las reglas obligatorias para asistentes y colaboradores están en [AGENTS.md](AGENTS.md).
+

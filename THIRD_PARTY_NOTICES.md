@@ -23,3 +23,7 @@ Esri World Imagery, World Street Map and World Transportation are online referen
 - https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer
 
 Only visible tiles are requested, using normal HTTP caching. Basemap images are not bundled with the app or exported as CAD entities.
+
+## Shared ESQUECHAT coordination module
+
+`editor/coordination-core70.js` is the dependency-free browser form of ESQUECHAT's `src/coordination70.js`, developed for the same project owner, Arq. Cristhian Torres R. Mgs. It retains `SPDX-License-Identifier: GPL-3.0-or-later`. Its complete license is in `editor/licenses/ESQUECHAT-coordination-GPL-3.0.txt`. The readable source is distributed with OtroCAD; there are no external runtimes, accounts or API calls for this module.
