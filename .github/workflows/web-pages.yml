@@ -55,6 +55,8 @@ jobs:
           node-version: "20"
       - name: Validar JavaScript y pruebas de grips
         run: |
+          node --test tests/coordination70.test.cjs tests/live-channel71.test.cjs
+          node --check editor/coordination-live71.js
           node --check editor/editor.js
           node --check editor/civil3d.js
           node --check editor/mep.js
